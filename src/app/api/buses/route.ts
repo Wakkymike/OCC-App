@@ -32,7 +32,7 @@ interface SiriVmResponse {
 
 export async function GET() {
   const apiKey = process.env.BODS_API_KEY;
-  const operatorCode = 'BNGN';
+  const operatorCode = '18880';
   
   if (!apiKey || apiKey === 'YOUR_BODS_KEY_HERE') {
     console.warn('BODS API key is not configured. Returning empty array.');
