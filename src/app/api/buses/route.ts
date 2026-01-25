@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
 import type { Bus } from '@/lib/types';
 
-// Simplified SIRI-VM types from XML, where values are directly on keys
+// Simplified SIRI-VM types
 interface VehicleActivityXml {
   MonitoredVehicleJourney: {
     LineRef: string;
@@ -19,7 +19,7 @@ export async function GET() {
   const feedId = '18880';
 
   if (!apiKey) {
-    console.error('BODS_API_KEY is missing. Please check .env.local');
+    console.error('BODS_API_KEY missing in .env.local');
     return NextResponse.json(
       { error: 'BODS_API_KEY not configured' },
       { status: 500 }
@@ -40,22 +40,25 @@ export async function GET() {
     }
 
     const xmlText = await response.text();
-    const parser = new XMLParser();
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
     const data = parser.parse(xmlText);
-    
-    let vehicleActivities: VehicleActivityXml[] = [];
-    const activitySource = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery?.VehicleActivity;
-    
-    if (activitySource) {
-        // The parser may return an object for a single entry, so we ensure it's an array.
-        vehicleActivities = Array.isArray(activitySource) ? activitySource : [activitySource];
-    }
 
+    let vehicleActivities: VehicleActivityXml[] = [];
+    try {
+      const activitySource = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery?.VehicleActivity;
+      if (activitySource) {
+        vehicleActivities = Array.isArray(activitySource) ? activitySource : [activitySource];
+      }
+    } catch (e) {
+      console.warn('No VehicleActivity found in XML', e);
+      vehicleActivities = [];
+    }
+    
     if (vehicleActivities.length === 0) {
       console.warn('No VehicleActivity found in BODS feed');
     }
 
-    const buses: Bus[] = vehicleActivities
+    const buses: Bus[] = (vehicleActivities || [])
       .map(activity => {
         const journey = activity?.MonitoredVehicleJourney;
         if (!journey || !journey.VehicleLocation || !journey.VehicleRef || !journey.LineRef || !journey.DestinationName) {
@@ -79,7 +82,7 @@ export async function GET() {
     console.log(`Returning ${buses.length} buses to frontend`);
     return NextResponse.json(buses);
   } catch (error) {
-    console.error('Unexpected error fetching/parsing BODS data:', error);
+    console.error('Unexpected error fetching/parsing BODS XML:', error);
     return NextResponse.json(
       { error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}` },
       { status: 500 }
