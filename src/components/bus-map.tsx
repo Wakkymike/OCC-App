@@ -1,13 +1,40 @@
 "use client";
 
-import { APIProvider, Map, AdvancedMarker, Polyline, useMap } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { useState, useMemo, useEffect } from 'react';
-import type { Bus } from '@/lib/types';
+import type { Bus, LatLng } from '@/lib/types';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { routes as allRoutes } from '@/lib/bus-data';
 import { BusIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+
+const RoutePolyline = ({ routePath }: { routePath: LatLng[] | null }) => {
+    const map = useMap();
+
+    useEffect(() => {
+        if (!map) return;
+        
+        let polyline: google.maps.Polyline | null = null;
+        if (routePath) {
+            polyline = new google.maps.Polyline({
+                path: routePath,
+                strokeColor: 'hsl(28, 80%, 52%)',
+                strokeOpacity: 0.8,
+                strokeWeight: 5,
+            });
+            polyline.setMap(map);
+        }
+        
+        return () => {
+            if (polyline) {
+                polyline.setMap(null);
+            }
+        };
+    }, [map, routePath]);
+
+    return null;
+};
 
 const BusMarker = ({ selected }: { selected: boolean }) => (
     <div className={`relative transition-transform duration-300 ease-in-out ${selected ? 'scale-125 z-10' : 'scale-100'}`}>
@@ -92,14 +119,7 @@ export default function BusMap({ apiKey }: { apiKey: string }) {
                     </AdvancedMarker>
                 ))}
 
-                {selectedRoute && (
-                    <Polyline
-                        path={selectedRoute.path}
-                        strokeColor="hsl(var(--accent))"
-                        strokeOpacity={0.8}
-                        strokeWeight={5}
-                    />
-                )}
+                <RoutePolyline routePath={selectedRoute?.path ?? null} />
             </Map>
             <MapControl selectedBus={selectedBus} onClear={clearSelection} />
         </APIProvider>
