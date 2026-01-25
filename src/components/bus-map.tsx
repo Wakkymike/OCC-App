@@ -61,11 +61,23 @@ export default function BusMap() {
             const currentPos = marker.getLngLat();
             const targetPos = bus.position;
 
+            if (currentPos.lat === targetPos.lat && currentPos.lng === targetPos.lng) {
+                return; // No need to animate if we're at the target
+            }
+
             // Linear interpolation for smooth movement
             const interpolatedLng = currentPos.lng + (targetPos.lng - currentPos.lng) * 0.1;
             const interpolatedLat = currentPos.lat + (targetPos.lat - currentPos.lat) * 0.1;
 
             marker.setLngLat([interpolatedLng, interpolatedLat]);
+
+            // Calculate bearing and rotate
+            const bearing = getBearing({ lat: currentPos.lat, lng: currentPos.lng }, targetPos);
+            const el = marker.getElement();
+            const icon = el.querySelector('img');
+            if (icon && bearing !== null) {
+                (icon as HTMLElement).style.transform = `rotate(${bearing}deg)`;
+            }
         });
 
         animationFrame = requestAnimationFrame(animateMarkers);
@@ -97,19 +109,8 @@ export default function BusMap() {
       const existing = markersRef.current[bus.id];
 
       if (existing) {
-        const oldPos = existing.bus.position;
-        const bearing = getBearing(oldPos, bus.position);
-        
         // Update the target data for the animation loop
         existing.bus = bus;
-        
-        // Update rotation
-        const el = existing.marker.getElement();
-        const icon = el.querySelector('img');
-        if (icon && bearing !== null) {
-            (icon as HTMLElement).style.transform = `rotate(${bearing}deg)`;
-        }
-
       } else {
         // Create new marker if it doesn't exist
         const el = document.createElement('div');
