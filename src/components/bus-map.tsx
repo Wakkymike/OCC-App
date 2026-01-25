@@ -5,7 +5,6 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useState, useRef } from 'react';
 import type { Bus } from '@/lib/types';
 
-// Using an inline SVG for the bus icon to avoid needing a separate file
 const BusIconSvg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M8 6v6"/>
@@ -19,93 +18,80 @@ const BusIconSvg = `
 
 export default function BusMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
   const [buses, setBuses] = useState<Bus[]>([]);
-  const markers = useRef<Marker[]>([]);
 
-  // Fetch bus data from the API route
   useEffect(() => {
-    const fetchBuses = async () => {
-      try {
-        const res = await fetch('/api/buses');
-        if (res.ok) {
-          const data: Bus[] = await res.json();
-          setBuses(data);
-        } else {
-          console.error("Failed to fetch buses. Status:", res.status);
-        }
-      } catch (error) {
-        console.error("Error fetching buses:", error);
-      }
-    };
+    if (mapRef.current || !mapContainer.current) return;
 
-    fetchBuses();
-    const interval = setInterval(fetchBuses, 15000); // refresh every 15s
-    return () => clearInterval(interval);
-  }, []);
-
-  // Initialize map
-  useEffect(() => {
-    if (map.current || !mapContainer.current) return; // initialize map only once
-    
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
-    map.current = new mapboxgl.Map({
+    const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [-2.2426, 53.4808], // Centered on Greater Manchester area
       zoom: 10,
     });
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    mapRef.current = map;
   }, []);
 
-  // Update markers when bus data changes
   useEffect(() => {
-    if (!map.current) return;
+    const fetchBuses = async () => {
+      try {
+        const res = await fetch('/api/buses');
+        const data: Bus[] = await res.json();
+        setBuses(data);
+      } catch (err) {
+        console.error('Error fetching buses:', err);
+      }
+    };
 
-    // Create a map of existing markers by bus ID for efficient updates
-    const markerMap = new Map(markers.current.map(m => [(m.getElement() as HTMLElement).dataset.busId, m]));
-    const newMarkers: Marker[] = [];
-    const currentBusIds = new Set();
+    fetchBuses();
+    const interval = setInterval(fetchBuses, 15000); // fetch every 15s
+    return () => clearInterval(interval);
+  }, []);
 
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const currentBusIds = new Set(buses.map(bus => bus.id));
+    const map = mapRef.current;
+    
+    // Update existing markers or add new ones
     buses.forEach(bus => {
-      currentBusIds.add(bus.id);
       const pos: [number, number] = [bus.position.lng, bus.position.lat];
 
-      // If marker exists, update its position
-      if (markerMap.has(bus.id)) {
-        const marker = markerMap.get(bus.id)!;
-        marker.setLngLat(pos);
-        newMarkers.push(marker);
-        markerMap.delete(bus.id);
+      if (markersRef.current[bus.id]) {
+        markersRef.current[bus.id].setLngLat(pos);
       } else {
-        // Otherwise, create a new marker
         const el = document.createElement('div');
         el.className = 'bus-marker';
-        el.dataset.busId = bus.id;
         el.innerHTML = `
+          <div class="bus-flag">
+            ${bus.service} → ${bus.destination}<br/>
+            <span class="fleet-number">Fleet: ${bus.fleetNumber}</span>
+          </div>
           <div class="bus-icon-wrapper">
             ${BusIconSvg}
           </div>
-          <div class="bus-flag">
-            <b>${bus.service}</b> to <b>${bus.destination}</b>
-            <div class="fleet-number">Fleet: ${bus.fleetNumber}</div>
-          </div>
         `;
 
-        const newMarker = new mapboxgl.Marker(el)
+        const marker = new mapboxgl.Marker(el)
           .setLngLat(pos)
-          .addTo(map.current!);
-        
-        newMarkers.push(newMarker);
+          .addTo(map);
+
+        markersRef.current[bus.id] = marker;
       }
     });
 
     // Remove markers for buses that are no longer in the data
-    markerMap.forEach(marker => marker.remove());
-
-    // Update the markers ref
-    markers.current = newMarkers;
+    Object.keys(markersRef.current).forEach(busId => {
+      if (!currentBusIds.has(busId)) {
+        markersRef.current[busId].remove();
+        delete markersRef.current[busId];
+      }
+    });
 
   }, [buses]);
 

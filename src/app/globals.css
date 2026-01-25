@@ -91,6 +91,20 @@
   text-align: center;
 }
 
+.bus-marker .bus-flag {
+  background: #003366;
+  color: white;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+
+.bus-flag .fleet-number {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 11px;
+}
+
 .bus-marker .bus-icon-wrapper {
   width: 32px;
   height: 32px;
@@ -107,21 +121,6 @@
 .bus-marker .bus-icon-wrapper svg {
     width: 20px;
     height: 20px;
-}
-
-.bus-marker .bus-flag {
-  background: #003366;
-  color: white;
-  border-radius: 4px;
-  padding: 2px 4px;
-  margin-bottom: 2px;
-  white-space: nowrap;
-}
-
-.bus-flag .fleet-number {
-    color: hsl(var(--muted-foreground));
-    font-size: 11px;
-    margin-top: 2px;
 }
 
 .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right {
