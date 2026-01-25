@@ -1,6 +1,6 @@
 'use client';
 
-import mapboxgl, { Marker } from 'mapbox-gl';
+import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useRef } from 'react';
 import type { Bus } from '@/lib/types';
@@ -29,11 +29,15 @@ const getBearing = (start: { lat: number; lng: number }, end: { lat: number; lng
     return ((bearing * 180) / Math.PI + 360) % 360; // convert to degrees
 };
 
+interface MarkerData {
+    marker: mapboxgl.Marker;
+    bus: Bus;
+}
 
 export default function BusMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
+  const markersRef = useRef<Record<string, MarkerData>>({});
   const { buses, error } = useBusTracker();
   const { toast } = useToast();
 
@@ -49,7 +53,28 @@ export default function BusMap() {
     });
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
     mapRef.current = map;
-  }, []);
+
+    // Animation loop for smooth marker movement
+    let animationFrame: number;
+    const animateMarkers = () => {
+        Object.values(markersRef.current).forEach(({ marker, bus }) => {
+            const currentPos = marker.getLngLat();
+            const targetPos = bus.position;
+
+            // Linear interpolation for smooth movement
+            const interpolatedLng = currentPos.lng + (targetPos.lng - currentPos.lng) * 0.1;
+            const interpolatedLat = currentPos.lat + (targetPos.lat - currentPos.lat) * 0.1;
+
+            marker.setLngLat([interpolatedLng, interpolatedLat]);
+        });
+
+        animationFrame = requestAnimationFrame(animateMarkers);
+    }
+    animateMarkers();
+    
+    return () => cancelAnimationFrame(animationFrame);
+
+  }, []); // Runs once to initialize map and animation loop
 
   useEffect(() => {
     if (error) {
@@ -67,25 +92,26 @@ export default function BusMap() {
     const currentBusIds = new Set(buses.map(bus => bus.id));
     const map = mapRef.current;
     
-    // Update existing markers or add new ones
+    // Update existing markers' target data or add new markers
     buses.forEach(bus => {
-      const pos: [number, number] = [bus.position.lng, bus.position.lat];
+      const existing = markersRef.current[bus.id];
 
-      if (markersRef.current[bus.id]) {
-        const marker = markersRef.current[bus.id];
-        const oldPos = marker.getLngLat();
+      if (existing) {
+        const oldPos = existing.bus.position;
+        const bearing = getBearing(oldPos, bus.position);
         
-        const bearing = getBearing({ lat: oldPos.lat, lng: oldPos.lng }, bus.position);
+        // Update the target data for the animation loop
+        existing.bus = bus;
         
-        marker.setLngLat(pos);
-
-        const el = marker.getElement();
+        // Update rotation
+        const el = existing.marker.getElement();
         const icon = el.querySelector('img');
         if (icon && bearing !== null) {
             (icon as HTMLElement).style.transform = `rotate(${bearing}deg)`;
         }
 
       } else {
+        // Create new marker if it doesn't exist
         const el = document.createElement('div');
         el.className = 'bus-marker';
         el.innerHTML = `
@@ -97,17 +123,17 @@ export default function BusMap() {
         `;
 
         const marker = new mapboxgl.Marker(el)
-          .setLngLat(pos)
+          .setLngLat([bus.position.lng, bus.position.lat])
           .addTo(map);
 
-        markersRef.current[bus.id] = marker;
+        markersRef.current[bus.id] = { marker, bus };
       }
     });
 
     // Remove markers for buses that are no longer in the data
     Object.keys(markersRef.current).forEach(busId => {
       if (!currentBusIds.has(busId)) {
-        markersRef.current[busId].remove();
+        markersRef.current[busId].marker.remove();
         delete markersRef.current[busId];
       }
     });
