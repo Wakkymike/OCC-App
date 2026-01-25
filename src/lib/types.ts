@@ -3,12 +3,6 @@ export type LatLng = {
   lng: number;
 };
 
-export type Route = {
-  id: string;
-  name: string;
-  path: LatLng[];
-};
-
 export type Bus = {
   id: string;
   fleetNumber: string;

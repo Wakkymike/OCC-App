@@ -1,13 +1,11 @@
 'use client';
 
 import BusMap from '@/components/bus-map';
-import { Info, Terminal, TriangleAlert } from 'lucide-react';
+import { Terminal } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { useBusTracker } from '@/hooks/use-bus-tracker';
 
 export default function Home() {
   const mapboxAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-  const { buses, error: busError } = useBusTracker();
 
   return (
     <div className="h-dvh w-screen bg-background text-foreground font-body flex flex-col">
@@ -16,35 +14,11 @@ export default function Home() {
           <h1 className="text-xl font-bold text-primary">
             BNGN Bus Tracker
           </h1>
-          <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
-             <Info size={16} />
-             <span>Click on a bus to see details. Live data from BODS.</span>
-          </div>
         </div>
       </header>
       <main className="flex-1 relative">
         {mapboxAccessToken ? (
-          <>
-            <BusMap accessToken={mapboxAccessToken} buses={buses} />
-            {busError && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 w-full max-w-xl px-4">
-                <Alert variant="destructive">
-                  <TriangleAlert className="h-4 w-4" />
-                  <AlertTitle>Data Fetching Error</AlertTitle>
-                  <AlertDescription>
-                    {busError}.
-                    {busError.includes("Forbidden") && (
-                      <span className="mt-2 block">
-                        This error usually means the BODS API key is incorrect or lacks permissions. Please check the
-                        <code className="bg-muted/50 text-destructive-foreground/80 px-1 py-0.5 rounded text-sm font-mono mx-1">.env.local</code> 
-                        file and verify your key with the Bus Open Data Service.
-                      </span>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              </div>
-            )}
-          </>
+          <BusMap />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
             <Alert variant="destructive" className="max-w-lg">

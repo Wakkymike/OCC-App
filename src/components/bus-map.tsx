@@ -1,99 +1,113 @@
-"use client";
+'use client';
 
-import Map, { Marker, MapRef } from 'react-map-gl';
+import mapboxgl, { Marker } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { Bus } from '@/lib/types';
-import { BusIcon, XIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
-const BusMarker = ({ selected }: { selected: boolean }) => (
-    <div className={`relative transition-transform duration-300 ease-in-out cursor-pointer ${selected ? 'scale-125 z-10' : 'scale-100'}`}>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-colors border-2 ${selected ? 'bg-accent border-accent-foreground/50' : 'bg-primary border-primary-foreground/50'}`}>
-            <BusIcon className="w-5 h-5 text-primary-foreground" />
-        </div>
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-2 h-2 bg-black/30 rounded-full blur-[3px] scale-y-50"></div>
-    </div>
-);
+// Using an inline SVG for the bus icon to avoid needing a separate file
+const BusIconSvg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 6v6"/>
+    <path d="M16 6v6"/>
+    <path d="M2 12h19.6"/>
+    <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/>
+    <circle cx="7" cy="18" r="2"/>
+    <circle cx="17" cy="18" r="2"/>
+</svg>
+`;
 
-function MapControl({ selectedBus, onClear }: { selectedBus: Bus | null; onClear: () => void; }) {
-    return (
-        <>
-            {selectedBus && (
-                <div className="absolute top-4 right-4 z-10">
-                    <Card className="w-72 shadow-2xl animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
-                        <CardHeader className="flex flex-row items-center justify-between pb-2">
-                             <CardTitle className="text-lg">Service {selectedBus.service}</CardTitle>
-                             <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={onClear}>
-                                <XIcon className="h-4 w-4" />
-                                <span className="sr-only">Close</span>
-                             </Button>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground">To: <span className="font-medium text-foreground">{selectedBus.destination}</span></p>
-                            <p className="text-sm text-muted-foreground">Fleet: <span className="font-medium text-foreground">{selectedBus.fleetNumber}</span></p>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-        </>
-    );
-}
+export default function BusMap() {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [buses, setBuses] = useState<Bus[]>([]);
+  const markers = useRef<Marker[]>([]);
 
-export default function BusMap({ accessToken, buses }: { accessToken: string; buses: Bus[] }) {
-  const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
-  const mapRef = useRef<MapRef>(null);
-  
-  const handleMarkerClick = (bus: Bus) => {
-    setSelectedBus(bus);
-  };
-
-  const clearSelection = () => {
-    setSelectedBus(null);
-  };
-  
+  // Fetch bus data from the API route
   useEffect(() => {
-    if (selectedBus && mapRef.current) {
-        mapRef.current.flyTo({ center: [selectedBus.position.lng, selectedBus.position.lat], zoom: 14 });
-    }
-  }, [selectedBus]);
-  
-  // Centered on Greater Manchester area
-  const mapCenter = useMemo(() => ({ lat: 53.4808, lng: -2.2426 }), []);
+    const fetchBuses = async () => {
+      try {
+        const res = await fetch('/api/buses');
+        if (res.ok) {
+          const data: Bus[] = await res.json();
+          setBuses(data);
+        } else {
+          console.error("Failed to fetch buses. Status:", res.status);
+        }
+      } catch (error) {
+        console.error("Error fetching buses:", error);
+      }
+    };
 
-  return (
-    <div className="w-full h-full">
-        <Map
-            ref={mapRef}
-            mapboxAccessToken={accessToken}
-            initialViewState={{
-                longitude: mapCenter.lng,
-                latitude: mapCenter.lat,
-                zoom: 10
-            }}
-            style={{width: '100%', height: '100%'}}
-            mapStyle="mapbox://styles/mapbox/streets-v12"
-            onClick={clearSelection}
-            onDragStart={clearSelection}
-            attributionControl={false}
-        >
-            {buses.map(bus => (
-                <Marker
-                    key={bus.id}
-                    longitude={bus.position.lng}
-                    latitude={bus.position.lat}
-                    onClick={(e) => {
-                        e.originalEvent.stopPropagation();
-                        handleMarkerClick(bus)
-                    }}
-                >
-                    <BusMarker selected={selectedBus?.id === bus.id} />
-                </Marker>
-            ))}
+    fetchBuses();
+    const interval = setInterval(fetchBuses, 15000); // refresh every 15s
+    return () => clearInterval(interval);
+  }, []);
 
-            <MapControl selectedBus={selectedBus} onClear={clearSelection} />
-        </Map>
-    </div>
-  );
+  // Initialize map
+  useEffect(() => {
+    if (map.current || !mapContainer.current) return; // initialize map only once
+    
+    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [-2.2426, 53.4808], // Centered on Greater Manchester area
+      zoom: 10,
+    });
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+  }, []);
+
+  // Update markers when bus data changes
+  useEffect(() => {
+    if (!map.current) return;
+
+    // Create a map of existing markers by bus ID for efficient updates
+    const markerMap = new Map(markers.current.map(m => [(m.getElement() as HTMLElement).dataset.busId, m]));
+    const newMarkers: Marker[] = [];
+    const currentBusIds = new Set();
+
+    buses.forEach(bus => {
+      currentBusIds.add(bus.id);
+      const pos: [number, number] = [bus.position.lng, bus.position.lat];
+
+      // If marker exists, update its position
+      if (markerMap.has(bus.id)) {
+        const marker = markerMap.get(bus.id)!;
+        marker.setLngLat(pos);
+        newMarkers.push(marker);
+        markerMap.delete(bus.id);
+      } else {
+        // Otherwise, create a new marker
+        const el = document.createElement('div');
+        el.className = 'bus-marker';
+        el.dataset.busId = bus.id;
+        el.innerHTML = `
+          <div class="bus-icon-wrapper">
+            ${BusIconSvg}
+          </div>
+          <div class="bus-flag">
+            <b>${bus.service}</b> to <b>${bus.destination}</b>
+            <div class="fleet-number">Fleet: ${bus.fleetNumber}</div>
+          </div>
+        `;
+
+        const newMarker = new mapboxgl.Marker(el)
+          .setLngLat(pos)
+          .addTo(map.current!);
+        
+        newMarkers.push(newMarker);
+      }
+    });
+
+    // Remove markers for buses that are no longer in the data
+    markerMap.forEach(marker => marker.remove());
+
+    // Update the markers ref
+    markers.current = newMarkers;
+
+  }, [buses]);
+
+  return <div ref={mapContainer} id="map" style={{ width: '100%', height: '100%' }} />;
 }
