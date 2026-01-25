@@ -16,6 +16,26 @@ const BusIconSvg = `
 </svg>
 `;
 
+// Helper to calculate bearing between two points
+const getBearing = (start: { lat: number; lng: number }, end: { lat: number; lng: number }) => {
+    if (start.lat === end.lat && start.lng === end.lng) {
+        return null; // No bearing if position hasn't changed
+    }
+
+    const startLat = (start.lat * Math.PI) / 180;
+    const startLng = (start.lng * Math.PI) / 180;
+    const endLat = (end.lat * Math.PI) / 180;
+    const endLng = (end.lng * Math.PI) / 180;
+
+    const y = Math.sin(endLng - startLng) * Math.cos(endLat);
+    const x =
+      Math.cos(startLat) * Math.sin(endLat) -
+      Math.sin(startLat) * Math.cos(endLat) * Math.cos(endLng - startLng);
+    const bearing = Math.atan2(y, x);
+    return ((bearing * 180) / Math.PI + 360) % 360; // convert to degrees
+};
+
+
 export default function BusMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -63,7 +83,19 @@ export default function BusMap() {
       const pos: [number, number] = [bus.position.lng, bus.position.lat];
 
       if (markersRef.current[bus.id]) {
-        markersRef.current[bus.id].setLngLat(pos);
+        const marker = markersRef.current[bus.id];
+        const oldPos = marker.getLngLat();
+        
+        const bearing = getBearing({ lat: oldPos.lat, lng: oldPos.lng }, bus.position);
+        
+        marker.setLngLat(pos);
+
+        const el = marker.getElement();
+        const iconWrapper = el.querySelector('.bus-icon-wrapper');
+        if (iconWrapper && bearing !== null) {
+            (iconWrapper as HTMLElement).style.transform = `rotate(${bearing}deg)`;
+        }
+
       } else {
         const el = document.createElement('div');
         el.className = 'bus-marker';
