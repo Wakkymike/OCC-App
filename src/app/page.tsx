@@ -11,7 +11,7 @@ export default function Home() {
     <div className="h-dvh w-screen bg-background text-foreground font-body flex flex-col">
       <header className="bg-card border-b shadow-sm z-20 shrink-0">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-primary">
+          <h1 className="text-xl font-bold text-accent">
             Go NorthWest Bus Tracker
           </h1>
         </div>
