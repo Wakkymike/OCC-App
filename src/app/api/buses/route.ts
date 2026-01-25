@@ -39,7 +39,7 @@ export async function GET() {
     return NextResponse.json([]);
   }
 
-  const url = `https://data.bus-data.dft.gov.uk/api/v1/siri-vm?OperatorRef=${operatorCode}&api-key=${apiKey}`;
+  const url = `https://data.bus-data.dft.gov.uk/api/v1/siri-vm?operatorRef=${operatorCode}&api_key=${apiKey}`;
 
   try {
     const response = await fetch(url, {
