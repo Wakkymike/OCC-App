@@ -28,29 +28,28 @@ interface SiriVmResponse {
 
 export async function GET() {
   const apiKey = process.env.BODS_API_KEY;
-  const operatorRef = 'GNWG'; // Go North West NOC
+  const feedId = '18880'; // numeric feed ID for Bee Network live feed
 
   if (!apiKey) {
-    console.warn('BODS_API_KEY not set. Returning empty array.');
+    console.warn('BODS_API_KEY not set.');
     return NextResponse.json(
       { error: 'BODS_API_KEY not configured' },
       { status: 500 }
     );
   }
 
-  // BODS datafeed endpoint for SIRI-VM
-  const url = `https://data.bus-data.dft.gov.uk/api/v1/siri-vm?api_key=${apiKey}&operatorRef=${operatorRef}`;
+  const url = `https://data.bus-data.dft.gov.uk/api/v1/datafeed/${feedId}/?api_key=${apiKey}`;
 
   try {
     const response = await fetch(url, { cache: 'no-store' });
 
     if (!response.ok) {
       const text = await response.text();
-      let error = 'Failed to fetch BODS data';
-      if (response.status === 403) error = 'Forbidden';
-      if (response.status === 404) error = 'Not Found';
       console.error('BODS API error:', response.status, text);
-      return NextResponse.json({ error }, { status: response.status });
+      return NextResponse.json(
+        { error: 'Failed to fetch BODS data' },
+        { status: response.status }
+      );
     }
 
     const data: SiriVmResponse = await response.json();
