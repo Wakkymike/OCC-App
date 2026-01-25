@@ -31,7 +31,7 @@ export async function GET() {
   const feedId = '18880'; // numeric feed ID for Bee Network live feed
 
   if (!apiKey) {
-    console.warn('BODS_API_KEY not set.');
+    console.error('BODS_API_KEY is missing. Please check .env.local');
     return NextResponse.json(
       { error: 'BODS_API_KEY not configured' },
       { status: 500 }
@@ -45,19 +45,25 @@ export async function GET() {
 
     if (!response.ok) {
       const text = await response.text();
-      console.error('BODS API error:', response.status, text);
+      console.error('BODS API returned error:', response.status, text);
       return NextResponse.json(
-        { error: 'Failed to fetch BODS data' },
+        { error: `BODS API error ${response.status}: ${text}` },
         { status: response.status }
       );
     }
 
     const data: SiriVmResponse = await response.json();
+    console.log('BODS response fetched successfully');
+
 
     const vehicleActivities =
       data.Siri?.ServiceDelivery?.VehicleMonitoringDelivery?.[0]
         ?.VehicleActivity ?? [];
 
+    if (!vehicleActivities.length) {
+      console.warn('No VehicleActivity found in BODS feed');
+    }
+    
     const buses: Bus[] = vehicleActivities
       .map(activity => {
         const journey = activity.MonitoredVehicleJourney;
@@ -79,12 +85,13 @@ export async function GET() {
         };
       })
       .filter((bus): bus is Bus => bus !== null);
-
+    
+    console.log(`Returning ${buses.length} buses to frontend`);
     return NextResponse.json(buses);
   } catch (error) {
     console.error('Unexpected error fetching BODS data:', error);
     return NextResponse.json(
-      { error: 'An error occurred while fetching bus data' },
+      { error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}` },
       { status: 500 }
     );
   }
