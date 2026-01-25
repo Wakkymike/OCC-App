@@ -84,8 +84,11 @@
 }
 
 .bus-marker {
-  cursor: pointer;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 12px;
+  text-align: center;
 }
 
 .bus-marker .bus-icon-wrapper {
@@ -107,25 +110,12 @@
 }
 
 .bus-marker .bus-flag {
-  display: none;
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 10px;
-  background-color: hsl(var(--card));
-  color: hsl(var(--card-foreground));
-  padding: 8px 12px;
-  border-radius: var(--radius);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  background: #003366;
+  color: white;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin-bottom: 2px;
   white-space: nowrap;
-  font-size: 12px;
-  z-index: 10;
-  border: 1px solid hsl(var(--border));
-}
-
-.bus-marker:hover .bus-flag {
-  display: block;
 }
 
 .bus-flag .fleet-number {
