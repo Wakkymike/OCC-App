@@ -118,7 +118,7 @@ export default function BusMap() {
         el.innerHTML = `
           <div class="bus-flag">
             ${bus.service} → ${bus.destination}<br/>
-            <span class="fleet-number">Fleet: ${bus.fleetNumber}</span>
+            Fleet: ${bus.fleetNumber}
           </div>
           <img src="${BusIconUri}" width="32" height="32" />
         `;

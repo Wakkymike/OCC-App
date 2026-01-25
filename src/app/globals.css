@@ -100,11 +100,6 @@
   white-space: nowrap;
 }
 
-.bus-flag .fleet-number {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 11px;
-}
-
 .bus-marker img {
   transition: transform 0.2s linear;
 }
