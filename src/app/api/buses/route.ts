@@ -43,15 +43,24 @@ export async function GET() {
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
     const data = parser.parse(xmlText);
 
+    // Collect all VehicleActivities across all VehicleMonitoringDelivery
     let vehicleActivities: VehicleActivityXml[] = [];
-    try {
-      const activitySource = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery?.VehicleActivity;
-      if (activitySource) {
-        vehicleActivities = Array.isArray(activitySource) ? activitySource : [activitySource];
+    const deliveriesSource = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery;
+
+    if (deliveriesSource) {
+      const deliveries = Array.isArray(deliveriesSource)
+        ? deliveriesSource
+        : [deliveriesSource];
+
+      for (const delivery of deliveries) {
+        if (delivery && delivery.VehicleActivity) {
+          const activitySource = delivery.VehicleActivity;
+          const activities = Array.isArray(activitySource)
+            ? activitySource
+            : [activitySource];
+          vehicleActivities.push(...activities);
+        }
       }
-    } catch (e) {
-      console.warn('No VehicleActivity found in XML', e);
-      vehicleActivities = [];
     }
     
     if (vehicleActivities.length === 0) {
