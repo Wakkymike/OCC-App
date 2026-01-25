@@ -14,7 +14,5 @@ export type Bus = {
   fleetNumber: string;
   service: string;
   destination: string;
-  routeId: string;
   position: LatLng;
-  progress: number;
 };

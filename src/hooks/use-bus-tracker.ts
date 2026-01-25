@@ -1,59 +1,38 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { initialBuses, routes } from '@/lib/bus-data';
-import type { Bus, LatLng } from '@/lib/types';
+import { useState, useEffect } from 'react';
+import type { Bus } from '@/lib/types';
 
-const SIMULATION_SPEED = 0.00005; // Adjust to control bus speed
-
-function interpolate(p1: LatLng, p2: LatLng, t: number): LatLng {
-  return {
-    lat: p1.lat + (p2.lat - p1.lat) * t,
-    lng: p1.lng + (p2.lng - p1.lng) * t,
-  };
-}
+const FETCH_INTERVAL = 15000; // 15 seconds
 
 export const useBusTracker = () => {
-  const [buses, setBuses] = useState<Bus[]>(initialBuses);
-  const animationFrameId = useRef<number>();
-
-  const moveBuses = useCallback(() => {
-    setBuses(currentBuses => 
-      currentBuses.map(bus => {
-        let newProgress = bus.progress + SIMULATION_SPEED;
-        if (newProgress >= 1) {
-          newProgress = 0;
-        }
-
-        const route = routes.find(r => r.id === bus.routeId);
-        if (!route || route.path.length < 2) return bus;
-
-        const totalSegments = route.path.length - 1;
-        const progressPerSegment = 1 / totalSegments;
-        
-        const currentSegmentIndex = Math.min(Math.floor(newProgress / progressPerSegment), totalSegments - 1);
-        const progressInSegment = (newProgress - (currentSegmentIndex * progressPerSegment)) / progressPerSegment;
-
-        const p1 = route.path[currentSegmentIndex];
-        const p2 = route.path[currentSegmentIndex + 1];
-
-        const newPosition = interpolate(p1, p2, progressInSegment);
-
-        return { ...bus, progress: newProgress, position: newPosition };
-      })
-    );
-
-    animationFrameId.current = requestAnimationFrame(moveBuses);
-  }, []);
+  const [buses, setBuses] = useState<Bus[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    animationFrameId.current = requestAnimationFrame(moveBuses);
-    return () => {
-      if (animationFrameId.current) {
-        cancelAnimationFrame(animationFrameId.current);
+    const fetchBuses = async () => {
+      try {
+        const response = await fetch('/api/buses');
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to fetch bus data');
+        }
+        const data: Bus[] = await response.json();
+        setBuses(data);
+        setError(null);
+      } catch (error: any) {
+        console.error('Error fetching bus data:', error);
+        setError(error.message);
       }
     };
-  }, [moveBuses]);
+
+    fetchBuses(); // Initial fetch
+    const intervalId = setInterval(fetchBuses, FETCH_INTERVAL);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
 
   return buses;
 };

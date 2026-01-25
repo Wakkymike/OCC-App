@@ -1,16 +1,13 @@
 "use client";
 
-import Map, { Marker, Source, Layer, MapRef } from 'react-map-gl';
-import type { LayerProps } from 'react-map-gl';
+import Map, { Marker, MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useState, useMemo, useEffect, useRef } from 'react';
-import type { Bus, LatLng } from '@/lib/types';
+import type { Bus } from '@/lib/types';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
-import { routes as allRoutes } from '@/lib/bus-data';
 import { BusIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import type { Feature, LineString } from 'geojson';
 
 const BusMarker = ({ selected }: { selected: boolean }) => (
     <div className={`relative transition-transform duration-300 ease-in-out cursor-pointer ${selected ? 'scale-125 z-10' : 'scale-100'}`}>
@@ -49,11 +46,6 @@ export default function BusMap({ accessToken }: { accessToken: string }) {
   const buses = useBusTracker();
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
   const mapRef = useRef<MapRef>(null);
-
-  const selectedRoute = useMemo(() => {
-    if (!selectedBus) return null;
-    return allRoutes.find(r => r.id === selectedBus.routeId);
-  }, [selectedBus]);
   
   const handleMarkerClick = (bus: Bus) => {
     setSelectedBus(bus);
@@ -69,34 +61,8 @@ export default function BusMap({ accessToken }: { accessToken: string }) {
     }
   }, [selectedBus]);
   
-  const mapCenter = useMemo(() => ({ lat: 51.509865, lng: -0.118092 }), []);
-
-  const routeGeoJson: Feature<LineString> | null = useMemo(() => {
-    if (!selectedRoute) return null;
-    return {
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'LineString',
-        coordinates: selectedRoute.path.map(p => [p.lng, p.lat]),
-      },
-    };
-  }, [selectedRoute]);
-
-  const routeLayer: LayerProps = {
-    id: 'route',
-    type: 'line',
-    source: 'route',
-    layout: {
-      'line-join': 'round',
-      'line-cap': 'round',
-    },
-    paint: {
-      'line-color': 'hsl(28, 80%, 52%)',
-      'line-width': 5,
-      'line-opacity': 0.8,
-    },
-  };
+  // Centered on Greater Manchester area
+  const mapCenter = useMemo(() => ({ lat: 53.4808, lng: -2.2426 }), []);
 
   return (
     <div className="w-full h-full">
@@ -106,7 +72,7 @@ export default function BusMap({ accessToken }: { accessToken: string }) {
             initialViewState={{
                 longitude: mapCenter.lng,
                 latitude: mapCenter.lat,
-                zoom: 11
+                zoom: 10
             }}
             style={{width: '100%', height: '100%'}}
             mapStyle="mapbox://styles/mapbox/streets-v12"
@@ -127,12 +93,6 @@ export default function BusMap({ accessToken }: { accessToken: string }) {
                     <BusMarker selected={selectedBus?.id === bus.id} />
                 </Marker>
             ))}
-
-            {routeGeoJson && (
-              <Source id="selected-route" type="geojson" data={routeGeoJson}>
-                <Layer {...routeLayer} />
-              </Source>
-            )}
 
             <MapControl selectedBus={selectedBus} onClear={clearSelection} />
         </Map>
