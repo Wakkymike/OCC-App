@@ -14,14 +14,19 @@ export const useBusTracker = () => {
       try {
         const response = await fetch('/api/buses');
         if (!response.ok) {
-          const data = await response.json();
+          const data = await response.json().catch(() => ({ error: 'Failed to parse error response from API' }));
           throw new Error(data.error || 'Failed to fetch bus data');
         }
-        const data: Bus[] = await response.json();
+        const data = await response.json();
+        if (!Array.isArray(data)) {
+          console.error("Bus API response is not an array: ", data);
+          throw new Error('Bus API returned invalid data.');
+        }
         setBuses(data);
         setError(null);
       } catch (err: any) {
         setError(err.message);
+        setBuses([]);
       }
     };
 

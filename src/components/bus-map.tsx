@@ -2,8 +2,10 @@
 
 import mapboxgl, { Marker } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Bus } from '@/lib/types';
+import { useBusTracker } from '@/hooks/use-bus-tracker';
+import { useToast } from '@/hooks/use-toast';
 
 // Using a data URI for the bus icon to combine background and icon into one image asset
 const BusIconUri = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="16" fill="%233498db" style="border: 2px solid rgba(250, 250, 250, 0.7); box-sizing: border-box;"/><g transform="translate(4 4)"><path d="M8 6v6" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6v6" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12h19.6" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="18" r="2" fill="none" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17" cy="18" r="2" fill="none" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
@@ -32,7 +34,8 @@ export default function BusMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
-  const [buses, setBuses] = useState<Bus[]>([]);
+  const { buses, error } = useBusTracker();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (mapRef.current || !mapContainer.current) return;
@@ -49,20 +52,14 @@ export default function BusMap() {
   }, []);
 
   useEffect(() => {
-    const fetchBuses = async () => {
-      try {
-        const res = await fetch('/api/buses');
-        const data: Bus[] = await res.json();
-        setBuses(data);
-      } catch (err) {
-        console.error('Error fetching buses:', err);
-      }
-    };
-
-    fetchBuses();
-    const interval = setInterval(fetchBuses, 15000); // fetch every 15s
-    return () => clearInterval(interval);
-  }, []);
+    if (error) {
+        toast({
+            variant: "destructive",
+            title: "Could not fetch bus data",
+            description: error,
+        });
+    }
+  }, [error, toast]);
 
   useEffect(() => {
     if (!mapRef.current) return;
