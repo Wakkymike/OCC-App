@@ -4,7 +4,6 @@ import Map, { Marker, MapRef } from 'react-map-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import type { Bus } from '@/lib/types';
-import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { BusIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -42,8 +41,7 @@ function MapControl({ selectedBus, onClear }: { selectedBus: Bus | null; onClear
     );
 }
 
-export default function BusMap({ accessToken }: { accessToken: string }) {
-  const buses = useBusTracker();
+export default function BusMap({ accessToken, buses }: { accessToken: string; buses: Bus[] }) {
   const [selectedBus, setSelectedBus] = useState<Bus | null>(null);
   const mapRef = useRef<MapRef>(null);
   

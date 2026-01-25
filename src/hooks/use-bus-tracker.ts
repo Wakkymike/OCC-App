@@ -20,13 +20,12 @@ export const useBusTracker = () => {
         const data: Bus[] = await response.json();
         setBuses(data);
         setError(null);
-      } catch (error: any) {
-        console.error('Error fetching bus data:', error);
-        setError(error.message);
+      } catch (err: any) {
+        setError(err.message);
       }
     };
 
-    fetchBuses(); // Initial fetch
+    fetchBuses();
     const intervalId = setInterval(fetchBuses, FETCH_INTERVAL);
 
     return () => {
@@ -34,5 +33,5 @@ export const useBusTracker = () => {
     };
   }, []);
 
-  return buses;
+  return { buses, error };
 };
