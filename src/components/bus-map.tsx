@@ -7,9 +7,6 @@ import type { Bus } from '@/lib/types';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { useToast } from '@/hooks/use-toast';
 
-// Using a data URI for the bus icon to combine background and icon into one image asset
-const BusIconUri = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="16" fill="%233498db" style="border: 2px solid rgba(250, 250, 250, 0.7); box-sizing: border-box;"/><g transform="translate(4 4)"><path d="M8 6v6" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6v6" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12h19.6" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="18" r="2" fill="none" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17" cy="18" r="2" fill="none" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
-
 // Helper to calculate bearing between two points
 const getBearing = (start: { lat: number; lng: number }, end: { lat: number; lng: number }) => {
     if (start.lat === end.lat && start.lng === end.lng) {
@@ -74,7 +71,7 @@ export default function BusMap() {
             // Calculate bearing and rotate
             const bearing = getBearing({ lat: currentPos.lat, lng: currentPos.lng }, targetPos);
             const el = marker.getElement();
-            const icon = el.querySelector('img');
+            const icon = el.querySelector('svg');
             if (icon && bearing !== null) {
                 (icon as HTMLElement).style.transform = `rotate(${bearing}deg)`;
             }
@@ -120,7 +117,14 @@ export default function BusMap() {
             ${bus.service} → ${bus.destination}<br/>
             Fleet: ${bus.fleetNumber}
           </div>
-          <img src="${BusIconUri}" width="32" height="32" />
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 64 64">
+            <rect x="8" y="16" width="48" height="32" rx="6" ry="6" fill="#FFD100" stroke="#000" stroke-width="1"/>
+            <rect class="stripe" x="8" y="28" width="48" height="8" fill="#000"/>
+            <rect x="16" y="20" width="8" height="8" fill="#fff"/>
+            <rect x="40" y="20" width="8" height="8" fill="#fff"/>
+            <circle cx="20" cy="52" r="4" fill="#333"/>
+            <circle cx="44" cy="52" r="4" fill="#333"/>
+          </svg>
         `;
 
         const marker = new mapboxgl.Marker(el)

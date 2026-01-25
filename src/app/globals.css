@@ -100,7 +100,7 @@
   white-space: nowrap;
 }
 
-.bus-marker img {
+.bus-marker svg {
   transition: transform 0.2s linear;
 }
 

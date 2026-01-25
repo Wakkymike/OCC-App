@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { Bus } from '@/lib/types';
 
-const FETCH_INTERVAL = 15000; // 15 seconds
+const FETCH_INTERVAL = 5000; // 5 seconds
 
 export const useBusTracker = () => {
   const [buses, setBuses] = useState<Bus[]>([]);
