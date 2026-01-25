@@ -5,8 +5,8 @@ import type { Bus } from '@/lib/types';
 // Simplified SIRI-VM structure from BODS
 interface SiriVmVehicleActivity {
   MonitoredVehicleJourney: {
-    LineRef: { value: string };
-    DestinationName: { value: string };
+    LineRef?: { value: string };
+    DestinationName?: { value: string };
     VehicleLocation: {
       Latitude: string;
       Longitude: string;
@@ -38,7 +38,7 @@ export async function GET() {
     );
   }
 
-  const url = `https://data.bus-data.dft.gov.uk/api/v1/datafeed/${feedId}/?api_key=${apiKey}`;
+  const url = `https://data.bus-data.dft.gov.uk/api/v1/datafeed/${feedId}/?api_key=${apiKey}&dataFormat=json`;
 
   try {
     const response = await fetch(url, { cache: 'no-store' });
@@ -67,7 +67,7 @@ export async function GET() {
     const buses: Bus[] = vehicleActivities
       .map(activity => {
         const journey = activity.MonitoredVehicleJourney;
-        if (!journey.VehicleLocation || !journey.VehicleRef) {
+        if (!journey || !journey.VehicleLocation || !journey.VehicleRef) {
           return null;
         }
 
