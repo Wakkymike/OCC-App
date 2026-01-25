@@ -101,27 +101,12 @@
 }
 
 .bus-flag .fleet-number {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
 }
 
-.bus-marker .bus-icon-wrapper {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid hsl(var(--primary-foreground) / 0.7);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  transition: transform 0.8s linear;
-}
-
-.bus-marker .bus-icon-wrapper svg {
-    width: 20px;
-    height: 20px;
+.bus-marker img {
+  transition: transform 0.2s linear;
 }
 
 .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right {

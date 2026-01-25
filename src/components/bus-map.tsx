@@ -5,16 +5,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useState, useRef } from 'react';
 import type { Bus } from '@/lib/types';
 
-const BusIconSvg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M8 6v6"/>
-    <path d="M16 6v6"/>
-    <path d="M2 12h19.6"/>
-    <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/>
-    <circle cx="7" cy="18" r="2"/>
-    <circle cx="17" cy="18" r="2"/>
-</svg>
-`;
+// Using a data URI for the bus icon to combine background and icon into one image asset
+const BusIconUri = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="16" fill="%233498db" style="border: 2px solid rgba(250, 250, 250, 0.7); box-sizing: border-box;"/><g transform="translate(4 4)"><path d="M8 6v6" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6v6" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12h19.6" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="18" r="2" fill="none" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17" cy="18" r="2" fill="none" stroke="%23FAFAFA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
 
 // Helper to calculate bearing between two points
 const getBearing = (start: { lat: number; lng: number }, end: { lat: number; lng: number }) => {
@@ -91,9 +83,9 @@ export default function BusMap() {
         marker.setLngLat(pos);
 
         const el = marker.getElement();
-        const iconWrapper = el.querySelector('.bus-icon-wrapper');
-        if (iconWrapper && bearing !== null) {
-            (iconWrapper as HTMLElement).style.transform = `rotate(${bearing}deg)`;
+        const icon = el.querySelector('img');
+        if (icon && bearing !== null) {
+            (icon as HTMLElement).style.transform = `rotate(${bearing}deg)`;
         }
 
       } else {
@@ -104,9 +96,7 @@ export default function BusMap() {
             ${bus.service} → ${bus.destination}<br/>
             <span class="fleet-number">Fleet: ${bus.fleetNumber}</span>
           </div>
-          <div class="bus-icon-wrapper">
-            ${BusIconSvg}
-          </div>
+          <img src="${BusIconUri}" width="32" height="32" />
         `;
 
         const marker = new mapboxgl.Marker(el)
