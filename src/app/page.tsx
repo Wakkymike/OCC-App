@@ -12,7 +12,7 @@ export default function Home() {
       <header className="bg-card border-b shadow-sm z-20 shrink-0">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <h1 className="text-xl font-bold text-primary">
-            BNGN Bus Tracker
+            Go NorthWest Bus Tracker
           </h1>
         </div>
       </header>

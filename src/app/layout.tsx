@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'BNGN Bus Tracker',
-  description: 'Live bus tracking on a map for BNGN services.',
+  title: 'Go NorthWest Bus Tracker',
+  description: 'Live bus tracking on a map for Go NorthWest services.',
 };
 
 export default function RootLayout({
