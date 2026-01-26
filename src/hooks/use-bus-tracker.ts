@@ -18,13 +18,17 @@ export const useBusTracker = () => {
           throw new Error(data.error || 'Failed to fetch bus data');
         }
         const data = await response.json();
-        if (!Array.isArray(data)) {
-          console.error("Bus API response is not an array: ", data);
-          throw new Error('Bus API returned invalid data.');
+        if (Array.isArray(data)) {
+          console.log(`Fetched ${data.length} buses from backend`);
+          setBuses(data);
+          setError(null);
+        } else {
+          console.warn('Backend returned non-array data:', data);
+          setBuses([]);
+          setError(data.error || 'Bus API returned invalid data.');
         }
-        setBuses(data);
-        setError(null);
       } catch (err: any) {
+        console.error('Error fetching buses:', err);
         setError(err.message);
         setBuses([]);
       }
