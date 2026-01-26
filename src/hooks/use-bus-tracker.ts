@@ -27,7 +27,6 @@ export function useBusTracker() {
   const [buses, setBuses] = useState<Bus[]>([]);
   const [error, setError] = useState<string | null>(null);
   const previousBusesMapRef = useRef<Map<string, Bus>>(new Map());
-  const busPathsRef = useRef<Map<string, LatLng[]>>(new Map());
 
   // Fetch all buses from the API
   useEffect(() => {
@@ -74,15 +73,7 @@ export function useBusTracker() {
             }
           }
           
-          const path = busPathsRef.current.get(markerId) || [];
-          const lastPosition = path[path.length - 1];
-          let updatedPath = path;
-          if (!lastPosition || lastPosition.lat !== bus.position.lat || lastPosition.lng !== bus.position.lng) {
-              updatedPath = [...path, bus.position];
-          }
-          busPathsRef.current.set(markerId, updatedPath);
-
-          return { ...bus, status, speed: speedMph, path: updatedPath };
+          return { ...bus, status, speed: speedMph };
         });
 
         setBuses(busesWithStatus);
