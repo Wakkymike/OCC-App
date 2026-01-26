@@ -1,31 +1,51 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, FormEvent } from 'react';
 import BusMap from '@/components/bus-map';
 import { Search, Terminal } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from '@/components/ui/button';
 
 type SearchCategory = 'fleetNumber' | 'service' | 'runningBoard';
 
 export default function Home() {
   const mapboxAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
   const { buses, error } = useBusTracker();
+  
+  // State for the input fields
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCategory, setSearchCategory] = useState<SearchCategory>('fleetNumber');
 
+  // State for the active/submitted filter
+  const [activeFilter, setActiveFilter] = useState<{ query: string; category: SearchCategory } | null>(null);
+
+  const handleSearch = (e: FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim() === '') {
+        setActiveFilter(null);
+    } else {
+        setActiveFilter({ query: searchQuery, category: searchCategory });
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setActiveFilter(null);
+  }
+
   const filteredBuses = useMemo(() => {
-    if (!searchQuery) {
+    if (!activeFilter || !activeFilter.query) {
       return buses;
     }
-    const lowercasedQuery = searchQuery.toLowerCase();
+    const lowercasedQuery = activeFilter.query.toLowerCase();
     return buses.filter(bus => {
-        const targetField = String(bus[searchCategory] ?? '').toLowerCase();
+        const targetField = String(bus[activeFilter.category] ?? '').toLowerCase();
         return targetField.includes(lowercasedQuery);
     });
-  }, [buses, searchQuery, searchCategory]);
+  }, [buses, activeFilter]);
 
   return (
     <div className="h-dvh w-screen bg-background text-foreground font-body flex flex-col">
@@ -34,7 +54,7 @@ export default function Home() {
           <h1 className="text-xl font-bold text-accent whitespace-nowrap">
             Go NorthWest Bus Tracker
           </h1>
-          <div className="flex w-full max-w-sm items-center gap-2">
+          <form onSubmit={handleSearch} className="flex w-full max-w-lg items-center gap-2">
             <Select value={searchCategory} onValueChange={(value) => setSearchCategory(value as SearchCategory)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Search by..." />
@@ -55,7 +75,9 @@ export default function Home() {
                 className="pl-10"
                 />
             </div>
-          </div>
+            <Button type="submit">Search</Button>
+            <Button type="button" variant="outline" onClick={clearSearch}>Clear</Button>
+          </form>
         </div>
       </header>
       <main className="flex-1 relative">
