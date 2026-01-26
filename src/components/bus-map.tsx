@@ -190,16 +190,11 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
       const flagElement = markerElement.querySelector('div') as HTMLDivElement;
       
       let serviceDisplay = bus.service;
-      const serviceStr = String(bus.service);
 
       if (bus.direction.toLowerCase() === 'inbound') {
         serviceDisplay += ` <span style="color: blue;">[I]</span>`;
       } else if (bus.direction.toLowerCase() === 'outbound') {
         serviceDisplay += ` <span style="color: blue;">[O]</span>`;
-      }
-
-      if (serviceStr.length === 3 && (serviceStr.startsWith('7') || serviceStr.startsWith('8'))) {
-        serviceDisplay += ` <span style="color: red;">(SCH)</span>`;
       }
 
       let statusDisplay = '';
