@@ -1,95 +1,62 @@
 'use client';
+// This hook fetches data from the API route defined in `src/app/api/buses/route.ts`
 
 import { useState, useEffect } from 'react';
 import type { Bus } from '@/lib/types';
-import { XMLParser } from 'fast-xml-parser';
 
 const FETCH_INTERVAL = 5000; // 5 seconds
 
-export function useBusTracker() {
-  const [buses, setBuses] = useState<Bus[]>([]);
+export function useBusTracker(searchQuery: string, searchType: keyof Bus) {
+  const [allBuses, setAllBuses] = useState<Bus[]>([]);
+  const [filteredBuses, setFilteredBuses] = useState<Bus[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch all buses from the API
   useEffect(() => {
     const fetchBuses = async () => {
       try {
-        const apiKey = process.env.BODS_API_KEY;
-        const feedId = '18880'; // Bee Network Go NW
-
-        if (!apiKey) {
-          setError('BODS_API_KEY is missing');
-          setBuses([]);
-          return;
-        }
-
-        const url = `https://data.bus-data.dft.gov.uk/api/v1/datafeed/${feedId}/?api_key=${apiKey}`;
-        const response = await fetch(url, { cache: 'no-store' });
-
+        const response = await fetch('/api/buses');
         if (!response.ok) {
-          const text = await response.text();
-          throw new Error(`BODS API Error ${response.status}: ${text}`);
+          const errorText = await response.text();
+          throw new Error(`API Error: ${response.status} ${errorText}`);
         }
-
-        const xmlText = await response.text();
-
-        // Parse XML
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '',
-          removeNSPrefix: true,
-        });
-        const data: any = parser.parse(xmlText);
-
-        // Collect all VehicleActivity entries
-        const deliveries = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery ?? [];
-        const deliveriesArray = Array.isArray(deliveries) ? deliveries : [deliveries];
-
-        let vehicleActivities: any[] = [];
-        deliveriesArray.forEach((delivery) => {
-          let activities = delivery?.VehicleActivity ?? [];
-          if (!activities) return;
-          if (!Array.isArray(activities)) activities = [activities];
-          vehicleActivities.push(...activities);
-        });
-
-        // Map to Bus[]
-        const mappedBuses: Bus[] = vehicleActivities
-          .map((activity) => {
-            const journey = activity.MonitoredVehicleJourney;
-            if (!journey?.VehicleLocation?.Latitude || !journey?.VehicleLocation?.Longitude) return null;
-
-            const lat = parseFloat(journey.VehicleLocation.Latitude);
-            const lng = parseFloat(journey.VehicleLocation.Longitude);
-            if (isNaN(lat) || isNaN(lng)) return null;
-
-            return {
-              id: String(journey.VehicleRef ?? 'unknown'),
-              fleetNumber: String(journey.VehicleRef ?? 'unknown'),
-              runningBoard: String(journey.BlockRef ?? 'unknown'),
-              service: String(journey.PublishedLineName ?? 'unknown'),
-              destination: String(journey.DestinationName?.replace(/_/g, ' ') ?? 'unknown'),
-              direction: String(journey.DirectionRef ?? 'unknown'),
-              position: { lat, lng },
-            };
-          })
-          .filter((bus): bus is Bus => bus !== null); // type guard
-
-        setBuses(mappedBuses);
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        setAllBuses(data.buses || []);
         setError(null);
       } catch (err: unknown) {
-        console.error('Error fetching BODS buses:', err);
+        console.error('Error fetching buses:', err);
         setError(err instanceof Error ? err.message : String(err));
-        setBuses([]);
+        setAllBuses([]);
       }
     };
 
     fetchBuses();
-
-    // ✅ Browser-safe interval
     const intervalId = window.setInterval(fetchBuses, FETCH_INTERVAL);
 
     return () => clearInterval(intervalId);
   }, []);
 
-  return { buses, error };
+  // Filter buses based on search query
+  useEffect(() => {
+    if (!searchQuery) {
+      setFilteredBuses(allBuses);
+      return;
+    }
+
+    const lowercasedQuery = searchQuery.toLowerCase();
+    const results = allBuses.filter(bus => {
+      const propertyValue = bus[searchType];
+      if (typeof propertyValue === 'string') {
+          return propertyValue.toLowerCase().includes(lowercasedQuery);
+      }
+      return false;
+    });
+
+    setFilteredBuses(results);
+  }, [searchQuery, searchType, allBuses]);
+
+  return { buses: filteredBuses, error };
 }

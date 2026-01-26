@@ -16,9 +16,10 @@ const getServiceColor = (service: string) => {
 
 interface BusMapProps {
     buses: Bus[];
+    focusedBus: Bus | null;
 }
 
-export default function BusMap({ buses }: BusMapProps) {
+export default function BusMap({ buses, focusedBus }: BusMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
@@ -36,6 +37,21 @@ export default function BusMap({ buses }: BusMapProps) {
     });
     mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
   }, []);
+  
+  // Handle focusing on a bus
+  useEffect(() => {
+    if (mapRef.current && focusedBus) {
+      mapRef.current.flyTo({
+        center: [focusedBus.position.lng, focusedBus.position.lat],
+        zoom: 15,
+        speed: 0.8,
+        curve: 1.4,
+        easing(t) {
+          return t;
+        },
+      });
+    }
+  }, [focusedBus]);
 
   // Update markers when buses change
   useEffect(() => {
