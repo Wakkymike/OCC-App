@@ -84,29 +84,27 @@
 }
 
 .bus-marker {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-size: 12px;
-  text-align: center;
-  pointer-events: none;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  font-size:12px;
+  text-align:center;
+  pointer-events:none;
 }
 
 .bus-flag {
-  background: #003366;
-  color: white;
-  border-radius: 4px;
-  padding: 2px 4px;
-  margin-bottom: 2px;
-  white-space: nowrap;
+  color:white;
+  border-radius:4px;
+  padding:2px 4px;
+  margin-bottom:2px;
+  white-space:nowrap;
 }
 
 .bus-marker svg {
-  transform-origin: center center;
+  transform-origin:center center;
   transition: transform 0.2s linear;
 }
 
-/* Animate the black stripe inside inline SVG */
 .bus-marker svg .stripe {
   animation: stripeMove 0.5s linear infinite;
 }
