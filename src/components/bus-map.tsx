@@ -93,8 +93,14 @@ export default function BusMap({ buses }: BusMapProps) {
       let serviceDisplay = bus.service;
       const serviceStr = String(bus.service);
 
+      if (bus.direction.toLowerCase() === 'inbound') {
+        serviceDisplay += ` <span style="color: blue;">[I]</span>`;
+      } else if (bus.direction.toLowerCase() === 'outbound') {
+        serviceDisplay += ` <span style="color: blue;">[O]</span>`;
+      }
+
       if (serviceStr.length === 3 && (serviceStr.startsWith('7') || serviceStr.startsWith('8'))) {
-        serviceDisplay = `${bus.service} <span style="color: red;">(SCH)</span>`;
+        serviceDisplay += ` <span style="color: red;">(SCH)</span>`;
       }
 
       flagElement.innerHTML = `${bus.fleetNumber} | ${serviceDisplay} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}`;
