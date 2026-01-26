@@ -6,6 +6,15 @@ import { useEffect, useRef } from 'react';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { useToast } from '@/hooks/use-toast';
 
+const colorPalette = ['#FF6F00','#1E88E5','#43A047','#8E24AA','#E53935', '#FFD100'];
+const serviceColors: Record<string, string> = {};
+const getServiceColor = (service: string) => {
+  if (!serviceColors[service]) {
+    serviceColors[service] = colorPalette[Object.keys(serviceColors).length % colorPalette.length];
+  }
+  return serviceColors[service];
+};
+
 export default function BusMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const { buses, error } = useBusTracker();
@@ -46,6 +55,7 @@ export default function BusMap() {
 
     buses.forEach(bus => {
       const { id, position, service, destination, fleetNumber } = bus;
+      const busColor = getServiceColor(service);
 
       if (markersRef.current[id]) {
         // Update position of existing marker
@@ -55,12 +65,12 @@ export default function BusMap() {
         const el = document.createElement('div');
         el.className = 'bus-marker';
         el.innerHTML = `
-          <div class="bus-flag" style="background:#FFD100;">
+          <div class="bus-flag" style="background-color:${busColor};">
             ${service} → ${destination}<br/>
             Fleet: ${fleetNumber}
           </div>
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 64 64">
-            <rect x="8" y="16" width="48" height="32" rx="6" ry="6" fill="#FFD100" stroke="#000" stroke-width="1"/>
+            <rect x="8" y="16" width="48" height="32" rx="6" ry="6" fill="${busColor}" stroke="#000" stroke-width="1"/>
             <rect class="stripe" x="8" y="28" width="48" height="8" fill="#000"/>
             <rect x="16" y="20" width="8" height="8" fill="#fff"/>
             <rect x="40" y="20" width="8" height="8" fill="#fff"/>

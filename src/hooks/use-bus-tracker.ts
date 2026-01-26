@@ -1,47 +1,48 @@
 import { useState, useEffect } from 'react';
 import type { Bus } from '@/lib/types';
 
-const FETCH_INTERVAL = 5000;
+const FETCH_INTERVAL = 5000; // fetch every 5 seconds
 
 export const useBusTracker = () => {
   const [buses, setBuses] = useState<Bus[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchBuses = async () => {
       try {
         const response = await fetch('/api/buses');
-
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+          const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+          throw new Error(errorData.error || `Failed to fetch bus data with status: ${response.status}`);
         }
-
+        
         const data = await response.json();
 
-        if (data && Array.isArray(data.buses)) {
-          setBuses(data.buses);
-          if (data.buses.length === 0) {
-            console.warn('API returned 0 buses.');
-            setError('No active buses found.');
-          } else {
-            setError(null); // Clear previous errors on success
-          }
-        } else {
-          console.warn('Received invalid data from API. Expected an object with a "buses" array.', data);
-          setBuses([]);
-          setError('Received invalid data from API.');
-        }
+        const busesArray = Array.isArray(data.buses) ? data.buses : [];
+
+        if (!isMounted) return;
+
+        setBuses(busesArray);
+        setError(null);
+
       } catch (err: any) {
         console.error('Error fetching buses:', err);
-        setError(err.message);
+        if (!isMounted) return;
+
+        setError(err.message || 'Failed to fetch bus data');
         setBuses([]);
       }
     };
 
     fetchBuses();
     const intervalId = setInterval(fetchBuses, FETCH_INTERVAL);
-    return () => clearInterval(intervalId);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
   }, []);
 
   return { buses, error };

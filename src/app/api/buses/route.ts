@@ -1,13 +1,6 @@
 import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
-
-export interface Bus {
-  id: string;
-  fleetNumber: string;
-  service: string;
-  destination: string;
-  position: { lat: number; lng: number };
-}
+import type { Bus } from '@/lib/types';
 
 export async function GET() {
   const apiKey = process.env.BODS_API_KEY;
@@ -15,20 +8,13 @@ export async function GET() {
 
   if (!apiKey) {
     console.error('BODS_API_KEY missing');
-    return NextResponse.json({ error: 'Server configuration error: BODS_API_KEY is missing.' }, { status: 500 });
+    return NextResponse.json([], { status: 500 });
   }
 
   const url = `https://data.bus-data.dft.gov.uk/api/v1/datafeed/${feedId}/?api_key=${apiKey}`;
 
   try {
     const response = await fetch(url, { cache: 'no-store' });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`BODS API request failed with status ${response.status}:`, errorText);
-      return NextResponse.json({ error: `Failed to fetch data from BODS API: ${errorText}` }, { status: response.status });
-    }
-    
     const xmlText = await response.text();
 
     const parser = new XMLParser({
@@ -41,17 +27,9 @@ export async function GET() {
 
     const deliveries = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery ?? [];
     const deliveriesArray = Array.isArray(deliveries) ? deliveries : [deliveries];
-    
-    // Check for ErrorCondition in the response
-    for (const delivery of deliveriesArray) {
-        if (delivery.ErrorCondition) {
-            const errorMessage = delivery.ErrorCondition.Description || 'Unknown error from BODS API';
-            console.error('BODS API returned an error condition:', errorMessage);
-            return NextResponse.json({ error: `BODS API error: ${errorMessage}` }, { status: 500 });
-        }
-    }
 
     let vehicleActivities: any[] = [];
+
     for (const delivery of deliveriesArray) {
       let activities = delivery?.VehicleActivity ?? [];
       if (!activities) continue;
@@ -59,11 +37,16 @@ export async function GET() {
       vehicleActivities.push(...activities);
     }
 
+    let skippedCount = 0;
+    const skippedVehicles: any[] = [];
+
     const buses: Bus[] = vehicleActivities
       .map(activity => {
         const journey = activity.MonitoredVehicleJourney;
 
         if (!journey?.VehicleLocation?.Latitude || !journey?.VehicleLocation?.Longitude) {
+          skippedCount++;
+          skippedVehicles.push(journey?.VehicleRef ?? 'unknown');
           return null;
         }
 
@@ -71,21 +54,35 @@ export async function GET() {
         const lng = parseFloat(journey.VehicleLocation.Longitude);
 
         if (Number.isNaN(lat) || Number.isNaN(lng)) {
+          skippedCount++;
+          skippedVehicles.push(journey?.VehicleRef ?? 'unknown');
           return null;
         }
 
         return {
           id: journey.VehicleRef,
-          fleetNumber: journey.BlockRef ?? journey.VehicleRef,
-          service: journey.LineRef ?? 'unknown',
-          destination: journey.DestinationName ?? 'unknown',
+          fleetNumber: journey.VehicleRef,
+          runningBoard: journey.BlockRef ?? 'unknown',
+          service: journey.PublishedLineName ?? 'unknown',
+          destination: (journey.DestinationName ?? 'unknown').replace(/_/g, ' '),
+          direction: journey.DirectionRef ?? 'unknown',
           position: { lat, lng },
         };
       })
-      .filter(Boolean);
+      .filter((bus): bus is Bus => bus !== null);
 
-    return NextResponse.json({ buses });
+    console.log(
+      `Total VehicleActivity parsed: ${vehicleActivities.length}, returning ${buses.length}, skipped ${skippedCount}`
+    );
 
+    return NextResponse.json({
+      buses,
+      debug: {
+        totalVehicleActivity: vehicleActivities.length,
+        skippedCount,
+        skippedVehicles: skippedVehicles.slice(0, 10),
+      },
+    });
   } catch (error) {
     console.error('Unexpected error fetching/parsing BODS XML:', error);
     return NextResponse.json(

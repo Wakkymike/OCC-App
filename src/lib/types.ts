@@ -3,10 +3,12 @@ export type LatLng = {
   lng: number;
 };
 
-export type Bus = {
+export interface Bus {
   id: string;
   fleetNumber: string;
+  runningBoard: string;
   service: string;
   destination: string;
+  direction?: string;
   position: LatLng;
-};
+}
