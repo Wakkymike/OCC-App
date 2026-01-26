@@ -196,6 +196,11 @@ export default function BusMap({ buses }: BusMapProps) {
       if (svgElement && bus.bearing !== undefined) {
         svgElement.style.transform = `rotate(${bus.bearing}deg)`;
       }
+
+      // If the bus is selected, pan the map to its new location
+      if (markerId === selectedBusId) {
+        map.panTo([bus.position.lng, bus.position.lat]);
+      }
     });
 
     // Remove markers for buses that are no longer in the feed
@@ -209,7 +214,7 @@ export default function BusMap({ buses }: BusMapProps) {
         setSelectedBusId(null);
       }
     });
-  }, [buses]);
+  }, [buses, selectedBusId]);
 
   return (
     <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
