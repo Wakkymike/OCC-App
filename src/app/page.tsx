@@ -57,34 +57,46 @@ export default function Home() {
     });
   }, [buses, activeFilter]);
 
-  // Effect to handle map view based on search results
+  // Effect to handle map view based on search results and selection
   useEffect(() => {
+    // This effect manages the map's viewport (zoom/pan) based on search results and user selections.
+    
+    // If a bus is selected (either by a click, or from a single-bus search result),
+    // we want to be zoomed in on it. In this case, we clear any multi-bus bounds.
+    if (selectedBusId) {
+        setBounds(null);
+        return;
+    }
+    
+    // If we're here, no bus is selected. We now decide what to show based on the active filter.
     if (!activeFilter || !activeFilter.query) {
+      // No active search, so reset everything.
       setSelectedBusId(null);
       setBounds(null);
       return;
     }
 
+    // A search is active, but no bus is selected.
     if (filteredBuses.length === 1) {
-      // Single bus found: select it, clear bounds
+      // The search returned exactly one bus. We auto-select it to zoom in.
+      // This will cause a re-render, and the `if (selectedBusId)` block above will handle the view.
       const bus = filteredBuses[0];
       const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}`;
       setSelectedBusId(busId);
-      setBounds(null);
     } else if (activeFilter.category === 'service' && filteredBuses.length > 1) {
-      // Multiple buses for a service: calculate bounds, clear selection
+      // The search is for a service and returned multiple buses.
+      // We calculate bounds to show them all on the map.
       const lats = filteredBuses.map(b => b.position.lat);
       const lngs = filteredBuses.map(b => b.position.lng);
       const southWest: [number, number] = [Math.min(...lngs), Math.min(...lats)];
       const northEast: [number, number] = [Math.max(...lngs), Math.max(...lats)];
       setBounds([southWest, northEast]);
-      setSelectedBusId(null);
     } else {
-      // No results, or multiple results for non-service category: clear selection and bounds
-      setSelectedBusId(null);
+      // For any other case (no results, or multiple results for a non-service search),
+      // we don't set any specific bounds.
       setBounds(null);
     }
-  }, [filteredBuses, activeFilter]);
+  }, [activeFilter, filteredBuses, selectedBusId]);
 
 
   return (
