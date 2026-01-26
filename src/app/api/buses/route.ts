@@ -92,6 +92,7 @@ export async function GET() {
       })
       .filter((bus): bus is Bus => bus !== null);
       
+      console.log(`Returning ${buses.length} buses`);
       return NextResponse.json(buses);
   } catch (error) {
     console.error('Unexpected error fetching/parsing BODS XML:', error);
