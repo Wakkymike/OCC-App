@@ -97,7 +97,7 @@ export default function BusMap({ buses }: BusMapProps) {
         serviceDisplay = `${bus.service} <span style="color: red;">(SCH)</span>`;
       }
 
-      flagElement.innerHTML = `${serviceDisplay} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}`;
+      flagElement.innerHTML = `${bus.fleetNumber} | ${serviceDisplay} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}`;
     });
 
     // Remove markers for buses that are no longer in the feed
