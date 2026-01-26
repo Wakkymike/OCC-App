@@ -11,7 +11,5 @@ export interface Bus {
   direction: string;        // DirectionRef
   position: LatLng;
   bearing?: number;
-  status?: 'moving' | 'stopped';
-  speed?: number;
   journeyRef?: string;
 }

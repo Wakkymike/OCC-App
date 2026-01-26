@@ -203,15 +203,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
       }
 
       let statusDisplay = '';
-      if (bus.status) {
-        const speedDisplay = bus.speed !== undefined ? ` (${bus.speed} mph)` : '';
-        const journeyDisplay = bus.journeyRef ? ` | ${bus.journeyRef}` : '';
-        if (bus.status === 'moving') {
-          statusDisplay = `<br/><i style="color: green;">moving${speedDisplay}${journeyDisplay}</i>`;
-        } else {
-          statusDisplay = `<br/><i style="color: red;">stopped${speedDisplay}${journeyDisplay}</i>`;
-        }
-      } else if (bus.journeyRef) {
+      if (bus.journeyRef) {
           statusDisplay = `<br/><i>${bus.journeyRef}</i>`;
       }
 
