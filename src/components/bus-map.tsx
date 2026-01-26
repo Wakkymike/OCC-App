@@ -89,7 +89,15 @@ export default function BusMap({ buses }: BusMapProps) {
       const marker = markersRef.current[markerId];
       marker.setLngLat([bus.position.lng, bus.position.lat]);
       const flagElement = marker.getElement().querySelector('div') as HTMLDivElement;
-      flagElement.innerText = `${bus.service} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}`;
+      
+      let serviceDisplay = bus.service;
+      const serviceStr = String(bus.service);
+
+      if (serviceStr.length === 3 && (serviceStr.startsWith('7') || serviceStr.startsWith('8'))) {
+        serviceDisplay = `${bus.service} <span style="color: red;">(sch)</span>`;
+      }
+
+      flagElement.innerHTML = `${serviceDisplay} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}`;
     });
 
     // Remove markers for buses that are no longer in the feed
