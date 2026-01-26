@@ -22,7 +22,7 @@ export default function Home() {
     }
     const lowercasedQuery = searchQuery.toLowerCase();
     return buses.filter(bus => {
-        const targetField = bus[searchCategory]?.toLowerCase() ?? '';
+        const targetField = String(bus[searchCategory] ?? '').toLowerCase();
         return targetField.includes(lowercasedQuery);
     });
   }, [buses, searchQuery, searchCategory]);
