@@ -72,8 +72,8 @@ export default function BusMap({ buses }: BusMapProps) {
         // SVG for the bus icon with an arrow. The arrow points up (0 degrees).
         iconContainer.innerHTML = `
           <svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(0deg); transition: transform 0.2s linear;">
-            <circle cx="12" cy="12" r="9" fill="yellow" stroke="black" stroke-width="1.5" />
-            <path d="M12 2 L18 12 L12 9 L6 12 Z" fill="black" />
+            <circle cx="12" cy="15" r="9" fill="yellow" stroke="black" stroke-width="1.5" />
+            <path d="M12 0 L18 8 L6 8 Z" fill="black" />
           </svg>
         `.trim();
         
