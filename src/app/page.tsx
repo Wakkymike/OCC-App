@@ -6,23 +6,26 @@ import { Search, Terminal } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type SearchCategory = 'fleetNumber' | 'service' | 'runningBoard';
 
 export default function Home() {
   const mapboxAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
   const { buses, error } = useBusTracker();
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchCategory, setSearchCategory] = useState<SearchCategory>('fleetNumber');
 
   const filteredBuses = useMemo(() => {
     if (!searchQuery) {
       return buses;
     }
     const lowercasedQuery = searchQuery.toLowerCase();
-    return buses.filter(bus => 
-      bus.fleetNumber.toLowerCase().includes(lowercasedQuery) ||
-      bus.service.toLowerCase().includes(lowercasedQuery) ||
-      bus.runningBoard.toLowerCase().includes(lowercasedQuery)
-    );
-  }, [buses, searchQuery]);
+    return buses.filter(bus => {
+        const targetField = bus[searchCategory]?.toLowerCase() ?? '';
+        return targetField.includes(lowercasedQuery);
+    });
+  }, [buses, searchQuery, searchCategory]);
 
   return (
     <div className="h-dvh w-screen bg-background text-foreground font-body flex flex-col">
@@ -31,15 +34,27 @@ export default function Home() {
           <h1 className="text-xl font-bold text-accent whitespace-nowrap">
             Go NorthWest Bus Tracker
           </h1>
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search by fleet, service, or board..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex w-full max-w-sm items-center gap-2">
+            <Select value={searchCategory} onValueChange={(value) => setSearchCategory(value as SearchCategory)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Search by..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fleetNumber">Fleet Number</SelectItem>
+                <SelectItem value="service">Service</SelectItem>
+                <SelectItem value="runningBoard">Running Board</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+                />
+            </div>
           </div>
         </div>
       </header>
