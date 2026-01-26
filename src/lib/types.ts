@@ -10,4 +10,5 @@ export interface Bus {
   destination: string;      // DestinationName
   direction: string;        // DirectionRef
   position: LatLng;
+  bearing?: number;
 }

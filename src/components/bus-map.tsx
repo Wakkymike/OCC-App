@@ -68,15 +68,17 @@ export default function BusMap({ buses }: BusMapProps) {
         flag.style.fontWeight = 'bold';
         flag.style.whiteSpace = 'nowrap';
         
-        const icon = document.createElement('div');
-        icon.style.width = '18px';
-        icon.style.height = '18px';
-        icon.style.background = 'yellow';
-        icon.style.border = '2px solid black';
-        icon.style.borderRadius = '50%';
+        const iconContainer = document.createElement('div');
+        // SVG for the bus icon with an arrow. The arrow points up (0 degrees).
+        iconContainer.innerHTML = `
+          <svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(0deg); transition: transform 0.2s linear;">
+            <circle cx="12" cy="12" r="9" fill="yellow" stroke="black" stroke-width="1.5" />
+            <path d="M12 2 L18 12 L12 9 L6 12 Z" fill="black" />
+          </svg>
+        `.trim();
         
         el.appendChild(flag);
-        el.appendChild(icon);
+        el.appendChild(iconContainer.firstChild!); // Append the SVG element.
         
         const marker = new mapboxgl.Marker(el)
           .setLngLat([bus.position.lng, bus.position.lat])
@@ -88,7 +90,8 @@ export default function BusMap({ buses }: BusMapProps) {
       // Update existing marker position and info
       const marker = markersRef.current[markerId];
       marker.setLngLat([bus.position.lng, bus.position.lat]);
-      const flagElement = marker.getElement().querySelector('div') as HTMLDivElement;
+      const markerElement = marker.getElement();
+      const flagElement = markerElement.querySelector('div') as HTMLDivElement;
       
       let serviceDisplay = bus.service;
       const serviceStr = String(bus.service);
@@ -104,6 +107,12 @@ export default function BusMap({ buses }: BusMapProps) {
       }
 
       flagElement.innerHTML = `${bus.fleetNumber} | ${serviceDisplay} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}`;
+      
+      // Rotate the SVG arrow based on bus bearing
+      const svgElement = markerElement.querySelector('svg');
+      if (svgElement && bus.bearing !== undefined) {
+        svgElement.style.transform = `rotate(${bus.bearing}deg)`;
+      }
     });
 
     // Remove markers for buses that are no longer in the feed

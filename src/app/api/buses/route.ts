@@ -65,6 +65,8 @@ export async function GET() {
           skippedCount++;
           return null;
         }
+        
+        const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
 
         return {
           fleetNumber: journey.VehicleRef,
@@ -73,6 +75,7 @@ export async function GET() {
           destination: (journey.DestinationName ?? 'unknown').replace(/_/g, ' '),
           direction: journey.DirectionRef ?? 'unknown',
           position: { lat, lng },
+          bearing: bearing && !Number.isNaN(bearing) ? bearing : undefined,
         };
       })
       .filter((bus): bus is Bus => bus !== null);
