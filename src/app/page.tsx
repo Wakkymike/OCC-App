@@ -1,44 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
 import BusMap from '@/components/bus-map';
 import { Terminal } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useBusTracker } from '@/hooks/use-bus-tracker';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Bus, LatLng } from '@/lib/types';
-
-type SearchCategory = 'fleetNumber' | 'service' | 'runningBoard' | 'journeyRef';
-
-const categoryLabels: Record<SearchCategory, string> = {
-  fleetNumber: 'Fleet Number',
-  service: 'Service',
-  runningBoard: 'Running Board',
-  journeyRef: 'Journey Number',
-};
 
 export default function Home() {
   const mapboxAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
   const { buses, error } = useBusTracker();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchCategory, setSearchCategory] = useState<SearchCategory>('fleetNumber');
-
-  const zoomToPosition = useMemo((): LatLng | null => {
-    if (!searchTerm.trim()) {
-      return null;
-    }
-    const filtered = buses.filter((bus) => {
-      const value = bus[searchCategory];
-      return value?.toString().toLowerCase().includes(searchTerm.toLowerCase());
-    });
-
-    if (filtered.length === 1) {
-      return filtered[0].position;
-    }
-    return null;
-  }, [buses, searchTerm, searchCategory]);
-
 
   return (
     <div className="h-dvh w-screen bg-background text-foreground font-body flex flex-col">
@@ -47,31 +16,23 @@ export default function Home() {
           <h1 className="text-xl font-bold text-accent">
             Go NorthWest Bus Tracker
           </h1>
-          <div className="flex items-center gap-2">
-            <Input
-              type="text"
-              placeholder={`Search by ${categoryLabels[searchCategory]}...`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-48"
-            />
-            <Select value={searchCategory} onValueChange={(value: SearchCategory) => setSearchCategory(value)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Search by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fleetNumber">Fleet Number</SelectItem>
-                <SelectItem value="service">Service</SelectItem>
-                <SelectItem value="runningBoard">Running Board</SelectItem>
-                <SelectItem value="journeyRef">Journey Number</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
       </header>
       <main className="flex-1 relative">
+        {error && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 w-full max-w-md">
+                <Alert variant="destructive">
+                    <Terminal className="h-4 w-4" />
+                    <AlertTitle>Error Fetching Data</AlertTitle>
+                    <AlertDescription>
+                        <p>{error}</p>
+                        <p className="mt-2 text-xs">The bus data feed may be temporarily down. Please try again later.</p>
+                    </AlertDescription>
+                </Alert>
+            </div>
+        )}
         {mapboxAccessToken ? (
-          <BusMap buses={buses} zoomToPosition={zoomToPosition} />
+          <BusMap buses={buses} />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
             <Alert variant="destructive" className="max-w-lg">

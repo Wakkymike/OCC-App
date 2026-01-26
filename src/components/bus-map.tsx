@@ -3,7 +3,7 @@
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useRef } from 'react';
-import type { Bus, LatLng } from '@/lib/types';
+import type { Bus } from '@/lib/types';
 
 const colorPalette = ['#FF6F00','#1E88E5','#43A047','#8E24AA','#E53935', '#FFD100'];
 const serviceColors: Record<string, string> = {};
@@ -16,10 +16,9 @@ const getServiceColor = (service: string) => {
 
 interface BusMapProps {
     buses: Bus[];
-    zoomToPosition?: LatLng | null;
 }
 
-export default function BusMap({ buses, zoomToPosition }: BusMapProps) {
+export default function BusMap({ buses }: BusMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
@@ -37,17 +36,6 @@ export default function BusMap({ buses, zoomToPosition }: BusMapProps) {
     });
     mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
   }, []);
-
-  // Effect to fly to a specific bus
-  useEffect(() => {
-    if (mapRef.current && zoomToPosition) {
-      mapRef.current.flyTo({
-        center: [zoomToPosition.lng, zoomToPosition.lat],
-        zoom: 15,
-        essential: true,
-      });
-    }
-  }, [zoomToPosition]);
 
   // Update markers when buses change
   useEffect(() => {

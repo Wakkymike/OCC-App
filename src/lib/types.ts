@@ -1,15 +1,14 @@
-export type LatLng = {
+export interface LatLng {
   lat: number;
   lng: number;
-};
+}
 
 export interface Bus {
   id: string;
   fleetNumber: string;
-  runningBoard: string;
   service: string;
-  destination: string;
-  direction?: string;
+  runningBoard: string;
+  direction: 'inbound' | 'outbound' | string;
+  destination?: string;
   position: LatLng;
-  journeyRef?: string;
 }
