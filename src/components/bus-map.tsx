@@ -24,14 +24,46 @@ export default function BusMap({ buses }: BusMapProps) {
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    mapRef.current = new mapboxgl.Map({
+    const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/light-v11',
       center: [-2.24, 53.48], // Manchester area
       zoom: 11,
     });
+    mapRef.current = map;
 
-    mapRef.current.addControl(new mapboxgl.NavigationControl());
+    map.addControl(new mapboxgl.NavigationControl());
+    
+    map.on('load', () => {
+      map.addSource('mapbox-traffic', {
+        type: 'vector',
+        url: 'mapbox://mapbox.mapbox-traffic-v1',
+      });
+      map.addLayer(
+        {
+          id: 'traffic-layer',
+          type: 'line',
+          source: 'mapbox-traffic',
+          'source-layer': 'traffic',
+          paint: {
+            'line-width': 1.5,
+            'line-color': [
+              'case',
+              ['==', 'heavy', ['get', 'congestion']],
+              '#e55e5e',
+              ['==', 'severe', ['get', 'congestion']],
+              '#b43b3b',
+              ['==', 'moderate', ['get', 'congestion']],
+              '#ffc62e',
+              '#42c86b', // low and default
+            ],
+          },
+        },
+        'road-label' // Add layer before road labels
+      );
+    });
+
+    return () => map.remove();
   }, []);
 
   // ---------------------------
