@@ -76,6 +76,7 @@ export async function GET() {
           destination: (journey.DestinationName ?? 'unknown').replace(/_/g, ' '),
           direction: journey.DirectionRef ?? 'unknown',
           position: { lat, lng },
+          journeyRef: journey.JourneyRef ?? 'unknown',
         };
       })
       .filter((bus): bus is Bus => bus !== null);

@@ -11,4 +11,5 @@ export interface Bus {
   destination: string;
   direction?: string;
   position: LatLng;
+  journeyRef?: string;
 }

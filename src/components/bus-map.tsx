@@ -3,8 +3,8 @@
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useRef } from 'react';
-import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { useToast } from '@/hooks/use-toast';
+import type { Bus } from '@/lib/types';
 
 const colorPalette = ['#FF6F00','#1E88E5','#43A047','#8E24AA','#E53935', '#FFD100'];
 const serviceColors: Record<string, string> = {};
@@ -15,12 +15,14 @@ const getServiceColor = (service: string) => {
   return serviceColors[service];
 };
 
-export default function BusMap() {
+interface BusMapProps {
+    buses: Bus[];
+}
+
+export default function BusMap({ buses }: BusMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const { buses, error } = useBusTracker();
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
-  const { toast } = useToast();
 
   // Initialize Map
   useEffect(() => {
@@ -36,16 +38,6 @@ export default function BusMap() {
     mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
   }, []);
 
-  useEffect(() => {
-    if (error) {
-        toast({
-            variant: "destructive",
-            title: "Could not fetch bus data",
-            description: error,
-        });
-    }
-  }, [error, toast]);
-
   // Update markers when buses change
   useEffect(() => {
     if (!mapRef.current) return;
@@ -57,27 +49,35 @@ export default function BusMap() {
       const { id, position, service, destination, fleetNumber } = bus;
       const busColor = getServiceColor(service);
 
+      const elContent = `
+        <div class="bus-flag" style="background-color:${busColor};">
+          ${service} → ${destination}<br/>
+          Fleet: ${fleetNumber}
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 64 64">
+          <rect x="8" y="16" width="48" height="32" rx="6" ry="6" fill="${busColor}" stroke="#000" stroke-width="1"/>
+          <rect class="stripe" x="8" y="28" width="48" height="8" fill="#000"/>
+          <rect x="16" y="20" width="8" height="8" fill="#fff"/>
+          <rect x="40" y="20" width="8" height="8" fill="#fff"/>
+          <circle cx="20" cy="52" r="4" fill="#333"/>
+          <circle cx="44" cy="52" r="4" fill="#333"/>
+        </svg>
+      `;
+
       if (markersRef.current[id]) {
         // Update position of existing marker
         markersRef.current[id].setLngLat([position.lng, position.lat]);
+        
+        const markerElement = markersRef.current[id].getElement();
+        if (markerElement.innerHTML !== elContent) {
+            markerElement.innerHTML = elContent;
+        }
+
       } else {
         // Create new marker
         const el = document.createElement('div');
         el.className = 'bus-marker';
-        el.innerHTML = `
-          <div class="bus-flag" style="background-color:${busColor};">
-            ${service} → ${destination}<br/>
-            Fleet: ${fleetNumber}
-          </div>
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 64 64">
-            <rect x="8" y="16" width="48" height="32" rx="6" ry="6" fill="${busColor}" stroke="#000" stroke-width="1"/>
-            <rect class="stripe" x="8" y="28" width="48" height="8" fill="#000"/>
-            <rect x="16" y="20" width="8" height="8" fill="#fff"/>
-            <rect x="40" y="20" width="8" height="8" fill="#fff"/>
-            <circle cx="20" cy="52" r="4" fill="#333"/>
-            <circle cx="44" cy="52" r="4" fill="#333"/>
-          </svg>
-        `;
+        el.innerHTML = elContent;
 
         const marker = new mapboxgl.Marker(el)
           .setLngLat([position.lng, position.lat])
