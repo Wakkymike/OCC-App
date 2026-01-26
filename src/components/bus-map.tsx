@@ -192,7 +192,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
 
       const specialJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
       if (bus.journeyRef && specialJourneyRefs.includes(String(bus.journeyRef))) {
-          serviceDisplay += ' [SCH]';
+          serviceDisplay += ` <span style="color: red;">[SCH]</span>`;
       }
 
       if (bus.direction.toLowerCase() === 'inbound') {
