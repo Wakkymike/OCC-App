@@ -59,7 +59,7 @@ export default function BusMap({ buses }: BusMapProps) {
             ],
           },
         },
-        'road-label' // Add layer before road labels
+        'waterway-label' // Add layer before waterway labels
       );
     });
 
