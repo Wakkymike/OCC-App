@@ -76,6 +76,9 @@ export async function GET() {
           const duration = delayStr.replace(/^-?P(T)?/, '');
           
           let totalSeconds = 0;
+          const hoursMatch = duration.match(/(\d+)H/);
+          if (hoursMatch) totalSeconds += parseInt(hoursMatch[1], 10) * 3600;
+
           const minutesMatch = duration.match(/(\d+)M/);
           if (minutesMatch) totalSeconds += parseInt(minutesMatch[1], 10) * 60;
 
