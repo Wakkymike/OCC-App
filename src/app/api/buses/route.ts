@@ -1,17 +1,12 @@
-'use server';
 import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
-import type { Bus } from '@/lib/types';
 
-// Simplified SIRI-VM types
-interface VehicleActivityXml {
-  MonitoredVehicleJourney: {
-    LineRef: string;
-    DestinationName: string;
-    VehicleLocation: { Longitude: string; Latitude: string };
-    VehicleRef: string;
-    BlockRef?: string;
-  };
+export interface Bus {
+  id: string;
+  fleetNumber: string;
+  service: string;
+  destination: string;
+  position: { lat: number; lng: number };
 }
 
 export async function GET() {
@@ -19,78 +14,82 @@ export async function GET() {
   const feedId = '18880';
 
   if (!apiKey) {
-    console.error('BODS_API_KEY missing in .env.local');
-    return NextResponse.json(
-      { error: 'BODS_API_KEY not configured' },
-      { status: 500 }
-    );
+    console.error('BODS_API_KEY missing');
+    return NextResponse.json([], { status: 500 });
   }
 
   const url = `https://data.bus-data.dft.gov.uk/api/v1/datafeed/${feedId}/?api_key=${apiKey}`;
 
   try {
     const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) {
-      const text = await response.text();
-      console.error('BODS API returned error:', response.status, text);
-      return NextResponse.json(
-        { error: `BODS API error ${response.status}: ${text}` },
-        { status: response.status }
-      );
-    }
-
     const xmlText = await response.text();
+
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '',
       removeNSPrefix: true,
     });
+
     const data = parser.parse(xmlText);
 
-    // Sometimes VehicleMonitoringDelivery is a single object
+    // Collect all VehicleMonitoringDelivery elements
     const deliveries = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery ?? [];
     const deliveriesArray = Array.isArray(deliveries) ? deliveries : [deliveries];
 
-    let vehicleActivities: VehicleActivityXml[] = [];
+    let vehicleActivities: any[] = [];
 
     for (const delivery of deliveriesArray) {
       let activities = delivery?.VehicleActivity ?? [];
-      if (!Array.isArray(activities)) activities = [activities];
+      if (!activities) continue;
+      if (!Array.isArray(activities)) activities = [activities]; // single vehicle
       vehicleActivities.push(...activities);
     }
 
-    // Debug logs to confirm all vehicles
-    console.log(`Total VehicleActivity parsed: ${vehicleActivities.length}`);
-    if (vehicleActivities.length > 0 && vehicleActivities[0]?.MonitoredVehicleJourney?.VehicleRef) {
-        console.log(
-          'First 5 vehicle IDs:',
-          vehicleActivities.slice(0, 5).map(v => v.MonitoredVehicleJourney.VehicleRef)
-        );
-    }
-    
+    // Map vehicles to Bus[] while keeping debug info
+    let skippedCount = 0;
+    const skippedVehicles: any[] = [];
+
     const buses: Bus[] = vehicleActivities
       .map(activity => {
-        const journey = activity?.MonitoredVehicleJourney;
-        if (!journey || !journey.VehicleLocation || !journey.VehicleRef || !journey.LineRef || !journey.DestinationName) {
-            return null;
+        const journey = activity.MonitoredVehicleJourney;
+
+        if (!journey?.VehicleLocation?.Latitude || !journey?.VehicleLocation?.Longitude) {
+          skippedCount++;
+          skippedVehicles.push(journey?.VehicleRef ?? 'unknown');
+          return null;
         }
 
         const lat = parseFloat(journey.VehicleLocation.Latitude);
         const lng = parseFloat(journey.VehicleLocation.Longitude);
-        if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+
+        if (Number.isNaN(lat) || Number.isNaN(lng)) {
+          skippedCount++;
+          skippedVehicles.push(journey?.VehicleRef ?? 'unknown');
+          return null;
+        }
 
         return {
           id: journey.VehicleRef,
           fleetNumber: journey.BlockRef ?? journey.VehicleRef,
-          service: journey.LineRef,
-          destination: journey.DestinationName,
+          service: journey.LineRef ?? 'unknown',
+          destination: journey.DestinationName ?? 'unknown',
           position: { lat, lng },
         };
       })
-      .filter((bus): bus is Bus => bus !== null);
+      .filter(Boolean);
 
-    console.log(`Returning ${buses.length} buses`);
-    return NextResponse.json(buses);
+    console.log(
+      `Total VehicleActivity parsed: ${vehicleActivities.length}, returning ${buses.length}, skipped ${skippedCount}`
+    );
+
+    return NextResponse.json({
+      buses,
+      debug: {
+        totalVehicleActivity: vehicleActivities.length,
+        skippedCount,
+        skippedVehicles: skippedVehicles.slice(0, 10), // first 10 for debug
+      },
+    });
   } catch (error) {
     console.error('Unexpected error fetching/parsing BODS XML:', error);
     return NextResponse.json(
