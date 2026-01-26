@@ -94,7 +94,7 @@ export default function BusMap({ buses }: BusMapProps) {
       const serviceStr = String(bus.service);
 
       if (serviceStr.length === 3 && (serviceStr.startsWith('7') || serviceStr.startsWith('8'))) {
-        serviceDisplay = `${bus.service} <span style="color: red;">(sch)</span>`;
+        serviceDisplay = `${bus.service} <span style="color: red;">(SCH)</span>`;
       }
 
       flagElement.innerHTML = `${serviceDisplay} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}`;
