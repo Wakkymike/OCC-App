@@ -191,7 +191,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
       let serviceDisplay = bus.service;
 
       const specialJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
-      if (bus.journeyRef && specialJourneyRefs.includes(bus.journeyRef)) {
+      if (bus.journeyRef && specialJourneyRefs.includes(String(bus.journeyRef))) {
           serviceDisplay += ' [SCH]';
       }
 
