@@ -69,7 +69,6 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
               ['==', 'severe', ['get', 'congestion']],
               '#b43b3b',
               ['==', 'moderate', ['get', 'congestion']],
-              '#ffc62e',
               '#42c86b', // low and default
             ],
           },
@@ -191,6 +190,11 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
       
       let serviceDisplay = bus.service;
 
+      const specialJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
+      if (bus.journeyRef && specialJourneyRefs.includes(bus.journeyRef)) {
+          serviceDisplay += ' [SCH]';
+      }
+
       if (bus.direction.toLowerCase() === 'inbound') {
         serviceDisplay += ` <span style="color: blue;">[I]</span>`;
       } else if (bus.direction.toLowerCase() === 'outbound') {
@@ -211,7 +215,10 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
 
       // If the bus is selected and we are zoomed in, pan the map to its new location
       if (markerId === selectedBusId && map.getZoom() > 14) {
-          map.panTo([bus.position.lng, bus.position.lat]);
+        const isPanning = map.isMoving() || map.isZooming();
+        if (!isPanning) {
+            map.panTo([bus.position.lng, bus.position.lat]);
+        }
       }
     });
 
