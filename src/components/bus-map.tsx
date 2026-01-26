@@ -201,9 +201,22 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
         serviceDisplay += ` <span style="color: blue;">[O]</span>`;
       }
 
-      let statusDisplay = '';
+      const statusParts: string[] = [];
+      if (bus.delay) {
+        if (bus.delay > 0) {
+          statusParts.push(`<span style="color: red;">${bus.delay} min late</span>`);
+        } else {
+          statusParts.push(`<span style="color: green;">${Math.abs(bus.delay)} min early</span>`);
+        }
+      }
+
       if (bus.journeyRef) {
-          statusDisplay = `<br/><i>${bus.journeyRef}</i>`;
+          statusParts.push(`<i>${bus.journeyRef}</i>`);
+      }
+
+      let statusDisplay = '';
+      if (statusParts.length > 0) {
+        statusDisplay = `<br/>${statusParts.join(' | ')}`;
       }
 
       flagElement.innerHTML = `${bus.fleetNumber} | ${serviceDisplay} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}${statusDisplay}`;

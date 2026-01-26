@@ -67,6 +67,29 @@ export async function GET() {
         }
         
         const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
+        
+        const delayStr = journey.Delay;
+        let delayInMinutes: number | undefined = undefined;
+
+        if (delayStr && typeof delayStr === 'string' && delayStr !== 'PT0S') {
+          const sign = delayStr.startsWith('-') ? -1 : 1;
+          const duration = delayStr.replace(/^-?P(T)?/, '');
+          
+          let totalSeconds = 0;
+          const minutesMatch = duration.match(/(\d+)M/);
+          if (minutesMatch) totalSeconds += parseInt(minutesMatch[1], 10) * 60;
+
+          const secondsMatch = duration.match(/(\d+)S/);
+          if (secondsMatch) totalSeconds += parseInt(secondsMatch[1], 10);
+          
+          if (totalSeconds > 0) {
+              const minutes = totalSeconds / 60;
+              const roundedMinutes = Math.round(minutes) * sign;
+              if (roundedMinutes !== 0) {
+                delayInMinutes = roundedMinutes;
+              }
+          }
+        }
 
         return {
           fleetNumber: journey.VehicleRef,
@@ -77,6 +100,7 @@ export async function GET() {
           position: { lat, lng },
           bearing: bearing && !Number.isNaN(bearing) ? bearing : undefined,
           journeyRef: journey.FramedVehicleJourneyRef?.DatedVehicleJourneyRef,
+          delay: delayInMinutes,
         };
       })
       .filter((bus): bus is Bus => bus !== null);

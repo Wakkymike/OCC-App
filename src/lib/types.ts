@@ -12,4 +12,5 @@ export interface Bus {
   position: LatLng;
   bearing?: number;
   journeyRef?: string;
+  delay?: number; // Delay in minutes
 }
