@@ -2,12 +2,13 @@
 
 import { useMemo, useState, FormEvent, useEffect } from 'react';
 import BusMap from '@/components/bus-map';
-import { Search, Terminal } from 'lucide-react';
+import { Search, Terminal, MapPin } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 import type { LngLatBoundsLike } from 'mapbox-gl';
 
 type SearchCategory = 'fleetNumber' | 'service' | 'runningBoard';
@@ -16,12 +17,16 @@ export default function Home() {
   const mapboxAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
   const { buses, error } = useBusTracker();
   
-  // State for the input fields
+  // State for the bus search input fields
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCategory, setSearchCategory] = useState<SearchCategory>('fleetNumber');
 
-  // State for the active/submitted filter
+  // State for the active/submitted bus filter
   const [activeFilter, setActiveFilter] = useState<{ query: string; category: SearchCategory } | null>(null);
+
+  // State for the place search
+  const [placeSearchQuery, setPlaceSearchQuery] = useState('');
+  const [searchedPlace, setSearchedPlace] = useState<[number, number] | null>(null);
 
   // State for the currently selected bus on the map
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
@@ -30,12 +35,57 @@ export default function Home() {
   const [bounds, setBounds] = useState<LngLatBoundsLike | null>(null);
 
 
-  const handleSearch = (e: FormEvent) => {
+  const handleBusSearch = (e: FormEvent) => {
     e.preventDefault();
+    setPlaceSearchQuery(''); // clear place search input
+    setSearchedPlace(null); // Clear place search result
     if (searchQuery.trim() === '') {
         setActiveFilter(null);
     } else {
         setActiveFilter({ query: searchQuery, category: searchCategory });
+    }
+  };
+
+  const handlePlaceSearch = async (e: FormEvent) => {
+    e.preventDefault();
+    
+    // Clear bus search states
+    setActiveFilter(null);
+    setSelectedBusId(null);
+    setBounds(null);
+
+    if (!placeSearchQuery.trim()) {
+        setSearchedPlace(null);
+        return;
+    }
+
+    const accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(placeSearchQuery)}.json`;
+    // Bbox for greater manchester to improve search relevance
+    const params = `?access_token=${accessToken}&limit=1&bbox=-2.73,53.32,-1.76,53.63&autocomplete=true`;
+
+    try {
+        const response = await fetch(endpoint + params);
+        const data = await response.json();
+        if (data.features && data.features.length > 0) {
+            const [lng, lat] = data.features[0].center;
+            setSearchedPlace([lng, lat]);
+        } else {
+            setSearchedPlace(null);
+            toast({
+                variant: "destructive",
+                title: "Place not found",
+                description: "Could not find a location matching your search.",
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching geocoding data:', error);
+        setSearchedPlace(null);
+        toast({
+            variant: "destructive",
+            title: "Error searching for place",
+            description: "There was a problem searching for the location.",
+        });
     }
   };
 
@@ -44,6 +94,16 @@ export default function Home() {
     setActiveFilter(null);
     setSelectedBusId(null);
     setBounds(null);
+    setPlaceSearchQuery('');
+    setSearchedPlace(null);
+  }
+
+  const handleSetSelectedBusId = (id: string | null) => {
+    if (id) {
+        setPlaceSearchQuery('');
+        setSearchedPlace(null);
+    }
+    setSelectedBusId(id);
   }
 
   const filteredBuses = useMemo(() => {
@@ -106,30 +166,46 @@ export default function Home() {
           <h1 className="text-xl font-bold text-accent whitespace-nowrap">
             Go NorthWest Bus Tracker
           </h1>
-          <form onSubmit={handleSearch} className="flex w-full max-w-lg items-center gap-2">
-            <Select value={searchCategory} onValueChange={(value) => setSearchCategory(value as SearchCategory)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Search by..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fleetNumber">Fleet Number</SelectItem>
-                <SelectItem value="service">Service</SelectItem>
-                <SelectItem value="runningBoard">Running Board</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-                />
-            </div>
-            <Button type="submit">Search</Button>
-            <Button type="button" variant="outline" onClick={clearSearch}>Clear</Button>
-          </form>
+          <div className="flex items-center gap-4 flex-1 justify-end">
+            <form onSubmit={handleBusSearch} className="flex w-full max-w-lg items-center gap-2">
+                <Select value={searchCategory} onValueChange={(value) => setSearchCategory(value as SearchCategory)}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Search by..." />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="fleetNumber">Fleet Number</SelectItem>
+                    <SelectItem value="service">Service</SelectItem>
+                    <SelectItem value="runningBoard">Running Board</SelectItem>
+                </SelectContent>
+                </Select>
+                <div className="relative w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                    type="text"
+                    placeholder="Search buses..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                    />
+                </div>
+                <Button type="submit">Search</Button>
+                <Button type="button" variant="outline" onClick={clearSearch}>Clear</Button>
+            </form>
+             <div className="h-8 border-l border-border"></div>
+            <form onSubmit={handlePlaceSearch} className="flex w-full max-w-xs items-center gap-2">
+                <div className="relative w-full">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="text"
+                        placeholder="Search places..."
+                        value={placeSearchQuery}
+                        onChange={(e) => setPlaceSearchQuery(e.target.value)}
+                        className="pl-10"
+                    />
+                </div>
+                <Button type="submit">Go</Button>
+            </form>
+          </div>
         </div>
       </header>
       <main className="flex-1 relative">
@@ -149,8 +225,9 @@ export default function Home() {
           <BusMap 
             buses={filteredBuses} 
             selectedBusId={selectedBusId}
-            setSelectedBusId={setSelectedBusId}
+            setSelectedBusId={handleSetSelectedBusId}
             boundsToFit={bounds}
+            searchedPlace={searchedPlace}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4">

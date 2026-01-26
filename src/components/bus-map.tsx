@@ -12,12 +12,14 @@ interface BusMapProps {
   selectedBusId: string | null;
   setSelectedBusId: (id: string | null) => void;
   boundsToFit?: LngLatBoundsLike | null;
+  searchedPlace?: [number, number] | null;
 }
 
-export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsToFit }: BusMapProps) {
+export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsToFit, searchedPlace }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
+  const placeMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   // ---------------------------
   // Initialize Map
@@ -104,7 +106,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
             padding: 100,
             essential: true,
         });
-    } else {
+    } else if (!searchedPlace) { // Only fly to default if no place is searched
        // Only fly back to default view if the map is currently zoomed in.
        const currentZoom = map.getZoom();
        if (currentZoom > 12) {
@@ -115,7 +117,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
           });
       }
     }
-  }, [selectedBusId, boundsToFit]);
+  }, [selectedBusId, boundsToFit, searchedPlace]);
 
 
   // ---------------------------
@@ -226,6 +228,43 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
       }
     });
   }, [buses, selectedBusId, setSelectedBusId]);
+
+  // ------------------------------------
+  // Handle Searched Place
+  // ------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Clean up previous marker
+    if (placeMarkerRef.current) {
+        placeMarkerRef.current.remove();
+        placeMarkerRef.current = null;
+    }
+    
+    if (searchedPlace) {
+        map.flyTo({
+            center: searchedPlace as mapboxgl.LngLatLike,
+            zoom: 14,
+            essential: true,
+        });
+
+        const el = document.createElement('div');
+        el.innerHTML = `
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 10.5C21 17.5 12 23 12 23C12 23 3 17.5 3 10.5C3 6.35786 7.02944 3 12 3C16.9706 3 21 6.35786 21 10.5Z" fill="#FF4136" stroke="white" stroke-width="1.5"/>
+                <circle cx="12" cy="10.5" r="3" fill="white"/>
+            </svg>
+        `.trim();
+
+        const marker = new mapboxgl.Marker(el)
+            .setLngLat(searchedPlace as mapboxgl.LngLatLike)
+            .addTo(map);
+        
+        placeMarkerRef.current = marker;
+    }
+  }, [searchedPlace]);
+
 
   return (
     <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
