@@ -71,10 +71,6 @@ export async function GET() {
       console.warn('No VehicleActivity found in BODS feed');
     }
 
-    console.log(`Total VehicleActivity parsed: ${vehicleActivities.length}`);
-    console.log('First 5 vehicles:', vehicleActivities.slice(0,5).map(v => v.MonitoredVehicleJourney.VehicleRef));
-    console.log('Positions for first 5 vehicles:', vehicleActivities.slice(0,5).map(v => v.MonitoredVehicleJourney.VehicleLocation));
-
     const buses: Bus[] = (vehicleActivities || [])
       .map(activity => {
         const journey = activity?.MonitoredVehicleJourney;
@@ -95,6 +91,10 @@ export async function GET() {
         };
       })
       .filter((bus): bus is Bus => bus !== null);
+
+    console.log(`Total VehicleActivity parsed: ${vehicleActivities.length}`);
+    console.log('First 5 vehicles:', vehicleActivities.slice(0,5).map(v => v.MonitoredVehicleJourney.VehicleRef));
+    console.log('Positions for first 5 vehicles:', vehicleActivities.slice(0,5).map(v => v.MonitoredVehicleJourney.VehicleLocation));
 
     console.log(`Returning ${buses.length} buses to frontend`);
     return NextResponse.json(buses);
