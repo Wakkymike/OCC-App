@@ -1,3 +1,4 @@
+// This hook fetches data from the API route defined in: src/app/api/buses/route.ts
 import { useState, useEffect } from 'react';
 import type { Bus } from '@/lib/types';
 
