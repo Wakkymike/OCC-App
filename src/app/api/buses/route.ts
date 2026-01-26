@@ -68,10 +68,19 @@ export async function GET() {
         
         const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
         
-        const delayStr = journey.Delay;
+        const delayValue = journey.Delay;
+        let delayStr: string | undefined;
+
+        if (typeof delayValue === 'string') {
+          delayStr = delayValue;
+        } else if (delayValue && typeof delayValue === 'object' && '#text' in delayValue) {
+          // Handle cases where parser returns an object like { '#text': 'PT1M' }
+          delayStr = (delayValue as any)['#text'];
+        }
+        
         let delayInMinutes: number | undefined = undefined;
 
-        if (delayStr && typeof delayStr === 'string' && delayStr !== 'PT0S') {
+        if (delayStr && delayStr !== 'PT0S') {
           const sign = delayStr.startsWith('-') ? -1 : 1;
           const duration = delayStr.replace(/^-?P(T)?/, '');
           
@@ -85,11 +94,12 @@ export async function GET() {
           const secondsMatch = duration.match(/(\d+)S/);
           if (secondsMatch) totalSeconds += parseInt(secondsMatch[1], 10);
           
-          if (totalSeconds > 0) {
+          // Only show delays/earliness of 30 seconds or more
+          if (totalSeconds >= 30) { 
               const minutes = totalSeconds / 60;
-              const roundedMinutes = Math.round(minutes) * sign;
+              const roundedMinutes = Math.round(minutes);
               if (roundedMinutes !== 0) {
-                delayInMinutes = roundedMinutes;
+                delayInMinutes = roundedMinutes * sign;
               }
           }
         }
