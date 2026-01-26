@@ -141,7 +141,7 @@ export default function Home() {
       // The search returned exactly one bus. We auto-select it to zoom in.
       // This will cause a re-render, and the `if (selectedBusId)` block above will handle the view.
       const bus = filteredBuses[0];
-      const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}`;
+      const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
       setSelectedBusId(busId);
     } else if (activeFilter.category === 'service' && filteredBuses.length > 1) {
       // The search is for a service and returned multiple buses.

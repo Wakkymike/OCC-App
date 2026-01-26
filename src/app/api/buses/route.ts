@@ -76,6 +76,7 @@ export async function GET() {
           direction: journey.DirectionRef ?? 'unknown',
           position: { lat, lng },
           bearing: bearing && !Number.isNaN(bearing) ? bearing : undefined,
+          journeyRef: journey.DatedVehicleJourneyRef,
         };
       })
       .filter((bus): bus is Bus => bus !== null);

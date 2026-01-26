@@ -47,7 +47,7 @@ export function useBusTracker() {
         const newBusesMap = new Map<string, Bus>();
 
         const busesWithStatus: Bus[] = newBuses.map(bus => {
-          const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}`;
+          const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
           newBusesMap.set(markerId, bus);
 
           const prevBus = previousBusesMap.get(markerId);

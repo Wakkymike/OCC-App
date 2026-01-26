@@ -137,7 +137,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
     const currentMarkerIds = new Set(Object.keys(markersRef.current));
 
     buses.forEach((bus) => {
-      const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}`;
+      const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
       currentMarkerIds.delete(markerId);
 
       let marker = markersRef.current[markerId];
@@ -205,11 +205,14 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
       let statusDisplay = '';
       if (bus.status) {
         const speedDisplay = bus.speed !== undefined ? ` (${bus.speed} mph)` : '';
+        const journeyDisplay = bus.journeyRef ? ` | ${bus.journeyRef}` : '';
         if (bus.status === 'moving') {
-          statusDisplay = `<br/><i style="color: green;">moving${speedDisplay}</i>`;
+          statusDisplay = `<br/><i style="color: green;">moving${speedDisplay}${journeyDisplay}</i>`;
         } else {
-          statusDisplay = `<br/><i style="color: red;">stopped${speedDisplay}</i>`;
+          statusDisplay = `<br/><i style="color: red;">stopped${speedDisplay}${journeyDisplay}</i>`;
         }
+      } else if (bus.journeyRef) {
+          statusDisplay = `<br/><i>${bus.journeyRef}</i>`;
       }
 
       flagElement.innerHTML = `${bus.fleetNumber} | ${serviceDisplay} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}${statusDisplay}`;
