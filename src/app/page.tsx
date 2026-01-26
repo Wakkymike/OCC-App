@@ -1,21 +1,13 @@
 'use client';
 
 import BusMap from '@/components/bus-map';
-import { Terminal, Search } from 'lucide-react';
+import { Terminal } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useBusTracker } from '@/hooks/use-bus-tracker';
-import { useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Bus } from '@/lib/types';
 
 export default function Home() {
   const mapboxAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState<keyof Bus>('fleetNumber');
-  const { buses, error } = useBusTracker(searchQuery, searchType);
-
-  const focusedBus = buses.length === 1 ? buses[0] : null;
+  const { buses, error } = useBusTracker();
 
   return (
     <div className="h-dvh w-screen bg-background text-foreground font-body flex flex-col">
@@ -24,29 +16,6 @@ export default function Home() {
           <h1 className="text-xl font-bold text-accent">
             Go NorthWest Bus Tracker
           </h1>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                type="search"
-                placeholder={`Search by ${searchType}...`}
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <Select value={searchType} onValueChange={(value) => setSearchType(value as keyof Bus)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Search by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fleetNumber">Fleet Number</SelectItem>
-                <SelectItem value="service">Service Number</SelectItem>
-                <SelectItem value="runningBoard">Running Board</SelectItem>
-                <SelectItem value="journey">Journey Number</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
       </header>
       <main className="flex-1 relative">
@@ -63,7 +32,7 @@ export default function Home() {
             </div>
         )}
         {mapboxAccessToken ? (
-          <BusMap buses={buses} focusedBus={focusedBus} />
+          <BusMap buses={buses} />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
             <Alert variant="destructive" className="max-w-lg">

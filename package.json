@@ -45,7 +45,7 @@
     "firebase": "^11.9.1",
     "genkit": "^1.20.0",
     "lucide-react": "^0.475.0",
-    "mapbox-gl": "^3.3.0",
+    "mapbox-gl": "^3.18.1",
     "next": "15.5.9",
     "patch-package": "^8.0.0",
     "react": "^19.2.1",

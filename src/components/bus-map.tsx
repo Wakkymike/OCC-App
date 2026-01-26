@@ -1,116 +1,105 @@
 'use client';
 
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css'; // 🔑 Import Mapbox CSS
 import type { Bus } from '@/lib/types';
 
-const colorPalette = ['#FF6F00','#1E88E5','#43A047','#8E24AA','#E53935', '#FFD100'];
-const serviceColors: Record<string, string> = {};
-const getServiceColor = (service: string) => {
-  if (!serviceColors[service]) {
-    serviceColors[service] = colorPalette[Object.keys(serviceColors).length % colorPalette.length];
-  }
-  return serviceColors[service];
-};
+mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
 
 interface BusMapProps {
-    buses: Bus[];
-    focusedBus: Bus | null;
+  buses: Bus[];
 }
 
-export default function BusMap({ buses, focusedBus }: BusMapProps) {
-  const mapContainer = useRef<HTMLDivElement>(null);
+export default function BusMap({ buses }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Store markers so we can update positions instead of recreating
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
 
+  // ---------------------------
   // Initialize Map
+  // ---------------------------
   useEffect(() => {
-    if (mapRef.current || !mapContainer.current) return;
+    if (!mapContainerRef.current || mapRef.current) return;
 
-    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
     mapRef.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v11',
-      center: [-2.24, 53.48], // Manchester center
+      container: mapContainerRef.current,
+      style: 'mapbox://styles/mapbox/light-v11',
+      center: [-2.24, 53.48], // Manchester area
       zoom: 11,
     });
-    mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
-  }, []);
-  
-  // Handle focusing on a bus
-  useEffect(() => {
-    if (mapRef.current && focusedBus) {
-      mapRef.current.flyTo({
-        center: [focusedBus.position.lng, focusedBus.position.lat],
-        zoom: 15,
-        speed: 0.8,
-        curve: 1.4,
-        easing(t) {
-          return t;
-        },
-      });
-    }
-  }, [focusedBus]);
 
-  // Update markers when buses change
+    mapRef.current.addControl(new mapboxgl.NavigationControl());
+  }, []);
+
+  // ---------------------------
+  // Render / Update Bus Markers
+  // ---------------------------
   useEffect(() => {
     if (!mapRef.current) return;
 
-    const map = mapRef.current;
-    const currentBusIds = new Set(buses.map(bus => bus.id));
+    const currentMarkerIds = new Set(Object.keys(markersRef.current));
 
-    buses.forEach(bus => {
-      const { id, position, service, destination, fleetNumber } = bus;
-      const busColor = getServiceColor(service);
+    buses.forEach((bus) => {
+      // A unique ID for each marker is crucial. A combination of fields that
+      // uniquely identifies a specific bus on a specific journey is best.
+      const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}`;
+      currentMarkerIds.delete(markerId);
 
-      const elContent = `
-        <div class="bus-flag" style="background-color:${busColor};">
-          ${service} → ${destination}<br/>
-          Fleet: ${fleetNumber}
-        </div>
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 64 64">
-          <rect x="8" y="16" width="48" height="32" rx="6" ry="6" fill="${busColor}" stroke="#000" stroke-width="1"/>
-          <rect class="stripe" x="8" y="28" width="48" height="8" fill="#000"/>
-          <rect x="16" y="20" width="8" height="8" fill="#fff"/>
-          <rect x="40" y="20" width="8" height="8" fill="#fff"/>
-          <circle cx="20" cy="52" r="4" fill="#333"/>
-          <circle cx="44" cy="52" r="4" fill="#333"/>
-        </svg>
-      `;
-
-      if (markersRef.current[id]) {
-        // Update position of existing marker
-        markersRef.current[id].setLngLat([position.lng, position.lat]);
-        
-        const markerElement = markersRef.current[id].getElement();
-        if (markerElement.innerHTML !== elContent) {
-            markerElement.innerHTML = elContent;
-        }
-
-      } else {
-        // Create new marker
+      // Create marker if it doesn't exist
+      if (!markersRef.current[markerId]) {
         const el = document.createElement('div');
-        el.className = 'bus-marker';
-        el.innerHTML = elContent;
 
+        // Marker container
+        el.style.display = 'flex';
+        el.style.flexDirection = 'column';
+        el.style.alignItems = 'center';
+        el.style.cursor = 'pointer';
+
+        // Flag showing info
+        const flag = document.createElement('div');
+        flag.style.background = 'white';
+        flag.style.padding = '2px 6px';
+        flag.style.border = '1px solid black';
+        flag.style.borderRadius = '4px';
+        flag.style.fontSize = '10px';
+        flag.style.fontWeight = 'bold';
+        flag.style.whiteSpace = 'nowrap';
+        
+        const icon = document.createElement('div');
+        icon.style.width = '18px';
+        icon.style.height = '18px';
+        icon.style.background = 'yellow';
+        icon.style.border = '2px solid black';
+        icon.style.borderRadius = '50%';
+        
+        el.appendChild(flag);
+        el.appendChild(icon);
+        
         const marker = new mapboxgl.Marker(el)
-          .setLngLat([position.lng, position.lat])
-          .addTo(map);
-
-        markersRef.current[id] = marker;
+          .setLngLat([bus.position.lng, bus.position.lat])
+          .addTo(mapRef.current!);
+        
+        markersRef.current[markerId] = marker;
       }
+      
+      // Update existing marker position and info
+      const marker = markersRef.current[markerId];
+      marker.setLngLat([bus.position.lng, bus.position.lat]);
+      const flagElement = marker.getElement().querySelector('div') as HTMLDivElement;
+      flagElement.innerText = `${bus.service} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}`;
     });
 
-    // Remove markers for buses that are no longer in the data
-    Object.keys(markersRef.current).forEach(busId => {
-      if (!currentBusIds.has(busId)) {
-        markersRef.current[busId].remove();
-        delete markersRef.current[busId];
-      }
+    // Remove markers for buses that are no longer in the feed
+    currentMarkerIds.forEach((id) => {
+      markersRef.current[id].remove();
+      delete markersRef.current[id];
     });
-
   }, [buses]);
 
-  return <div ref={mapContainer} id="map" style={{ width: '100%', height: '100%' }} />;
+  return (
+    <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+  );
 }

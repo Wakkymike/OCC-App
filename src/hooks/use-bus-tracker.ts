@@ -6,9 +6,8 @@ import type { Bus } from '@/lib/types';
 
 const FETCH_INTERVAL = 5000; // 5 seconds
 
-export function useBusTracker(searchQuery: string, searchType: keyof Bus) {
-  const [allBuses, setAllBuses] = useState<Bus[]>([]);
-  const [filteredBuses, setFilteredBuses] = useState<Bus[]>([]);
+export function useBusTracker() {
+  const [buses, setBuses] = useState<Bus[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch all buses from the API
@@ -24,12 +23,12 @@ export function useBusTracker(searchQuery: string, searchType: keyof Bus) {
         if (data.error) {
           throw new Error(data.error);
         }
-        setAllBuses(data.buses || []);
+        setBuses(data.buses || []);
         setError(null);
       } catch (err: unknown) {
         console.error('Error fetching buses:', err);
         setError(err instanceof Error ? err.message : String(err));
-        setAllBuses([]);
+        setBuses([]);
       }
     };
 
@@ -39,24 +38,5 @@ export function useBusTracker(searchQuery: string, searchType: keyof Bus) {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Filter buses based on search query
-  useEffect(() => {
-    if (!searchQuery) {
-      setFilteredBuses(allBuses);
-      return;
-    }
-
-    const lowercasedQuery = searchQuery.toLowerCase();
-    const results = allBuses.filter(bus => {
-      const propertyValue = bus[searchType];
-      if (typeof propertyValue === 'string') {
-          return propertyValue.toLowerCase().includes(lowercasedQuery);
-      }
-      return false;
-    });
-
-    setFilteredBuses(results);
-  }, [searchQuery, searchType, allBuses]);
-
-  return { buses: filteredBuses, error };
+  return { buses, error };
 }

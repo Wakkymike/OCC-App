@@ -39,8 +39,6 @@ export async function GET() {
     for (const delivery of deliveriesArray) {
       if (delivery.ErrorCondition) {
         console.error('BODS API returned error condition:', delivery.ErrorCondition.Description);
-        // If there's an error in one of the delivery packages, we can either skip it or fail the whole request.
-        // Let's continue, in case other delivery packages are valid.
         continue;
       }
       let activities = delivery?.VehicleActivity ?? [];
@@ -69,14 +67,12 @@ export async function GET() {
         }
 
         return {
-          id: journey.VehicleRef,
           fleetNumber: journey.VehicleRef,
           runningBoard: journey.BlockRef ?? 'unknown',
           service: journey.PublishedLineName ?? 'unknown',
           destination: (journey.DestinationName ?? 'unknown').replace(/_/g, ' '),
           direction: journey.DirectionRef ?? 'unknown',
           position: { lat, lng },
-          journey: journey.JourneyRef ?? 'unknown',
         };
       })
       .filter((bus): bus is Bus => bus !== null);
