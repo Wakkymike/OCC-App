@@ -8,13 +8,19 @@ export async function GET() {
 
   if (!apiKey) {
     console.error('BODS_API_KEY missing');
-    return NextResponse.json([], { status: 500 });
+    return NextResponse.json({ error: "Server configuration error: BODS_API_KEY is missing." }, { status: 500 });
   }
 
   const url = `https://data.bus-data.dft.gov.uk/api/v1/datafeed/${feedId}/?api_key=${apiKey}`;
 
   try {
     const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`BODS API error: ${response.status}`, errorText.slice(0, 500));
+        return NextResponse.json({ error: `Failed to fetch data from bus API. Status: ${response.status}`}, { status: response.status });
+    }
+    
     const xmlText = await response.text();
 
     const parser = new XMLParser({
@@ -31,6 +37,12 @@ export async function GET() {
     let vehicleActivities: any[] = [];
 
     for (const delivery of deliveriesArray) {
+      if (delivery.ErrorCondition) {
+        console.error('BODS API returned error condition:', delivery.ErrorCondition.Description);
+        // If there's an error in one of the delivery packages, we can either skip it or fail the whole request.
+        // Let's continue, in case other delivery packages are valid.
+        continue;
+      }
       let activities = delivery?.VehicleActivity ?? [];
       if (!activities) continue;
       if (!Array.isArray(activities)) activities = [activities];
@@ -38,15 +50,13 @@ export async function GET() {
     }
 
     let skippedCount = 0;
-    const skippedVehicles: any[] = [];
-
+    
     const buses: Bus[] = vehicleActivities
       .map(activity => {
         const journey = activity.MonitoredVehicleJourney;
 
         if (!journey?.VehicleLocation?.Latitude || !journey?.VehicleLocation?.Longitude) {
           skippedCount++;
-          skippedVehicles.push(journey?.VehicleRef ?? 'unknown');
           return null;
         }
 
@@ -55,7 +65,6 @@ export async function GET() {
 
         if (Number.isNaN(lat) || Number.isNaN(lng)) {
           skippedCount++;
-          skippedVehicles.push(journey?.VehicleRef ?? 'unknown');
           return null;
         }
 
@@ -71,22 +80,15 @@ export async function GET() {
       })
       .filter((bus): bus is Bus => bus !== null);
 
-    console.log(
-      `Total VehicleActivity parsed: ${vehicleActivities.length}, returning ${buses.length}, skipped ${skippedCount}`
-    );
+    if (skippedCount > 0) {
+        console.log(`Skipped ${skippedCount} buses due to missing location data.`);
+    }
 
-    return NextResponse.json({
-      buses,
-      debug: {
-        totalVehicleActivity: vehicleActivities.length,
-        skippedCount,
-        skippedVehicles: skippedVehicles.slice(0, 10),
-      },
-    });
+    return NextResponse.json({ buses });
   } catch (error) {
     console.error('Unexpected error fetching/parsing BODS XML:', error);
     return NextResponse.json(
-      { error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}` },
+      { error: `Unexpected server error: ${error instanceof Error ? error.message : String(error)}` },
       { status: 500 }
     );
   }
