@@ -81,17 +81,30 @@ export async function GET() {
 
         if (delayStr && delayStr !== 'PT0S') {
           const sign = delayStr.startsWith('-') ? -1 : 1;
-          const duration = delayStr.replace(/^-?P(T)?/, '');
+          let duration = delayStr.replace(/^-?P(T)?/, '');
           
           let totalSeconds = 0;
-          const hoursMatch = duration.match(/(\d+(?:\.\d+)?)H/);
-          if (hoursMatch) totalSeconds += parseFloat(hoursMatch[1]) * 3600;
-
-          const minutesMatch = duration.match(/(\d+(?:\.\d+)?)M/);
-          if (minutesMatch) totalSeconds += parseFloat(minutesMatch[1]) * 60;
-
-          const secondsMatch = duration.match(/(\d+(?:\.\d+)?)S/);
-          if (secondsMatch) totalSeconds += parseFloat(secondsMatch[1]);
+          
+          if (duration.includes('H')) {
+            const parts = duration.split('H');
+            if (parts[0] && !isNaN(parseFloat(parts[0]))) {
+                totalSeconds += parseFloat(parts[0]) * 3600;
+            }
+            duration = parts[1] || '';
+          }
+          if (duration.includes('M')) {
+            const parts = duration.split('M');
+            if (parts[0] && !isNaN(parseFloat(parts[0]))) {
+                totalSeconds += parseFloat(parts[0]) * 60;
+            }
+            duration = parts[1] || '';
+          }
+          if (duration.includes('S')) {
+            const parts = duration.split('S');
+            if (parts[0] && !isNaN(parseFloat(parts[0]))) {
+                totalSeconds += parseFloat(parts[0]);
+            }
+          }
           
           if (totalSeconds >= 30) { 
               const minutes = totalSeconds / 60;
