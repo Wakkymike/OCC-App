@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css'; // 🔑 Import Mapbox CSS
 import type { Bus } from '@/lib/types';
@@ -14,9 +14,8 @@ interface BusMapProps {
 export default function BusMap({ buses }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-
-  // Store markers so we can update positions instead of recreating
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
+  const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
 
   // ---------------------------
   // Initialize Map
@@ -34,6 +33,11 @@ export default function BusMap({ buses }: BusMapProps) {
 
     map.addControl(new mapboxgl.NavigationControl());
     
+    // Add a click listener to the map to deselect any bus
+    map.on('click', () => {
+        setSelectedBusId(null);
+    });
+
     map.on('load', () => {
       map.addSource('mapbox-traffic', {
         type: 'vector',
@@ -66,30 +70,71 @@ export default function BusMap({ buses }: BusMapProps) {
     return () => map.remove();
   }, []);
 
+  // ----------------------------------------
+  // Handle Bus Selection (Zoom, Fly, & Visibility)
+  // ----------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Update marker visibility
+    Object.entries(markersRef.current).forEach(([id, marker]) => {
+      const markerElement = marker.getElement();
+      if (selectedBusId) {
+        markerElement.style.display = id === selectedBusId ? 'flex' : 'none';
+      } else {
+        markerElement.style.display = 'flex';
+      }
+    });
+
+    // Fly to selected bus or back to default view
+    if (selectedBusId) {
+      const selectedMarker = markersRef.current[selectedBusId];
+      if (selectedMarker) {
+        map.flyTo({
+          center: selectedMarker.getLngLat(),
+          zoom: 16,
+          essential: true,
+        });
+      }
+    } else {
+      map.flyTo({
+        center: [-2.24, 53.48],
+        zoom: 11,
+        essential: true,
+      });
+    }
+  }, [selectedBusId]);
+
+
   // ---------------------------
   // Render / Update Bus Markers
   // ---------------------------
   useEffect(() => {
     if (!mapRef.current) return;
+    const map = mapRef.current;
 
     const currentMarkerIds = new Set(Object.keys(markersRef.current));
 
     buses.forEach((bus) => {
-      // A unique ID for each marker is crucial. A combination of fields that
-      // uniquely identifies a specific bus on a specific journey is best.
       const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}`;
       currentMarkerIds.delete(markerId);
 
-      // Create marker if it doesn't exist
-      if (!markersRef.current[markerId]) {
-        const el = document.createElement('div');
+      let marker = markersRef.current[markerId];
 
-        // Marker container
+      if (!marker) {
+        const el = document.createElement('div');
+        el.style.cursor = 'pointer';
         el.style.display = 'flex';
         el.style.flexDirection = 'column';
         el.style.alignItems = 'center';
         
-        // Flag showing info
+        // Add click listener to select the bus
+        el.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent the map's click event from firing
+            setSelectedBusId(markerId);
+        });
+
         const flag = document.createElement('div');
         flag.style.background = 'white';
         flag.style.padding = '2px 6px';
@@ -100,7 +145,6 @@ export default function BusMap({ buses }: BusMapProps) {
         flag.style.whiteSpace = 'nowrap';
         
         const iconContainer = document.createElement('div');
-        // SVG for the bus icon with an arrow. The arrow points up (0 degrees).
         iconContainer.innerHTML = `
           <svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(0deg); transition: transform 0.2s linear;">
             <circle cx="12" cy="15" r="9" fill="yellow" stroke="black" stroke-width="1.5" />
@@ -109,17 +153,16 @@ export default function BusMap({ buses }: BusMapProps) {
         `.trim();
         
         el.appendChild(flag);
-        el.appendChild(iconContainer.firstChild!); // Append the SVG element.
+        el.appendChild(iconContainer.firstChild!);
         
-        const marker = new mapboxgl.Marker(el)
+        marker = new mapboxgl.Marker(el)
           .setLngLat([bus.position.lng, bus.position.lat])
-          .addTo(mapRef.current!);
+          .addTo(map);
         
         markersRef.current[markerId] = marker;
       }
       
       // Update existing marker position and info
-      const marker = markersRef.current[markerId];
       marker.setLngLat([bus.position.lng, bus.position.lat]);
       const markerElement = marker.getElement();
       const flagElement = markerElement.querySelector('div') as HTMLDivElement;
@@ -149,7 +192,6 @@ export default function BusMap({ buses }: BusMapProps) {
 
       flagElement.innerHTML = `${bus.fleetNumber} | ${serviceDisplay} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}${statusDisplay}`;
       
-      // Rotate the SVG arrow based on bus bearing
       const svgElement = markerElement.querySelector('svg');
       if (svgElement && bus.bearing !== undefined) {
         svgElement.style.transform = `rotate(${bus.bearing}deg)`;
@@ -158,8 +200,14 @@ export default function BusMap({ buses }: BusMapProps) {
 
     // Remove markers for buses that are no longer in the feed
     currentMarkerIds.forEach((id) => {
-      markersRef.current[id].remove();
-      delete markersRef.current[id];
+      if(markersRef.current[id]) {
+        markersRef.current[id].remove();
+        delete markersRef.current[id];
+      }
+      // If the selected bus is one of the ones being removed, deselect it
+      if (id === selectedBusId) {
+        setSelectedBusId(null);
+      }
     });
   }, [buses]);
 
