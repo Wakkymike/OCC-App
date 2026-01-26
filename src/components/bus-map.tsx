@@ -64,12 +64,13 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
             'line-width': 1.5,
             'line-color': [
               'case',
-              ['==', 'heavy', ['get', 'congestion']],
-              '#e55e5e',
               ['==', 'severe', ['get', 'congestion']],
               '#b43b3b',
+              ['==', 'heavy', ['get', 'congestion']],
+              '#e55e5e',
               ['==', 'moderate', ['get', 'congestion']],
-              '#42c86b', // low and default
+              '#ffa500',
+              '#42c86b',
             ],
           },
         },
@@ -78,6 +79,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
     });
 
     return () => map.remove();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ----------------------------------------
