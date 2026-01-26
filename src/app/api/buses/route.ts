@@ -43,35 +43,32 @@ export async function GET() {
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '',
-      removeNSPrefix: true, // Remove XML namespace prefixes for easier parsing
+      removeNSPrefix: true,
     });
     const data = parser.parse(xmlText);
 
-    // Collect all VehicleActivities across all VehicleMonitoringDelivery
+    // Sometimes VehicleMonitoringDelivery is a single object
+    const deliveries = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery ?? [];
+    const deliveriesArray = Array.isArray(deliveries) ? deliveries : [deliveries];
+
     let vehicleActivities: VehicleActivityXml[] = [];
-    const deliveriesSource = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery;
 
-    if (deliveriesSource) {
-      const deliveries = Array.isArray(deliveriesSource)
-        ? deliveriesSource
-        : [deliveriesSource];
+    for (const delivery of deliveriesArray) {
+      let activities = delivery?.VehicleActivity ?? [];
+      if (!Array.isArray(activities)) activities = [activities];
+      vehicleActivities.push(...activities);
+    }
 
-      for (const delivery of deliveries) {
-        if (delivery && delivery.VehicleActivity) {
-          const activitySource = delivery.VehicleActivity;
-          const activities = Array.isArray(activitySource)
-            ? activitySource
-            : [activitySource];
-          vehicleActivities.push(...activities);
-        }
-      }
+    // Debug logs to confirm all vehicles
+    console.log(`Total VehicleActivity parsed: ${vehicleActivities.length}`);
+    if (vehicleActivities.length > 0 && vehicleActivities[0]?.MonitoredVehicleJourney?.VehicleRef) {
+        console.log(
+          'First 5 vehicle IDs:',
+          vehicleActivities.slice(0, 5).map(v => v.MonitoredVehicleJourney.VehicleRef)
+        );
     }
     
-    if (vehicleActivities.length === 0) {
-      console.warn('No VehicleActivity found in BODS feed');
-    }
-
-    const buses: Bus[] = (vehicleActivities || [])
+    const buses: Bus[] = vehicleActivities
       .map(activity => {
         const journey = activity?.MonitoredVehicleJourney;
         if (!journey || !journey.VehicleLocation || !journey.VehicleRef || !journey.LineRef || !journey.DestinationName) {
@@ -91,11 +88,14 @@ export async function GET() {
         };
       })
       .filter((bus): bus is Bus => bus !== null);
-      
-      console.log(`Returning ${buses.length} buses`);
-      return NextResponse.json(buses);
+
+    console.log(`Returning ${buses.length} buses`);
+    return NextResponse.json(buses);
   } catch (error) {
     console.error('Unexpected error fetching/parsing BODS XML:', error);
-    return NextResponse.json({ error: 'Unexpected error fetching bus data' }, { status: 500 });
+    return NextResponse.json(
+      { error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}` },
+      { status: 500 }
+    );
   }
 }
