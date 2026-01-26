@@ -106,7 +106,16 @@ export default function BusMap({ buses }: BusMapProps) {
         serviceDisplay += ` <span style="color: red;">(SCH)</span>`;
       }
 
-      flagElement.innerHTML = `${bus.fleetNumber} | ${serviceDisplay} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}`;
+      let statusDisplay = '';
+      if (bus.status) {
+        if (bus.status === 'moving') {
+          statusDisplay = `<br/><i style="color: green;">moving</i>`;
+        } else {
+          statusDisplay = `<br/><i style="color: red;">stopped</i>`;
+        }
+      }
+
+      flagElement.innerHTML = `${bus.fleetNumber} | ${serviceDisplay} | ${bus.destination.replace(/_/g, ' ')} | ${bus.runningBoard}${statusDisplay}`;
       
       // Rotate the SVG arrow based on bus bearing
       const svgElement = markerElement.querySelector('svg');
