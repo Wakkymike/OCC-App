@@ -74,7 +74,6 @@ export async function GET() {
         if (typeof delayValue === 'string') {
           delayStr = delayValue;
         } else if (delayValue && typeof delayValue === 'object' && '#text' in delayValue) {
-          // Handle cases where parser returns an object like { '#text': 'PT1M' }
           delayStr = (delayValue as any)['#text'];
         }
         
@@ -85,16 +84,15 @@ export async function GET() {
           const duration = delayStr.replace(/^-?P(T)?/, '');
           
           let totalSeconds = 0;
-          const hoursMatch = duration.match(/(\d+)H/);
-          if (hoursMatch) totalSeconds += parseInt(hoursMatch[1], 10) * 3600;
+          const hoursMatch = duration.match(/(\d+(?:\.\d+)?)H/);
+          if (hoursMatch) totalSeconds += parseFloat(hoursMatch[1]) * 3600;
 
-          const minutesMatch = duration.match(/(\d+)M/);
-          if (minutesMatch) totalSeconds += parseInt(minutesMatch[1], 10) * 60;
+          const minutesMatch = duration.match(/(\d+(?:\.\d+)?)M/);
+          if (minutesMatch) totalSeconds += parseFloat(minutesMatch[1]) * 60;
 
-          const secondsMatch = duration.match(/(\d+)S/);
-          if (secondsMatch) totalSeconds += parseInt(secondsMatch[1], 10);
+          const secondsMatch = duration.match(/(\d+(?:\.\d+)?)S/);
+          if (secondsMatch) totalSeconds += parseFloat(secondsMatch[1]);
           
-          // Only show delays/earliness of 30 seconds or more
           if (totalSeconds >= 30) { 
               const minutes = totalSeconds / 60;
               const roundedMinutes = Math.round(minutes);
