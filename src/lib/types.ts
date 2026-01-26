@@ -12,4 +12,5 @@ export interface Bus {
   position: LatLng;
   bearing?: number;
   status?: 'moving' | 'stopped';
+  speed?: number;
 }

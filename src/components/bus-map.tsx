@@ -108,10 +108,11 @@ export default function BusMap({ buses }: BusMapProps) {
 
       let statusDisplay = '';
       if (bus.status) {
+        const speedDisplay = bus.speed !== undefined ? ` (${bus.speed} mph)` : '';
         if (bus.status === 'moving') {
-          statusDisplay = `<br/><i style="color: green;">moving</i>`;
+          statusDisplay = `<br/><i style="color: green;">moving${speedDisplay}</i>`;
         } else {
-          statusDisplay = `<br/><i style="color: red;">stopped</i>`;
+          statusDisplay = `<br/><i style="color: red;">stopped${speedDisplay}</i>`;
         }
       }
 
