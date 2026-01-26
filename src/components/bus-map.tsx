@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css'; // 🔑 Import Mapbox CSS
 import type { Bus } from '@/lib/types';
@@ -9,13 +9,14 @@ mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
 
 interface BusMapProps {
   buses: Bus[];
+  selectedBusId: string | null;
+  setSelectedBusId: (id: string | null) => void;
 }
 
-export default function BusMap({ buses }: BusMapProps) {
+export default function BusMap({ buses, selectedBusId, setSelectedBusId }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
-  const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
 
   // ---------------------------
   // Initialize Map
@@ -68,7 +69,7 @@ export default function BusMap({ buses }: BusMapProps) {
     });
 
     return () => map.remove();
-  }, []);
+  }, [setSelectedBusId]);
 
   // ----------------------------------------
   // Handle Bus Selection (Zoom, Fly, & Visibility)
@@ -98,11 +99,16 @@ export default function BusMap({ buses }: BusMapProps) {
         });
       }
     } else {
-      map.flyTo({
-        center: [-2.24, 53.48],
-        zoom: 11,
-        essential: true,
-      });
+       // Only fly back to default view if the map is currently zoomed in.
+      // This prevents an unnecessary animation when the component first loads
+      // or when a search with multiple results is cleared.
+      if (map.getZoom() > 12) {
+          map.flyTo({
+              center: [-2.24, 53.48],
+              zoom: 11,
+              essential: true,
+          });
+      }
     }
   }, [selectedBusId]);
 
@@ -214,7 +220,7 @@ export default function BusMap({ buses }: BusMapProps) {
         setSelectedBusId(null);
       }
     });
-  }, [buses, selectedBusId]);
+  }, [buses, selectedBusId, setSelectedBusId]);
 
   return (
     <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />

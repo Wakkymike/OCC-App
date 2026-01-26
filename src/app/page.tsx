@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, FormEvent } from 'react';
+import { useMemo, useState, FormEvent, useEffect } from 'react';
 import BusMap from '@/components/bus-map';
 import { Search, Terminal } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -22,10 +22,15 @@ export default function Home() {
   // State for the active/submitted filter
   const [activeFilter, setActiveFilter] = useState<{ query: string; category: SearchCategory } | null>(null);
 
+  // State for the currently selected bus on the map
+  const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
+
+
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim() === '') {
         setActiveFilter(null);
+        setSelectedBusId(null);
     } else {
         setActiveFilter({ query: searchQuery, category: searchCategory });
     }
@@ -34,6 +39,7 @@ export default function Home() {
   const clearSearch = () => {
     setSearchQuery('');
     setActiveFilter(null);
+    setSelectedBusId(null);
   }
 
   const filteredBuses = useMemo(() => {
@@ -46,6 +52,23 @@ export default function Home() {
         return targetField.includes(lowercasedQuery);
     });
   }, [buses, activeFilter]);
+
+  // Effect to handle auto-selection when search returns a single bus
+  useEffect(() => {
+    if (activeFilter && activeFilter.query) {
+      if (filteredBuses.length === 1) {
+        const bus = filteredBuses[0];
+        // Construct the same unique ID used for markers in BusMap
+        const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}`;
+        setSelectedBusId(busId);
+      } else {
+        // If search yields multiple or no results, don't focus on any single bus
+        // This will cause the map to zoom out if it was previously focused.
+        setSelectedBusId(null);
+      }
+    }
+  }, [filteredBuses, activeFilter, setSelectedBusId]);
+
 
   return (
     <div className="h-dvh w-screen bg-background text-foreground font-body flex flex-col">
@@ -94,7 +117,11 @@ export default function Home() {
             </div>
         )}
         {mapboxAccessToken ? (
-          <BusMap buses={filteredBuses} />
+          <BusMap 
+            buses={filteredBuses} 
+            selectedBusId={selectedBusId}
+            setSelectedBusId={setSelectedBusId}
+          />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
             <Alert variant="destructive" className="max-w-lg">
