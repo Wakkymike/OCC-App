@@ -40,7 +40,11 @@ export async function GET() {
     }
 
     const xmlText = await response.text();
-    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '',
+      removeNSPrefix: true, // Remove XML namespace prefixes for easier parsing
+    });
     const data = parser.parse(xmlText);
 
     // Collect all VehicleActivities across all VehicleMonitoringDelivery
