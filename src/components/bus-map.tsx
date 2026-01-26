@@ -21,6 +21,13 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
   const placeMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
+  // Keep a ref to the setSelectedBusId function to avoid re-running effects
+  // that would cause the map to be re-initialized.
+  const setSelectedBusIdRef = useRef(setSelectedBusId);
+  useEffect(() => {
+    setSelectedBusIdRef.current = setSelectedBusId;
+  }, [setSelectedBusId]);
+
   // ---------------------------
   // Initialize Map
   // ---------------------------
@@ -39,7 +46,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
     
     // Add a click listener to the map to deselect any bus
     map.on('click', () => {
-        setSelectedBusId(null);
+        setSelectedBusIdRef.current(null);
     });
 
     map.on('load', () => {
@@ -72,7 +79,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
     });
 
     return () => map.remove();
-  }, [setSelectedBusId]);
+  }, []);
 
   // ----------------------------------------
   // Handle View Changes (Zoom, Pan, Bounds)
@@ -145,7 +152,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
         // Add click listener to select the bus
         el.addEventListener('click', (e) => {
             e.stopPropagation(); // Prevent the map's click event from firing
-            setSelectedBusId(markerId);
+            setSelectedBusIdRef.current(markerId);
         });
 
         const flag = document.createElement('div');
@@ -166,7 +173,9 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
         `.trim();
         
         el.appendChild(flag);
-        el.appendChild(iconContainer.firstChild!);
+        if (iconContainer.firstChild) {
+          el.appendChild(iconContainer.firstChild);
+        }
         
         marker = new mapboxgl.Marker(el)
           .setLngLat([bus.position.lng, bus.position.lat])
@@ -224,10 +233,10 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsT
       }
       // If the selected bus is one of the ones being removed, deselect it
       if (id === selectedBusId) {
-        setSelectedBusId(null);
+        setSelectedBusIdRef.current(null);
       }
     });
-  }, [buses, selectedBusId, setSelectedBusId]);
+  }, [buses, selectedBusId]);
 
   // ------------------------------------
   // Handle Searched Place
