@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import mapboxgl from 'mapbox-gl';
+import mapboxgl, { LngLatBoundsLike } from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css'; // 🔑 Import Mapbox CSS
 import type { Bus } from '@/lib/types';
 
@@ -11,9 +11,10 @@ interface BusMapProps {
   buses: Bus[];
   selectedBusId: string | null;
   setSelectedBusId: (id: string | null) => void;
+  boundsToFit?: LngLatBoundsLike | null;
 }
 
-export default function BusMap({ buses, selectedBusId, setSelectedBusId }: BusMapProps) {
+export default function BusMap({ buses, selectedBusId, setSelectedBusId, boundsToFit }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
@@ -72,13 +73,13 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId }: BusMa
   }, [setSelectedBusId]);
 
   // ----------------------------------------
-  // Handle Bus Selection (Zoom, Fly, & Visibility)
+  // Handle View Changes (Zoom, Pan, Bounds)
   // ----------------------------------------
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    // Update marker visibility
+    // Update marker visibility based on selection
     Object.entries(markersRef.current).forEach(([id, marker]) => {
       const markerElement = marker.getElement();
       if (selectedBusId) {
@@ -88,7 +89,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId }: BusMa
       }
     });
 
-    // Fly to selected bus or back to default view
+    // Fly to selected bus, fit bounds, or go back to default view
     if (selectedBusId) {
       const selectedMarker = markersRef.current[selectedBusId];
       if (selectedMarker) {
@@ -98,11 +99,15 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId }: BusMa
           essential: true,
         });
       }
+    } else if (boundsToFit) {
+        map.fitBounds(boundsToFit, {
+            padding: 100,
+            essential: true,
+        });
     } else {
        // Only fly back to default view if the map is currently zoomed in.
-      // This prevents an unnecessary animation when the component first loads
-      // or when a search with multiple results is cleared.
-      if (map.getZoom() > 12) {
+       const currentZoom = map.getZoom();
+       if (currentZoom > 12) {
           map.flyTo({
               center: [-2.24, 53.48],
               zoom: 11,
@@ -110,7 +115,7 @@ export default function BusMap({ buses, selectedBusId, setSelectedBusId }: BusMa
           });
       }
     }
-  }, [selectedBusId]);
+  }, [selectedBusId, boundsToFit]);
 
 
   // ---------------------------

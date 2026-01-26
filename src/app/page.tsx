@@ -8,6 +8,7 @@ import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from '@/components/ui/button';
+import type { LngLatBoundsLike } from 'mapbox-gl';
 
 type SearchCategory = 'fleetNumber' | 'service' | 'runningBoard';
 
@@ -25,12 +26,14 @@ export default function Home() {
   // State for the currently selected bus on the map
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
 
+  // State for bounds to fit multiple buses
+  const [bounds, setBounds] = useState<LngLatBoundsLike | null>(null);
+
 
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim() === '') {
         setActiveFilter(null);
-        setSelectedBusId(null);
     } else {
         setActiveFilter({ query: searchQuery, category: searchCategory });
     }
@@ -40,6 +43,7 @@ export default function Home() {
     setSearchQuery('');
     setActiveFilter(null);
     setSelectedBusId(null);
+    setBounds(null);
   }
 
   const filteredBuses = useMemo(() => {
@@ -53,21 +57,34 @@ export default function Home() {
     });
   }, [buses, activeFilter]);
 
-  // Effect to handle auto-selection when search returns a single bus
+  // Effect to handle map view based on search results
   useEffect(() => {
-    if (activeFilter && activeFilter.query) {
-      if (filteredBuses.length === 1) {
-        const bus = filteredBuses[0];
-        // Construct the same unique ID used for markers in BusMap
-        const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}`;
-        setSelectedBusId(busId);
-      } else {
-        // If search yields multiple or no results, don't focus on any single bus
-        // This will cause the map to zoom out if it was previously focused.
-        setSelectedBusId(null);
-      }
+    if (!activeFilter || !activeFilter.query) {
+      setSelectedBusId(null);
+      setBounds(null);
+      return;
     }
-  }, [filteredBuses, activeFilter, setSelectedBusId]);
+
+    if (filteredBuses.length === 1) {
+      // Single bus found: select it, clear bounds
+      const bus = filteredBuses[0];
+      const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}`;
+      setSelectedBusId(busId);
+      setBounds(null);
+    } else if (activeFilter.category === 'service' && filteredBuses.length > 1) {
+      // Multiple buses for a service: calculate bounds, clear selection
+      const lats = filteredBuses.map(b => b.position.lat);
+      const lngs = filteredBuses.map(b => b.position.lng);
+      const southWest: [number, number] = [Math.min(...lngs), Math.min(...lats)];
+      const northEast: [number, number] = [Math.max(...lngs), Math.max(...lats)];
+      setBounds([southWest, northEast]);
+      setSelectedBusId(null);
+    } else {
+      // No results, or multiple results for non-service category: clear selection and bounds
+      setSelectedBusId(null);
+      setBounds(null);
+    }
+  }, [filteredBuses, activeFilter]);
 
 
   return (
@@ -121,6 +138,7 @@ export default function Home() {
             buses={filteredBuses} 
             selectedBusId={selectedBusId}
             setSelectedBusId={setSelectedBusId}
+            boundsToFit={bounds}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
