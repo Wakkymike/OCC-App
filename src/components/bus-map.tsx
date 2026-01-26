@@ -197,9 +197,9 @@ export default function BusMap({ buses }: BusMapProps) {
         svgElement.style.transform = `rotate(${bus.bearing}deg)`;
       }
 
-      // If the bus is selected, pan the map to its new location
-      if (markerId === selectedBusId) {
-        map.panTo([bus.position.lng, bus.position.lat]);
+      // If the bus is selected and we are zoomed in, pan the map to its new location
+      if (markerId === selectedBusId && map.getZoom() > 14) {
+          map.panTo([bus.position.lng, bus.position.lat]);
       }
     });
 
