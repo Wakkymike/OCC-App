@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css'; // 🔑 Import Mapbox CSS
 import type { Bus } from '@/lib/types';
@@ -14,6 +14,7 @@ interface BusMapProps {
 export default function BusMap({ buses }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
 
   // Store markers so we can update positions instead of recreating
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
@@ -67,6 +68,72 @@ export default function BusMap({ buses }: BusMapProps) {
   }, []);
 
   // ---------------------------
+  // Draw Selected Bus Route
+  // ---------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const removeRoute = () => {
+      if (map.getLayer('bus-route-layer')) {
+        map.removeLayer('bus-route-layer');
+      }
+      if (map.getSource('bus-route')) {
+        map.removeSource('bus-route');
+      }
+    };
+
+    if (!selectedBusId) {
+      removeRoute();
+      return;
+    }
+
+    const selectedBus = buses.find(b => {
+      const id = `${b.fleetNumber}-${b.runningBoard}-${b.service}-${b.direction}`;
+      return id === selectedBusId;
+    });
+    
+    if (!selectedBus || !selectedBus.path || selectedBus.path.length < 2) {
+      removeRoute();
+      return;
+    }
+
+    const geojson: GeoJSON.Feature<GeoJSON.LineString> = {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'LineString',
+        coordinates: selectedBus.path.map(p => [p.lng, p.lat]),
+      },
+    };
+    
+    const source = map.getSource('bus-route') as mapboxgl.GeoJSONSource;
+
+    if (source) {
+      source.setData(geojson);
+    } else {
+      map.addSource('bus-route', {
+        type: 'geojson',
+        data: geojson,
+      });
+
+      map.addLayer({
+        id: 'bus-route-layer',
+        type: 'line',
+        source: 'bus-route',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        paint: {
+          'line-color': '#007cbf',
+          'line-width': 4,
+        },
+      });
+    }
+  }, [selectedBusId, buses]);
+
+  // ---------------------------
   // Render / Update Bus Markers
   // ---------------------------
   useEffect(() => {
@@ -89,6 +156,11 @@ export default function BusMap({ buses }: BusMapProps) {
         el.style.flexDirection = 'column';
         el.style.alignItems = 'center';
         el.style.cursor = 'pointer';
+
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setSelectedBusId(prevId => (prevId === markerId ? null : markerId));
+        });
 
         // Flag showing info
         const flag = document.createElement('div');

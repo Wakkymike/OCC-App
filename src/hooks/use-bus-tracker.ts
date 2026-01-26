@@ -2,7 +2,7 @@
 // This hook fetches data from the API route defined in `src/app/api/buses/route.ts`
 
 import { useState, useEffect, useRef } from 'react';
-import type { Bus } from '@/lib/types';
+import type { Bus, LatLng } from '@/lib/types';
 
 const FETCH_INTERVAL = 5000; // 5 seconds
 
@@ -27,6 +27,7 @@ export function useBusTracker() {
   const [buses, setBuses] = useState<Bus[]>([]);
   const [error, setError] = useState<string | null>(null);
   const previousBusesMapRef = useRef<Map<string, Bus>>(new Map());
+  const busPathsRef = useRef<Map<string, LatLng[]>>(new Map());
 
   // Fetch all buses from the API
   useEffect(() => {
@@ -46,7 +47,7 @@ export function useBusTracker() {
         const previousBusesMap = previousBusesMapRef.current;
         const newBusesMap = new Map<string, Bus>();
 
-        const busesWithStatus = newBuses.map(bus => {
+        const busesWithStatus: Bus[] = newBuses.map(bus => {
           const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}`;
           newBusesMap.set(markerId, bus);
 
@@ -73,7 +74,15 @@ export function useBusTracker() {
             }
           }
           
-          return { ...bus, status, speed: speedMph };
+          const path = busPathsRef.current.get(markerId) || [];
+          const lastPosition = path[path.length - 1];
+          let updatedPath = path;
+          if (!lastPosition || lastPosition.lat !== bus.position.lat || lastPosition.lng !== bus.position.lng) {
+              updatedPath = [...path, bus.position];
+          }
+          busPathsRef.current.set(markerId, updatedPath);
+
+          return { ...bus, status, speed: speedMph, path: updatedPath };
         });
 
         setBuses(busesWithStatus);
