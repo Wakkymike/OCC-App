@@ -1,21 +1,46 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import BusMap from '@/components/bus-map';
-import { Terminal } from 'lucide-react';
+import { Search, Terminal } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useBusTracker } from '@/hooks/use-bus-tracker';
+import { Input } from '@/components/ui/input';
 
 export default function Home() {
   const mapboxAccessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
   const { buses, error } = useBusTracker();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredBuses = useMemo(() => {
+    if (!searchQuery) {
+      return buses;
+    }
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return buses.filter(bus => 
+      bus.fleetNumber.toLowerCase().includes(lowercasedQuery) ||
+      bus.service.toLowerCase().includes(lowercasedQuery) ||
+      bus.runningBoard.toLowerCase().includes(lowercasedQuery)
+    );
+  }, [buses, searchQuery]);
 
   return (
     <div className="h-dvh w-screen bg-background text-foreground font-body flex flex-col">
       <header className="bg-card border-b shadow-sm z-20 shrink-0">
-        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-accent">
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center gap-4">
+          <h1 className="text-xl font-bold text-accent whitespace-nowrap">
             Go NorthWest Bus Tracker
           </h1>
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search by fleet, service, or board..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
       </header>
       <main className="flex-1 relative">
@@ -32,7 +57,7 @@ export default function Home() {
             </div>
         )}
         {mapboxAccessToken ? (
-          <BusMap buses={buses} />
+          <BusMap buses={filteredBuses} />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
             <Alert variant="destructive" className="max-w-lg">
