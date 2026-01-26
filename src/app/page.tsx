@@ -1,6 +1,6 @@
 'use client';
 
-import BusMap from '@/lib/bus-map';
+import BusMap from '@/components/bus-map';
 import { Terminal } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useBusTracker } from '@/hooks/use-bus-tracker';

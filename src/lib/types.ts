@@ -1,3 +1,5 @@
+// src/lib/types.ts
+
 export interface LatLng {
   lat: number;
   lng: number;
@@ -5,10 +7,10 @@ export interface LatLng {
 
 export interface Bus {
   id: string;
-  fleetNumber: string;
-  service: string;
-  runningBoard: string;
-  direction: 'inbound' | 'outbound' | string;
-  destination?: string;
+  fleetNumber: string;      // VehicleRef
+  runningBoard: string;     // BlockRef
+  service: string;          // PublishedLineName
+  destination: string;      // DestinationName
+  direction: string;        // DirectionRef
   position: LatLng;
 }

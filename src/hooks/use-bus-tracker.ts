@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Bus } from '@/lib/types';
+import { XMLParser } from 'fast-xml-parser';
 
 const FETCH_INTERVAL = 5000; // 5 seconds
 
@@ -10,8 +11,6 @@ export function useBusTracker() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let intervalId: NodeJS.Timer;
-
     const fetchBuses = async () => {
       try {
         const apiKey = process.env.BODS_API_KEY;
@@ -34,21 +33,19 @@ export function useBusTracker() {
         const xmlText = await response.text();
 
         // Parse XML
-        const { XMLParser } = await import('fast-xml-parser');
         const parser = new XMLParser({
           ignoreAttributes: false,
           attributeNamePrefix: '',
           removeNSPrefix: true,
         });
-        const data = parser.parse(xmlText);
+        const data: any = parser.parse(xmlText);
 
-        // Collect all VehicleActivity
+        // Collect all VehicleActivity entries
         const deliveries = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery ?? [];
         const deliveriesArray = Array.isArray(deliveries) ? deliveries : [deliveries];
 
         let vehicleActivities: any[] = [];
-
-        deliveriesArray.forEach((delivery: any) => {
+        deliveriesArray.forEach((delivery) => {
           let activities = delivery?.VehicleActivity ?? [];
           if (!activities) return;
           if (!Array.isArray(activities)) activities = [activities];
@@ -66,19 +63,20 @@ export function useBusTracker() {
             if (isNaN(lat) || isNaN(lng)) return null;
 
             return {
-              fleetNumber: journey.VehicleRef ?? 'unknown',
-              runningBoard: journey.BlockRef ?? 'unknown',
-              service: journey.PublishedLineName ?? 'unknown',
-              destination: journey.DestinationName?.replace(/_/g, ' ') ?? 'unknown',
-              direction: journey.DirectionRef ?? 'unknown',
+              id: String(journey.VehicleRef ?? 'unknown'),
+              fleetNumber: String(journey.VehicleRef ?? 'unknown'),
+              runningBoard: String(journey.BlockRef ?? 'unknown'),
+              service: String(journey.PublishedLineName ?? 'unknown'),
+              destination: String(journey.DestinationName?.replace(/_/g, ' ') ?? 'unknown'),
+              direction: String(journey.DirectionRef ?? 'unknown'),
               position: { lat, lng },
             };
           })
-          .filter(Boolean) as Bus[];
+          .filter((bus): bus is Bus => bus !== null); // type guard
 
         setBuses(mappedBuses);
         setError(null);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching BODS buses:', err);
         setError(err instanceof Error ? err.message : String(err));
         setBuses([]);
@@ -86,7 +84,9 @@ export function useBusTracker() {
     };
 
     fetchBuses();
-    intervalId = setInterval(fetchBuses, FETCH_INTERVAL);
+
+    // ✅ Browser-safe interval
+    const intervalId = window.setInterval(fetchBuses, FETCH_INTERVAL);
 
     return () => clearInterval(intervalId);
   }, []);
