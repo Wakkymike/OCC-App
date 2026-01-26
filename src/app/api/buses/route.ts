@@ -91,18 +91,10 @@ export async function GET() {
         };
       })
       .filter((bus): bus is Bus => bus !== null);
-
-    console.log(`Total VehicleActivity parsed: ${vehicleActivities.length}`);
-    console.log('First 5 vehicles:', vehicleActivities.slice(0,5).map(v => v.MonitoredVehicleJourney.VehicleRef));
-    console.log('Positions for first 5 vehicles:', vehicleActivities.slice(0,5).map(v => v.MonitoredVehicleJourney.VehicleLocation));
-
-    console.log(`Returning ${buses.length} buses to frontend`);
-    return NextResponse.json(buses);
+      
+      return NextResponse.json(buses);
   } catch (error) {
     console.error('Unexpected error fetching/parsing BODS XML:', error);
-    return NextResponse.json(
-      { error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}` },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Unexpected error fetching bus data' }, { status: 500 });
   }
 }
