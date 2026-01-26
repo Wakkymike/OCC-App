@@ -7,7 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Bus } from '@/lib/types';
+import type { Bus, LatLng } from '@/lib/types';
 
 type SearchCategory = 'fleetNumber' | 'service' | 'runningBoard' | 'journeyRef';
 
@@ -24,14 +24,19 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchCategory, setSearchCategory] = useState<SearchCategory>('fleetNumber');
 
-  const filteredBuses = useMemo(() => {
+  const zoomToPosition = useMemo((): LatLng | null => {
     if (!searchTerm.trim()) {
-      return buses;
+      return null;
     }
-    return buses.filter((bus) => {
+    const filtered = buses.filter((bus) => {
       const value = bus[searchCategory];
       return value?.toString().toLowerCase().includes(searchTerm.toLowerCase());
     });
+
+    if (filtered.length === 1) {
+      return filtered[0].position;
+    }
+    return null;
   }, [buses, searchTerm, searchCategory]);
 
 
@@ -66,7 +71,7 @@ export default function Home() {
       </header>
       <main className="flex-1 relative">
         {mapboxAccessToken ? (
-          <BusMap buses={filteredBuses} />
+          <BusMap buses={buses} zoomToPosition={zoomToPosition} />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
             <Alert variant="destructive" className="max-w-lg">
