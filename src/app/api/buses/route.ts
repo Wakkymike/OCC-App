@@ -8,7 +8,10 @@ export async function GET() {
 
   if (!apiKey) {
     console.error('BODS_API_KEY missing');
-    return NextResponse.json({ error: "Server configuration error: BODS_API_KEY is missing." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Server configuration error: BODS_API_KEY is missing." },
+      { status: 500 }
+    );
   }
 
   const url = `https://data.bus-data.dft.gov.uk/api/v1/datafeed/${feedId}/?api_key=${apiKey}`;
@@ -16,11 +19,14 @@ export async function GET() {
   try {
     const response = await fetch(url, { cache: 'no-store' });
     if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`BODS API error: ${response.status}`, errorText.slice(0, 500));
-        return NextResponse.json({ error: `Failed to fetch data from bus API. Status: ${response.status}`}, { status: response.status });
+      const errorText = await response.text();
+      console.error(`BODS API error: ${response.status}`, errorText.slice(0, 500));
+      return NextResponse.json(
+        { error: `Failed to fetch data from bus API. Status: ${response.status}` },
+        { status: response.status }
+      );
     }
-    
+
     const xmlText = await response.text();
 
     const parser = new XMLParser({
@@ -35,12 +41,12 @@ export async function GET() {
     const deliveriesArray = Array.isArray(deliveries) ? deliveries : [deliveries];
 
     let vehicleActivities: any[] = [];
-
     for (const delivery of deliveriesArray) {
       if (delivery.ErrorCondition) {
         console.error('BODS API returned error condition:', delivery.ErrorCondition.Description);
         continue;
       }
+
       let activities = delivery?.VehicleActivity ?? [];
       if (!activities) continue;
       if (!Array.isArray(activities)) activities = [activities];
@@ -48,9 +54,9 @@ export async function GET() {
     }
 
     let skippedCount = 0;
-    
+
     const buses: Bus[] = vehicleActivities
-      .map(activity => {
+      .map((activity): Bus | null => {
         const journey = activity.MonitoredVehicleJourney;
 
         if (!journey?.VehicleLocation?.Latitude || !journey?.VehicleLocation?.Longitude) {
@@ -65,53 +71,23 @@ export async function GET() {
           skippedCount++;
           return null;
         }
-        
+
         const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
-        
-        const delayValue = journey.Delay;
-        let delayStr: string | undefined;
 
-        if (typeof delayValue === 'string') {
-          delayStr = delayValue;
-        } else if (delayValue && typeof delayValue === 'object' && '#text' in delayValue) {
-          delayStr = (delayValue as any)['#text'];
-        }
-        
-        let delayInMinutes: number | undefined = undefined;
-
-        if (delayStr && delayStr !== 'PT0S') {
-          const sign = delayStr.startsWith('-') ? -1 : 1;
-          let duration = delayStr.replace(/^-?P(T)?/, '');
-          
-          let totalSeconds = 0;
-          
-          if (duration.includes('H')) {
-            const parts = duration.split('H');
-            if (parts[0] && !isNaN(parseFloat(parts[0]))) {
-                totalSeconds += parseFloat(parts[0]) * 3600;
+        // Optional: parse delay in minutes
+        let delayInMinutes: number | undefined;
+        if (journey.Delay) {
+          const raw = typeof journey.Delay === 'string' ? journey.Delay : journey.Delay['#text'];
+          if (raw && raw !== 'PT0S') {
+            const match = raw.match(/(-)?PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+            if (match) {
+              const sign = match[1] === '-' ? -1 : 1;
+              const hours = parseInt(match[2] || '0', 10);
+              const minutes = parseInt(match[3] || '0', 10);
+              const seconds = parseInt(match[4] || '0', 10);
+              const totalMinutes = Math.round((hours * 60 + minutes + seconds / 60) * sign);
+              if (totalMinutes !== 0) delayInMinutes = totalMinutes;
             }
-            duration = parts[1] || '';
-          }
-          if (duration.includes('M')) {
-            const parts = duration.split('M');
-            if (parts[0] && !isNaN(parseFloat(parts[0]))) {
-                totalSeconds += parseFloat(parts[0]) * 60;
-            }
-            duration = parts[1] || '';
-          }
-          if (duration.includes('S')) {
-            const parts = duration.split('S');
-            if (parts[0] && !isNaN(parseFloat(parts[0]))) {
-                totalSeconds += parseFloat(parts[0]);
-            }
-          }
-          
-          if (totalSeconds >= 30) { 
-              const minutes = totalSeconds / 60;
-              const roundedMinutes = Math.round(minutes);
-              if (roundedMinutes !== 0) {
-                delayInMinutes = roundedMinutes * sign;
-              }
           }
         }
 
@@ -127,10 +103,10 @@ export async function GET() {
           delay: delayInMinutes,
         };
       })
-      .filter((bus): bus is Bus => bus !== null);
+      .filter((bus): bus is Bus => bus !== null); // ✅ TypeScript knows this is Bus[]
 
     if (skippedCount > 0) {
-        console.log(`Skipped ${skippedCount} buses due to missing location data.`);
+      console.log(`Skipped ${skippedCount} buses due to missing or invalid location data.`);
     }
 
     return NextResponse.json({ buses });
