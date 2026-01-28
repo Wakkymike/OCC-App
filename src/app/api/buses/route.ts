@@ -52,8 +52,6 @@ const parseISODuration = (duration: string): number | undefined => {
     if (minutesMatch) totalSeconds += parseFloat(minutesMatch[1]) * 60;
     if (secondsMatch) totalSeconds += parseFloat(secondsMatch[1]);
     
-    if (totalSeconds === 0 && duration.length > 3) return undefined; // Invalid parse
-
     if (isNegative) totalSeconds = -totalSeconds;
     
     return Math.round(totalSeconds / 60);
