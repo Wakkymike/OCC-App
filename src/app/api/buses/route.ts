@@ -74,47 +74,53 @@ export async function GET() {
 
         const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
 
-        // --- Calculate Delay ---
-        // The bus data can provide delay in two ways:
-        // 1. A `Delay` field (ISO 8601 duration)
-        // 2. A set of `OnwardCalls` with aimed vs. expected arrival times.
-        // We will try the `Delay` field first and fall back to `OnwardCalls`.
-
+        // --- Robust Delay Calculation ---
         let delayInMinutes: number | undefined;
 
-        // Method 1: Parse the `Delay` field if it exists.
+        // Method 1: Attempt to parse the 'Delay' field (ISO 8601 duration). This is the preferred method.
         if (journey.Delay) {
           const rawDelay = typeof journey.Delay === 'string' ? journey.Delay : journey.Delay['#text'];
           if (rawDelay && typeof rawDelay === 'string') {
-            const match = rawDelay.match(/(-)?PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+            // Regex for ISO 8601 duration format, e.g., 'PT1M30S' or '-PT2M'
+            const match = rawDelay.match(/(-)?PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(\.\d+)?)S)?/);
             if (match) {
-              const sign = match[1] === '-' ? -1 : 1;
-              const hours = parseInt(match[2] || '0', 10);
-              const minutes = parseInt(match[3] || '0', 10);
-              const seconds = parseInt(match[4] || '0', 10);
-              const totalSeconds = (hours * 3600 + minutes * 60 + seconds) * sign;
-              delayInMinutes = Math.round(totalSeconds / 60);
+                try {
+                    const sign = match[1] === '-' ? -1 : 1;
+                    const hours = parseInt(match[2] || '0', 10);
+                    const minutes = parseInt(match[3] || '0', 10);
+                    const seconds = parseFloat(match[4] || '0');
+                    
+                    if (!isNaN(hours) && !isNaN(minutes) && !isNaN(seconds)) {
+                        const totalSeconds = (hours * 3600 + minutes * 60 + seconds) * sign;
+                        delayInMinutes = Math.round(totalSeconds / 60);
+                    }
+                } catch {
+                    // Ignore parsing errors, will fallback to method 2.
+                }
             }
           }
         }
 
-        // Method 2: If no delay was found, calculate from the first onward call.
+        // Method 2: If 'Delay' field is not present or failed, calculate from the first available OnwardCall.
         if (delayInMinutes === undefined && journey.OnwardCalls?.OnwardCall) {
           const onwardCalls = Array.isArray(journey.OnwardCalls.OnwardCall)
             ? journey.OnwardCalls.OnwardCall
             : [journey.OnwardCalls.OnwardCall];
           
-          if (onwardCalls.length > 0) {
-            const firstCall = onwardCalls[0];
-            if (firstCall.AimedArrivalTime && firstCall.ExpectedArrivalTime) {
-              const aimed = new Date(firstCall.AimedArrivalTime);
-              const expected = new Date(firstCall.ExpectedArrivalTime);
-              if (!isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
-                const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
-                // We only consider it a valid delay if it's not a huge number (e.g., > 1 day)
-                if (Math.abs(diffSeconds) < 86400) { 
-                  delayInMinutes = Math.round(diffSeconds / 60);
-                }
+          // Find the first call that has both aimed and expected arrival times.
+          const firstValidCall = onwardCalls.find(call => call.AimedArrivalTime && call.ExpectedArrivalTime);
+          
+          if (firstValidCall) {
+            const aimed = new Date(firstValidCall.AimedArrivalTime);
+            const expected = new Date(firstValidCall.ExpectedArrivalTime);
+            
+            // Ensure both dates are valid before calculating.
+            if (!isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
+              const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
+              
+              // Sanity check: A huge delay is likely a data error, so we ignore it.
+              if (Math.abs(diffSeconds) < 86400) { // less than 1 day
+                delayInMinutes = Math.round(diffSeconds / 60);
               }
             }
           }
