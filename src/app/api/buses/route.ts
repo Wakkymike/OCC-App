@@ -3,7 +3,20 @@ import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
 import type { Bus } from '@/lib/types';
 
-// Helper function moved outside GET to avoid re-declaration and ensure scope.
+// Helper to safely extract a text value from a field which might be a string or an object with a #text property.
+const getText = (field: any): string | undefined => {
+    if (field === undefined || field === null) return undefined;
+    if (typeof field === 'object' && '#text' in field) {
+        return field['#text'];
+    }
+    if (typeof field === 'string' || typeof field === 'number' || typeof field === 'boolean') {
+        return String(field);
+    }
+    return undefined;
+};
+
+
+// Helper to calculate delay by comparing aimed vs expected times.
 const calculateDelayFromTimes = (call: any): number | undefined => {
     if (!call) return undefined;
 
@@ -20,12 +33,11 @@ const calculateDelayFromTimes = (call: any): number | undefined => {
         return undefined;
     }
     
-    // Handle cases where the value is in a '#text' property due to XML attributes
-    const aimedTimeStr = (typeof aimedTimeVal === 'object' && aimedTimeVal !== null && '#text' in aimedTimeVal) ? aimedTimeVal['#text'] : aimedTimeVal;
-    const expectedTimeStr = (typeof expectedTimeVal === 'object' && expectedTimeVal !== null && '#text' in expectedTimeVal) ? expectedTimeVal['#text'] : expectedTimeVal;
+    const aimedTimeStr = getText(aimedTimeVal);
+    const expectedTimeStr = getText(expectedTimeVal);
 
     // Ensure we have valid, non-empty strings before creating Date objects
-    if (typeof aimedTimeStr !== 'string' || typeof expectedTimeStr !== 'string' || !aimedTimeStr || !expectedTimeStr) {
+    if (!aimedTimeStr || !expectedTimeStr) {
         return undefined;
     }
 
@@ -85,7 +97,7 @@ export async function GET() {
     let vehicleActivities: any[] = [];
     for (const delivery of deliveriesArray) {
       if (delivery.ErrorCondition) {
-        console.error('BODS API returned error condition:', delivery.ErrorCondition.Description);
+        console.error('BODS API returned error condition:', getText(delivery.ErrorCondition.Description));
         continue;
       }
 
@@ -100,22 +112,28 @@ export async function GET() {
     const buses: Bus[] = vehicleActivities
       .map((activity): Bus | null => {
         const journey = activity.MonitoredVehicleJourney;
-        
-        // --- NEW CANCELLATION CHECK ---
-        const progressStatusText = (journey.ProgressStatus || '').toLowerCase();
+        if (!journey) return null;
+
+        const fleetNumber = getText(journey.VehicleRef);
+        const runningBoard = getText(journey.BlockRef);
+        const service = getText(journey.PublishedLineName);
+        const destination = getText(journey.DestinationName)?.replace(/_/g, ' ');
+        const direction = getText(journey.DirectionRef);
+        const journeyRef = getText(journey.FramedVehicleJourneyRef?.DatedVehicleJourneyRef);
+
+        // --- CANCELLATION CHECK ---
+        const progressStatusText = getText(journey.ProgressStatus)?.toLowerCase() ?? '';
         if (progressStatusText.includes('cancelled')) {
           return {
-            fleetNumber: journey.VehicleRef,
-            runningBoard: journey.BlockRef ?? 'unknown',
-            service: journey.PublishedLineName ?? 'unknown',
-            destination: (journey.DestinationName ?? 'unknown').replace(/_/g, ' '),
-            direction: journey.DirectionRef ?? 'unknown',
-            journeyRef: journey.FramedVehicleJourneyRef?.DatedVehicleJourneyRef,
+            fleetNumber: fleetNumber ?? 'unknown',
+            runningBoard: runningBoard ?? 'unknown',
+            service: service ?? 'unknown',
+            destination: destination ?? 'Cancelled',
+            direction: direction ?? 'unknown',
+            journeyRef: journeyRef,
             status: 'Cancelled',
-            // No position data for cancelled buses
           };
         }
-
 
         if (!journey?.VehicleLocation?.Latitude || !journey?.VehicleLocation?.Longitude) {
           skippedCount++;
@@ -130,29 +148,23 @@ export async function GET() {
           return null;
         }
         
-        const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
+        const bearing = journey.Bearing ? parseFloat(getText(journey.Bearing)!) : undefined;
         
         const monitoredCall = journey.MonitoredCall;
-        const nextStopName = monitoredCall?.StopPointName;
-        const nextStop = (typeof nextStopName === 'object' && nextStopName !== null && '#text' in nextStopName) 
-            ? nextStopName['#text'] 
-            : nextStopName;
+        const nextStop = getText(monitoredCall?.StopPointName)?.replace(/_/g, ' ');
 
 
-        // --- NEW, MOST ROBUST STATUS CALCULATION ---
+        // --- MULTI-LAYERED STATUS CALCULATION ---
         let delayInMinutes: number | undefined;
-        let status: string = 'Unknown'; // Default status
+        let status: string = 'Unknown';
 
         // Method 1: Calculate from scheduled vs expected times. This is often the most reliable.
         const callsToCheck = [];
-        if (journey.MonitoredCall) {
-            callsToCheck.push(journey.MonitoredCall);
-        }
+        if (journey.MonitoredCall) callsToCheck.push(journey.MonitoredCall);
+        
         if (journey.OnwardCalls?.OnwardCall) {
-            const onwardCalls = Array.isArray(journey.OnwardCalls.OnwardCall)
-              ? journey.OnwardCalls.OnwardCall
-              : [journey.OnwardCalls.OnwardCall];
-            callsToCheck.push(...onwardCalls);
+            const onward = Array.isArray(journey.OnwardCalls.OnwardCall) ? journey.OnwardCalls.OnwardCall : [journey.OnwardCalls.OnwardCall];
+            callsToCheck.push(...onward);
         }
 
         for (const call of callsToCheck) {
@@ -164,17 +176,29 @@ export async function GET() {
         }
 
         // Method 2: Fallback to the <Delay> field if calculation fails.
-        // This field is often in seconds. We won't parse complex ISO durations.
         if (delayInMinutes === undefined) {
-            const delayValue = journey.Delay;
-            if (delayValue !== undefined && delayValue !== null) {
-                const rawDelay = (typeof delayValue === 'object' && '#text' in delayValue) 
-                  ? delayValue['#text'] 
-                  : delayValue;
-                
-                if (!isNaN(Number(rawDelay))) {
-                    const delaySeconds = Number(rawDelay);
-                    // Only consider delays if they are less than a day
+            const delayText = getText(journey.Delay);
+            if (delayText) {
+                // Handle ISO 8601 Duration format (e.g., 'PT2M30S', '-PT1M')
+                if (delayText.startsWith('PT') || delayText.startsWith('-PT')) {
+                    const isNegative = delayText.startsWith('-');
+                    const durationStr = isNegative ? delayText.substring(1) : delayText;
+                    try {
+                        const minutesMatch = durationStr.match(/(\d+)M/);
+                        const secondsMatch = durationStr.match(/(\d+)S/);
+                        const minutes = minutesMatch ? parseInt(minutesMatch[1], 10) : 0;
+                        const seconds = secondsMatch ? parseInt(secondsMatch[1], 10) : 0;
+                        let totalSeconds = (minutes * 60) + seconds;
+                        if (isNegative) totalSeconds = -totalSeconds;
+                        
+                        if (Math.abs(totalSeconds) < 86400) {
+                            delayInMinutes = Math.round(totalSeconds / 60);
+                        }
+                    } catch (e) { /* Parsing failed, continue */ }
+                } 
+                // Handle raw seconds format
+                else if (!isNaN(Number(delayText))) {
+                    const delaySeconds = Number(delayText);
                     if (Math.abs(delaySeconds) < 86400) { 
                         delayInMinutes = Math.round(delaySeconds / 60);
                     }
@@ -184,20 +208,17 @@ export async function GET() {
         
         // Method 3: Final fallback to text-based status indicators.
         if (delayInMinutes === undefined) {
-            const progressStatus = (journey.ProgressStatus || '').toLowerCase();
-            if (progressStatus.includes('on time')) {
+            if (progressStatusText.includes('on time')) {
                 status = 'On Time';
                 delayInMinutes = 0; // Set to 0 so the formatter below provides a consistent message
-            } else if (progressStatus.includes('late')) {
+            } else if (progressStatusText.includes('late')) {
                 status = 'Late';
-            } else if (progressStatus.includes('early')) {
+            } else if (progressStatusText.includes('early')) {
                 status = 'Early';
             }
         }
 
-
-        // Finally, set the status string based on the numeric delay, if we have one.
-        // This will override generic statuses like 'Late' with a more specific 'X min late'.
+        // Finally, set the specific status string based on the numeric delay, if we have one.
         if (delayInMinutes !== undefined) {
             if (delayInMinutes > 2) {
               status = `${delayInMinutes} min late`;
@@ -209,17 +230,17 @@ export async function GET() {
         }
 
         return {
-          fleetNumber: journey.VehicleRef,
-          runningBoard: journey.BlockRef ?? 'unknown',
-          service: journey.PublishedLineName ?? 'unknown',
-          destination: (journey.DestinationName ?? 'unknown').replace(/_/g, ' '),
-          direction: journey.DirectionRef ?? 'unknown',
+          fleetNumber: fleetNumber ?? 'unknown',
+          runningBoard: runningBoard ?? 'unknown',
+          service: service ?? 'unknown',
+          destination: destination ?? 'unknown',
+          direction: direction ?? 'unknown',
           position: { lat, lng },
           bearing: bearing && !Number.isNaN(bearing) ? bearing : undefined,
-          journeyRef: journey.FramedVehicleJourneyRef?.DatedVehicleJourneyRef,
+          journeyRef: journeyRef,
           delay: delayInMinutes,
           status: status,
-          nextStop: nextStop ? nextStop.replace(/_/g, ' ') : undefined,
+          nextStop: nextStop,
         };
       })
       .filter((bus): bus is Bus => bus !== null);
