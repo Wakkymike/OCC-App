@@ -3,6 +3,35 @@ import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
 import type { Bus } from '@/lib/types';
 
+// Helper function moved outside GET to avoid re-declaration and ensure scope.
+const calculateDelayFromTimes = (call: any): number | undefined => {
+    if (!call) return undefined;
+
+    let aimed: Date | undefined, expected: Date | undefined;
+
+    // Prefer arrival times, but fallback to departure times
+    if (call.AimedArrivalTime && call.ExpectedArrivalTime) {
+        aimed = new Date(call.AimedArrivalTime);
+        expected = new Date(call.ExpectedArrivalTime);
+    } else if (call.AimedDepartureTime && call.ExpectedDepartureTime) {
+        aimed = new Date(call.AimedDepartureTime);
+        expected = new Date(call.ExpectedDepartureTime);
+    } else {
+        return undefined;
+    }
+        
+    if (aimed && expected && !isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
+        const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
+        
+        // Sanity check: A huge delay is likely a data error (e.g., > 1 day)
+        if (Math.abs(diffSeconds) < 86400) { 
+            return Math.round(diffSeconds / 60);
+        }
+    }
+    return undefined;
+}
+
+
 export async function GET() {
   const apiKey = process.env.BODS_API_KEY;
   const feedId = '18880';
@@ -73,85 +102,61 @@ export async function GET() {
           return null;
         }
         
-        const calculateDelayFromTimes = (call: any): number | undefined => {
-            if (!call) return undefined;
-
-            let aimed: Date | undefined, expected: Date | undefined;
-
-            // Prefer arrival times, but fallback to departure times
-            if (call.AimedArrivalTime && call.ExpectedArrivalTime) {
-                aimed = new Date(call.AimedArrivalTime);
-                expected = new Date(call.ExpectedArrivalTime);
-            } else if (call.AimedDepartureTime && call.ExpectedDepartureTime) {
-                aimed = new Date(call.AimedDepartureTime);
-                expected = new Date(call.ExpectedDepartureTime);
-            } else {
-                return undefined;
-            }
-                
-            if (aimed && expected && !isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
-                const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
-                
-                // Sanity check: A huge delay is likely a data error (e.g., > 1 day)
-                if (Math.abs(diffSeconds) < 86400) { 
-                    return Math.round(diffSeconds / 60);
-                }
-            }
-            return undefined;
-        }
-
         const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
 
         // --- New Robust Delay Calculation ---
         let delayInMinutes: number | undefined;
 
-        // Method 1: Attempt to parse the 'Delay' field (ISO 8601 duration).
-        const rawDelay = typeof journey.Delay === 'string' 
-            ? journey.Delay 
-            : (journey.Delay && typeof journey.Delay === 'object' && '#text' in journey.Delay) 
-                ? journey.Delay['#text'] 
-                : null;
-                
-        if (rawDelay && typeof rawDelay === 'string') {
-            const match = rawDelay.match(/(-)?P(?:T)?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(\.\d+)?)S)?/);
-            if (match) {
-                try {
-                    const sign = match[1] === '-' ? -1 : 1;
-                    const hours = parseInt(match[2] || '0', 10);
-                    const minutes = parseInt(match[3] || '0', 10);
-                    const seconds = parseFloat(match[4] || '0');
-                    
-                    if (!isNaN(hours) && !isNaN(minutes) && !isNaN(seconds)) {
-                        if (hours > 0 || minutes > 0 || seconds > 0) {
-                            const totalSeconds = (hours * 3600 + minutes * 60 + seconds) * sign;
-                            delayInMinutes = Math.round(totalSeconds / 60);
-                        } else if (rawDelay.includes('PT0S') || rawDelay.includes('P0S') || rawDelay === 'P0D') {
-                            delayInMinutes = 0;
-                        }
-                    }
-                } catch {
-                    // Ignore parsing errors, will fallback.
-                }
+        // Method 1: Parse the 'Delay' field (ISO 8601 duration or raw seconds).
+        const delayValue = journey.Delay;
+        if (delayValue !== undefined && delayValue !== null) {
+            const rawDelay = (typeof delayValue === 'object' && '#text' in delayValue) 
+              ? delayValue['#text'] 
+              : delayValue;
+
+            if (typeof rawDelay === 'string' && (rawDelay.startsWith('P') || rawDelay.startsWith('-P'))) {
+              // It's likely an ISO 8601 duration string like "PT2M3S" or "-PT1M"
+              try {
+                  const match = rawDelay.match(/(-)?P(?:T)?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(\.\d+)?)S)?/);
+                  if (match) {
+                      const sign = match[1] === '-' ? -1 : 1;
+                      const hours = parseInt(match[2] || '0', 10);
+                      const minutes = parseInt(match[3] || '0', 10);
+                      const seconds = parseFloat(match[4] || '0');
+                      
+                      if (!isNaN(hours) && !isNaN(minutes) && !isNaN(seconds)) {
+                          const totalSeconds = (hours * 3600 + minutes * 60 + seconds);
+                          if (totalSeconds >= 0) {
+                             delayInMinutes = Math.round((totalSeconds * sign) / 60);
+                          }
+                      }
+                  }
+              } catch { /* Ignore parsing errors, will fallback. */ }
+            } else if (!isNaN(Number(rawDelay))) {
+                // It's likely a number of seconds, which could be a string '120' or a number 120.
+                const delaySeconds = Number(rawDelay);
+                delayInMinutes = Math.round(delaySeconds / 60);
             }
         }
-
-        // Method 2: Check the 'MonitoredCall' (next stop) if no delay found yet.
+        
+        // Method 2: Calculate from Aimed vs Expected times (if delay still unknown).
         if (delayInMinutes === undefined) {
-            delayInMinutes = calculateDelayFromTimes(journey.MonitoredCall);
-        }
+          // Check the 'MonitoredCall' (next stop)
+          delayInMinutes = calculateDelayFromTimes(journey.MonitoredCall);
 
-        // Method 3: If still no delay, check the 'OnwardCalls' (subsequent stops).
-        if (delayInMinutes === undefined && journey.OnwardCalls?.OnwardCall) {
-          const onwardCalls = Array.isArray(journey.OnwardCalls.OnwardCall)
-            ? journey.OnwardCalls.OnwardCall
-            : [journey.OnwardCalls.OnwardCall];
-          
-          for (const call of onwardCalls) {
-              const delay = calculateDelayFromTimes(call);
-              if (delay !== undefined) {
-                  delayInMinutes = delay;
-                  break; // Use the first valid delay we find
-              }
+          // If still no delay, check the 'OnwardCalls' (subsequent stops)
+          if (delayInMinutes === undefined && journey.OnwardCalls?.OnwardCall) {
+            const onwardCalls = Array.isArray(journey.OnwardCalls.OnwardCall)
+              ? journey.OnwardCalls.OnwardCall
+              : [journey.OnwardCalls.OnwardCall];
+            
+            for (const call of onwardCalls) {
+                const delay = calculateDelayFromTimes(call);
+                if (delay !== undefined) {
+                    delayInMinutes = delay;
+                    break; // Use the first valid delay we find
+                }
+            }
           }
         }
 
