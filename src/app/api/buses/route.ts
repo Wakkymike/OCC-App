@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
 import type { Bus } from '@/lib/types';
+import timetable from '@/lib/timetable-data.json';
+import { parse as dateFnsParse } from 'date-fns';
 
 // Helper to safely extract a text value from a field which might be a string or an object with a #text property.
 const getText = (field: any): string | undefined => {
@@ -13,6 +15,12 @@ const getText = (field: any): string | undefined => {
         return String(field);
     }
     return undefined;
+};
+
+const ensureArray = (item: any) => {
+    if (!item) return [];
+    if (Array.isArray(item)) return item;
+    return [item];
 };
 
 
@@ -149,38 +157,52 @@ export async function GET() {
 
           const monitoredCall = journey.MonitoredCall;
           const onwardCallsRaw = journey.OnwardCalls?.OnwardCall;
-          const onwardCalls = onwardCallsRaw ? (Array.isArray(onwardCallsRaw) ? onwardCallsRaw : [onwardCallsRaw]) : [];
+          const onwardCalls = onwardCallsRaw ? ensureArray(onwardCallsRaw) : [];
+
+          // --- NEW TIMETABLE-BASED DELAY CALCULATION ---
+          const scheduledJourney = journeyRef ? (timetable as Record<string, any>)[journeyRef] : undefined;
+          if (scheduledJourney && Array.isArray(scheduledJourney)) {
+            const nextCall = onwardCalls[0];
+            if (nextCall) {
+              const nextStopRef = getText(nextCall.StopPointRef);
+              const expectedTimeStr = getText(nextCall.ExpectedArrivalTime);
+              const scheduledStopTime = scheduledJourney.find((s: any) => s.stop === nextStopRef);
+
+              if (scheduledStopTime && expectedTimeStr) {
+                // Re-anchor scheduled time to the date of the expected time for accurate comparison
+                const expectedTime = new Date(expectedTimeStr);
+                const scheduledTime = dateFnsParse(scheduledStopTime.time, 'HH:mm:ss', expectedTime);
+
+                if (!isNaN(scheduledTime.getTime()) && !isNaN(expectedTime.getTime())) {
+                    const diffSeconds = (expectedTime.getTime() - scheduledTime.getTime()) / 1000;
+                    delayInMinutes = Math.round(diffSeconds / 60);
+                }
+              }
+            }
+          }
           
           if (monitoredCall) {
               lastStop = getText(monitoredCall.StopPointName)?.replace(/_/g, ' ');
           }
 
-          const potentialCalls = [...onwardCalls];
-          if (monitoredCall) {
-            potentialCalls.push(monitoredCall)
-          }
-
-          for (const call of potentialCalls) {
-              const aimedTime = getText(call.AimedArrivalTime) ?? getText(call.AimedDepartureTime);
-              const expectedTime = getText(call.ExpectedArrivalTime) ?? getText(call.ExpectedDepartureTime);
-              
-              const calculatedDelay = calculateDelayFromTimes(aimedTime, expectedTime);
-
-              if (calculatedDelay !== undefined) {
-                  delayInMinutes = calculatedDelay;
+          // --- FALLBACK DELAY CALCULATION & NEXT STOP FINDER ---
+          if (delayInMinutes === undefined) {
+              for (const call of onwardCalls) {
+                  const aimedTime = getText(call.AimedArrivalTime) ?? getText(call.AimedDepartureTime);
+                  const expectedTime = getText(call.ExpectedArrivalTime) ?? getText(call.ExpectedDepartureTime);
                   
-                  if (!nextStop) {
-                    const stopName = getText(call.StopPointName)?.replace(/_/g, ' ');
-                    if (stopName && stopName !== lastStop) {
-                        nextStop = stopName;
-                    }
+                  const calculatedDelay = calculateDelayFromTimes(aimedTime, expectedTime);
+
+                  if (calculatedDelay !== undefined) {
+                      delayInMinutes = calculatedDelay;
+                      // Once we find a delay, we can break
+                      break; 
                   }
-                  
-                  break; 
               }
           }
           
-          if (delayInMinutes !== undefined && !nextStop && onwardCalls.length > 0) {
+          // Find next stop name from the first onward call
+          if (onwardCalls.length > 0) {
               nextStop = getText(onwardCalls[0].StopPointName)?.replace(/_/g, ' ');
           }
 

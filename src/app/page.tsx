@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Map, Clock } from 'lucide-react';
+import { Map, Clock, Shield } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -23,6 +23,12 @@ export default function HomePage() {
             <Link href="/timetable">
               <Clock className="mr-2 h-5 w-5" />
               View Timetables
+            </Link>
+          </Button>
+          <Button asChild size="lg" variant="secondary">
+            <Link href="/admin">
+              <Shield className="mr-2 h-5 w-5" />
+              Admin Panel
             </Link>
           </Button>
         </div>
