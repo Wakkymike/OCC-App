@@ -9,6 +9,7 @@ import mapboxgl from 'mapbox-gl';
 import { Home } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import Link from 'next/link';
+import MapControls from '@/components/map-controls';
 
 export default function Page() {
   const { buses, error } = useBusTracker();
@@ -25,6 +26,10 @@ export default function Page() {
     query: string;
     direction: 'all' | 'inbound' | 'outbound';
   } | null>(null);
+
+  // New state for map layers
+  const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/dark-v11');
+  const [show3DBuildings, setShow3DBuildings] = useState(true);
 
   useEffect(() => {
     let results = buses;
@@ -123,12 +128,22 @@ export default function Page() {
           {error}
         </p>
       )}
+      <div className="absolute bottom-4 right-4 z-10">
+        <MapControls
+          mapStyle={mapStyle}
+          setMapStyle={setMapStyle}
+          show3DBuildings={show3DBuildings}
+          setShow3DBuildings={setShow3DBuildings}
+        />
+      </div>
       <BusMap
         buses={displayBuses}
         selectedBusId={selectedBusId}
         setSelectedBusId={setSelectedBusId}
         searchedPlace={searchedPlace}
         mapView={mapView}
+        mapStyle={mapStyle}
+        show3DBuildings={show3DBuildings}
       />
     </div>
   );
