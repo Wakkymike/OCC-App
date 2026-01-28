@@ -22,7 +22,7 @@ const parseISODuration = (duration: string): number | undefined => {
 
     // Handle case where duration is just a number (in seconds)
     const secondsAsNumber = parseFloat(duration);
-    if (!isNaN(secondsAsNumber) && !duration.startsWith('P')) {
+    if (!isNaN(secondsAsNumber) && !duration.startsWith('P') && !duration.startsWith('-P')) {
         // A duration of 0 is valid.
         if (Math.abs(secondsAsNumber) < 86400) { // Sanity check for less than a day
             return Math.round(secondsAsNumber / 60);
@@ -194,7 +194,7 @@ export async function GET() {
         const lat = parseFloat(journey.VehicleLocation.Latitude);
         const lng = parseFloat(journey.VehicleLocation.Longitude);
 
-        if (Number.isNaN(lat) || Number.isNaN(lng)) {
+        if (isNaN(lat) || isNaN(lng)) {
           skippedCount++;
           return null;
         }
@@ -266,7 +266,7 @@ export async function GET() {
           destination: destination ?? 'unknown',
           direction: direction ?? 'unknown',
           position: { lat, lng },
-          bearing: bearing && !Number.isNaN(bearing) ? bearing : undefined,
+          bearing: bearing && !isNaN(bearing) ? bearing : undefined,
           journeyRef: journeyRef,
           delay: delayInMinutes,
           status: status,
@@ -288,3 +288,5 @@ export async function GET() {
     );
   }
 }
+
+    
