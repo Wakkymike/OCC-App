@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
 import type { Bus } from '@/lib/types';
 import timetable from '@/lib/timetable-data.json';
-import { parse as dateFnsParse } from 'date-fns';
 
 // Helper to safely extract a text value from a field which might be a string or an object with a #text property.
 const getText = (field: any): string | undefined => {
@@ -164,10 +163,52 @@ export async function GET() {
               lastStop = getText(monitoredCall.StopPointName)?.replace(/_/g, ' ');
           }
           if (onwardCalls.length > 0) {
-              nextStop = getText(onwardCalls[0].StopPointName)?.replace(/_/g, ' ');
+              // Try to find the first onward call with a name to set the next stop
+              for (const call of onwardCalls) {
+                  const stopName = getText(call.StopPointName);
+                  if (stopName) {
+                      nextStop = stopName.replace(/_/g, ' ');
+                      break;
+                  }
+              }
           }
 
           // --- TIMETABLE-BASED DELAY CALCULATION (PRIMARY) ---
+          const calculateDelayWithTimetable = (
+            expectedTimeStr: string | undefined, 
+            scheduledStopTime: { time: string } | undefined
+          ): number | undefined => {
+            if (!expectedTimeStr || !scheduledStopTime?.time) return undefined;
+            
+            try {
+              const expectedTime = new Date(expectedTimeStr);
+              const [hours, minutes, seconds] = scheduledStopTime.time.split(':').map(Number);
+              
+              // Create scheduled time on the same date as the expected time
+              const scheduledTime = new Date(expectedTime);
+              scheduledTime.setHours(hours, minutes, seconds, 0);
+
+              let diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
+
+              // Basic midnight crossing handling
+              if (diffMinutes > 12 * 60) { // e.g., expected is 00:05, scheduled is 23:55
+                  scheduledTime.setDate(scheduledTime.getDate() - 1);
+                  diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
+              } else if (diffMinutes < -12 * 60) { // e.g., expected is 23:55, scheduled is 00:05
+                  scheduledTime.setDate(scheduledTime.getDate() + 1);
+                  diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
+              }
+              
+              // Only return a delay if it's within a reasonable range (e.g., less than a day)
+              if (Math.abs(diffMinutes) < 1440) {
+                  return Math.round(diffMinutes);
+              }
+            } catch (e) {
+              return undefined;
+            }
+            return undefined;
+          };
+
           const scheduledJourney = journeyRef ? (timetable as Record<string, any>)[journeyRef] : undefined;
           if (scheduledJourney && Array.isArray(scheduledJourney)) {
             let delayFound = false;
@@ -175,52 +216,25 @@ export async function GET() {
             // Method 1: Iterate through upcoming stops (OnwardCalls)
             for (const call of onwardCalls) {
               const stopRef = getText(call.StopPointRef);
-              const expectedTimeStr = getText(call.ExpectedArrivalTime);
               const scheduledStopTime = scheduledJourney.find((s: any) => s.stop === stopRef);
-
-              if (scheduledStopTime && expectedTimeStr) {
-                const expectedTime = new Date(expectedTimeStr);
-                const scheduledToday = dateFnsParse(scheduledStopTime.time, 'HH:mm:ss', expectedTime);
-                const scheduledYesterday = new Date(scheduledToday.getTime() - 24 * 60 * 60 * 1000);
-                const scheduledTomorrow = new Date(scheduledToday.getTime() + 24 * 60 * 60 * 1000);
-                const diffToday = expectedTime.getTime() - scheduledToday.getTime();
-                const diffYesterday = expectedTime.getTime() - scheduledYesterday.getTime();
-                const diffTomorrow = expectedTime.getTime() - scheduledTomorrow.getTime();
-                let bestDiff = diffToday;
-                if (Math.abs(diffYesterday) < Math.abs(bestDiff)) bestDiff = diffYesterday;
-                if (Math.abs(diffTomorrow) < Math.abs(bestDiff)) bestDiff = diffTomorrow;
-                
-                const finalDelayInMinutes = Math.round(bestDiff / (1000 * 60));
-                if (Math.abs(finalDelayInMinutes) < 1440) {
-                    delayInMinutes = finalDelayInMinutes;
-                    delayFound = true;
-                    break; // Found a valid delay, stop searching
-                }
+              const calculatedDelay = calculateDelayWithTimetable(getText(call.ExpectedArrivalTime), scheduledStopTime);
+              
+              if (calculatedDelay !== undefined) {
+                delayInMinutes = calculatedDelay;
+                delayFound = true;
+                break; // Found a valid delay, stop searching
               }
             }
 
             // Method 2: If no delay found, check the last stop visited (MonitoredCall)
             if (!delayFound && monitoredCall) {
                 const stopRef = getText(monitoredCall.StopPointRef);
-                const expectedTimeStr = getText(monitoredCall.ExpectedDepartureTime) ?? getText(monitoredCall.ActualDepartureTime);
                 const scheduledStopTime = scheduledJourney.find((s: any) => s.stop === stopRef);
+                const expectedTimeStr = getText(monitoredCall.ExpectedDepartureTime) ?? getText(monitoredCall.ActualDepartureTime);
+                const calculatedDelay = calculateDelayWithTimetable(expectedTimeStr, scheduledStopTime);
 
-                if (scheduledStopTime && expectedTimeStr) {
-                    const expectedTime = new Date(expectedTimeStr);
-                    const scheduledToday = dateFnsParse(scheduledStopTime.time, 'HH:mm:ss', expectedTime);
-                    const scheduledYesterday = new Date(scheduledToday.getTime() - 24 * 60 * 60 * 1000);
-                    const scheduledTomorrow = new Date(scheduledToday.getTime() + 24 * 60 * 60 * 1000);
-                    const diffToday = expectedTime.getTime() - scheduledToday.getTime();
-                    const diffYesterday = expectedTime.getTime() - scheduledYesterday.getTime();
-                    const diffTomorrow = expectedTime.getTime() - scheduledTomorrow.getTime();
-                    let bestDiff = diffToday;
-                    if (Math.abs(diffYesterday) < Math.abs(bestDiff)) bestDiff = diffYesterday;
-                    if (Math.abs(diffTomorrow) < Math.abs(bestDiff)) bestDiff = diffTomorrow;
-                    
-                    const finalDelayInMinutes = Math.round(bestDiff / (1000 * 60));
-                    if (Math.abs(finalDelayInMinutes) < 1440) {
-                        delayInMinutes = finalDelayInMinutes;
-                    }
+                if (calculatedDelay !== undefined) {
+                    delayInMinutes = calculatedDelay;
                 }
             }
           }
