@@ -163,37 +163,28 @@ export async function GET() {
         let status: string = 'Unknown';
         let nextStop: string | undefined;
 
-        // Consolidate all upcoming stops into one list to iterate through.
         const monitoredCall = journey.MonitoredCall;
         const onwardCalls = journey.OnwardCalls?.OnwardCall ? (Array.isArray(journey.OnwardCalls.OnwardCall) ? journey.OnwardCalls.OnwardCall : [journey.OnwardCalls.OnwardCall]) : [];
-        const allCalls = [];
-        if (monitoredCall) allCalls.push(monitoredCall);
-        allCalls.push(...onwardCalls);
+        
+        const potentialCalls = [...onwardCalls];
+        // Add MonitoredCall as a final fallback if no OnwardCalls exist or are useful
+        if (monitoredCall) {
+            potentialCalls.push(monitoredCall);
+        }
 
-        // Iterate through all upcoming stops to find the first valid delay and next stop name.
-        for (const call of allCalls) {
-            // Find delay if we don't have one yet.
-            if (delayInMinutes === undefined) {
-                const calculatedDelay = calculateDelayFromTimes(call);
-                if (calculatedDelay !== undefined) {
-                    delayInMinutes = calculatedDelay;
-                }
-            }
-            // Find next stop name if we don't have one yet.
-            if (nextStop === undefined) {
-                const stopName = getText(call?.StopPointName);
-                if (stopName) {
-                    nextStop = stopName.replace(/_/g, ' ');
-                }
-            }
-            // If we have both, we can stop searching.
-            if (delayInMinutes !== undefined && nextStop !== undefined) {
-                break;
-            }
+        // Iterate through potential stops to find the first one with complete data
+        for (const call of potentialCalls) {
+             const stopName = getText(call.StopPointName);
+             const calculatedDelay = calculateDelayFromTimes(call);
+
+             if (stopName && calculatedDelay !== undefined) {
+                 nextStop = stopName.replace(/_/g, ' ');
+                 delayInMinutes = calculatedDelay;
+                 break; // Exit loop once we have a valid stop and delay
+             }
         }
         
         // --- Status String Generation ---
-        // Primary method: Use the calculated numeric delay.
         if (delayInMinutes !== undefined) {
             if (delayInMinutes > 2) {
               status = `${delayInMinutes} min late`;
@@ -203,10 +194,9 @@ export async function GET() {
               status = 'On Time';
             }
         } else {
-            // Fallback method: Use text-based status if no numeric delay could be found.
+            // Fallback to text status if no delay could be calculated
             if (progressStatusText.includes('on time')) {
                 status = 'On Time';
-                delayInMinutes = 0; 
             } else if (progressStatusText.includes('late')) {
                 status = 'Late';
             } else if (progressStatusText.includes('early')) {
