@@ -129,7 +129,6 @@ export async function GET() {
       ignoreAttributes: false,
       attributeNamePrefix: '',
       removeNSPrefix: true,
-      // The following option is crucial for handling inconsistent values
       parseNodeValue: true, 
       parseAttributeValue: true,
       trimValues: true,
@@ -206,34 +205,34 @@ export async function GET() {
             nextStop = getText(onwardCalls[0]?.StopPointName)?.replace(/_/g, ' ');
         }
 
-        // --- MULTI-LAYERED STATUS CALCULATION ---
+        // --- NEW MULTI-LAYERED STATUS CALCULATION ---
         let delayInMinutes: number | undefined;
         let status: string = 'Unknown';
 
-        // Method 1: Calculate from scheduled vs expected times. This is often the most reliable.
-        const callsToCheck = [];
-        if (monitoredCall) callsToCheck.push(monitoredCall);
-        callsToCheck.push(...onwardCalls);
-
-        for (const call of callsToCheck) {
-            const calculatedDelay = calculateDelayFromTimes(call);
-            if (calculatedDelay !== undefined) {
-                delayInMinutes = calculatedDelay;
-                break; // Use the first valid delay we find
-            }
-        }
-
-        // Method 2: Fallback to the <Delay> field with robust parsing.
-        if (delayInMinutes === undefined) {
-            const delayText = getText(journey.Delay);
-            if (delayText) {
-                const parsedDelay = parseISODuration(delayText);
-                if (parsedDelay !== undefined) {
-                    delayInMinutes = parsedDelay;
-                }
+        // Method 1: Use the <Delay> field. This is the most direct data source.
+        const delayText = getText(journey.Delay);
+        if (delayText) {
+            const parsedDelay = parseISODuration(delayText);
+            if (parsedDelay !== undefined) {
+                delayInMinutes = parsedDelay;
             }
         }
         
+        // Method 2: Fallback to calculating from scheduled vs expected times.
+        if (delayInMinutes === undefined) {
+            const callsToCheck = [];
+            if (monitoredCall) callsToCheck.push(monitoredCall);
+            callsToCheck.push(...onwardCalls);
+
+            for (const call of callsToCheck) {
+                const calculatedDelay = calculateDelayFromTimes(call);
+                if (calculatedDelay !== undefined) {
+                    delayInMinutes = calculatedDelay;
+                    break; // Use the first valid delay we find
+                }
+            }
+        }
+
         // Method 3: Final fallback to text-based status indicators.
         if (delayInMinutes === undefined) {
             if (progressStatusText.includes('on time')) {
