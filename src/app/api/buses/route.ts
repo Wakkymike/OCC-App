@@ -120,9 +120,9 @@ export async function GET() {
         let delayInMinutes: number | undefined;
         let status: string = 'Unknown'; // Default status
 
-        // Method 1: Use the <Delay> field if present and valid.
+        // Method 1: The <Delay> field is the most direct source.
         const delayValue = journey.Delay;
-        if (delayValue !== undefined && delayValue !== null) {
+        if (delayInMinutes === undefined && delayValue !== undefined && delayValue !== null) {
             const rawDelay = (typeof delayValue === 'object' && '#text' in delayValue) 
               ? delayValue['#text'] 
               : delayValue;
@@ -135,58 +135,64 @@ export async function GET() {
                       const hours = parseInt(match[2] || '0', 10);
                       const minutes = parseInt(match[3] || '0', 10);
                       const seconds = parseFloat(match[4] || '0');
-                      
-                      const totalSeconds = hours * 3600 + minutes * 60 + seconds;
-                      delayInMinutes = Math.round((totalSeconds * sign) / 60);
+                      const totalSeconds = (hours * 3600 + minutes * 60 + seconds) * sign;
+                      if (Math.abs(totalSeconds) < 86400) {
+                          delayInMinutes = Math.round(totalSeconds / 60);
+                      }
                   }
-              } catch { /* Ignore parsing errors, will fallback. */ }
+              } catch { /* Fallback */ }
             } else if (!isNaN(Number(rawDelay))) {
                 const delaySeconds = Number(rawDelay);
-                delayInMinutes = Math.round(delaySeconds / 60);
+                if (Math.abs(delaySeconds) < 86400) {
+                    delayInMinutes = Math.round(delaySeconds / 60);
+                }
             }
         }
 
-        // Method 2: Calculate from Aimed vs Expected times (if delay still not found).
+        // Method 2: Fallback to calculating from scheduled vs expected times.
         if (delayInMinutes === undefined) {
-          delayInMinutes = calculateDelayFromTimes(journey.MonitoredCall);
+            const callsToCheck = [];
+            if (journey.MonitoredCall) {
+                callsToCheck.push(journey.MonitoredCall);
+            }
+            if (journey.OnwardCalls?.OnwardCall) {
+                const onwardCalls = Array.isArray(journey.OnwardCalls.OnwardCall)
+                  ? journey.OnwardCalls.OnwardCall
+                  : [journey.OnwardCalls.OnwardCall];
+                callsToCheck.push(...onwardCalls);
+            }
 
-          if (delayInMinutes === undefined && journey.OnwardCalls?.OnwardCall) {
-            const onwardCalls = Array.isArray(journey.OnwardCalls.OnwardCall)
-              ? journey.OnwardCalls.OnwardCall
-              : [journey.OnwardCalls.OnwardCall];
-            
-            for (const call of onwardCalls) {
+            for (const call of callsToCheck) {
                 const calculatedDelay = calculateDelayFromTimes(call);
                 if (calculatedDelay !== undefined) {
                     delayInMinutes = calculatedDelay;
-                    break; 
+                    break; // Use the first valid delay we find
                 }
             }
-          }
         }
 
-        // Method 3: Check for ProgressStatus as a text indicator (another fallback)
-        if (delayInMinutes === undefined && journey.ProgressStatus) {
-            const statusText = String(journey.ProgressStatus).toLowerCase();
-            if (statusText.includes('on time') || statusText.includes('on-time')) {
+        // Method 3: Final fallback to text-based status indicators.
+        if (delayInMinutes === undefined) {
+            const progressStatus = (journey.ProgressStatus || '').toLowerCase();
+            if (progressStatus.includes('on time')) {
                 status = 'On Time';
-                delayInMinutes = 0; 
-            } else if (statusText.includes('late')) {
-                status = 'Late'; 
-            } else if (statusText.includes('early')) {
+            } else if (progressStatus.includes('late')) {
+                status = 'Late';
+            } else if (progressStatus.includes('early')) {
                 status = 'Early';
             }
         }
-        
-        // Final step: Convert the numeric delay (from Method 1 or 2) into a human-readable status string.
-        if (delayInMinutes !== undefined && status === 'Unknown') { // Only set if not already set by ProgressStatus
-          if (delayInMinutes > 2) {
-            status = `${delayInMinutes} min late`;
-          } else if (delayInMinutes < -2) {
-            status = `${Math.abs(delayInMinutes)} min early`;
-          } else {
-            status = 'On Time';
-          }
+
+        // Finally, set the status string based on the numeric delay, if we have one.
+        // This will override text statuses like 'Late' with a more specific 'X min late'.
+        if (delayInMinutes !== undefined) {
+            if (delayInMinutes > 2) {
+              status = `${delayInMinutes} min late`;
+            } else if (delayInMinutes < -2) {
+              status = `${Math.abs(delayInMinutes)} min early`;
+            } else {
+              status = 'On Time';
+            }
         }
 
         return {
