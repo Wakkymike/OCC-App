@@ -30,6 +30,7 @@ export default function BusMap({
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
   const placeMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const animationFrameRefs = useRef<Record<string, number>>({});
 
   // ---------------------------
   // Initialize map
@@ -51,15 +52,57 @@ export default function BusMap({
       setSelectedBusId(null);
     });
 
-    return () => map.remove();
+    return () => {
+      // Clean up animations when map is removed
+      Object.values(animationFrameRefs.current).forEach(cancelAnimationFrame);
+      animationFrameRefs.current = {};
+      map.remove();
+    };
   }, [setSelectedBusId]);
 
   // ---------------------------
-  // Update bus markers
+  // Update bus markers with animation
   // ---------------------------
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+
+    const animateMarkerPosition = (
+      marker: mapboxgl.Marker,
+      endPosition: LatLng,
+      markerId: string
+    ) => {
+      if (animationFrameRefs.current[markerId]) {
+        cancelAnimationFrame(animationFrameRefs.current[markerId]);
+      }
+
+      const startLngLat = marker.getLngLat();
+      const startPosition = { lat: startLngLat.lat, lng: startLngLat.lng };
+      const animationDuration = 4000; // Just under the 5s refresh interval
+      const startTime = performance.now();
+      
+      if (startPosition.lat === endPosition.lat && startPosition.lng === endPosition.lng) {
+        return; // No movement needed
+      }
+
+      const frame = () => {
+        const now = performance.now();
+        const progress = Math.min(1, (now - startTime) / animationDuration);
+        
+        const lng = startPosition.lng + (endPosition.lng - startPosition.lng) * progress;
+        const lat = startPosition.lat + (endPosition.lat - startPosition.lat) * progress;
+
+        marker.setLngLat([lng, lat]);
+
+        if (progress < 1) {
+          animationFrameRefs.current[markerId] = requestAnimationFrame(frame);
+        } else {
+          delete animationFrameRefs.current[markerId];
+        }
+      };
+
+      animationFrameRefs.current[markerId] = requestAnimationFrame(frame);
+    };
 
     const currentMarkerIds = new Set(Object.keys(markersRef.current));
 
@@ -110,12 +153,12 @@ export default function BusMap({
           .addTo(map);
 
         markersRef.current[markerId] = marker;
+      } else {
+        // Animate existing marker to its new position
+        animateMarkerPosition(marker, bus.position, markerId);
       }
 
-      // Update marker position
-      marker.setLngLat([bus.position.lng, bus.position.lat]);
-
-      // Update flag text with fleet number at start + [I]/[O] in blue
+      // Update flag text
       const markerElement = marker.getElement();
       const flagElement = markerElement.querySelector('div') as HTMLDivElement;
 
@@ -147,6 +190,10 @@ export default function BusMap({
     // Remove markers no longer active
     currentMarkerIds.forEach((id) => {
       if (markersRef.current[id]) {
+        if (animationFrameRefs.current[id]) {
+          cancelAnimationFrame(animationFrameRefs.current[id]);
+          delete animationFrameRefs.current[id];
+        }
         markersRef.current[id].remove();
         delete markersRef.current[id];
       }
