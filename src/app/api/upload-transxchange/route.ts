@@ -64,7 +64,8 @@ export async function POST(req: NextRequest) {
                 // 2. Parse VehicleJourneys and build timetable
                 const vehicleJourneys = ensureArray(data.VehicleJourneys?.VehicleJourney);
                 for (const vj of vehicleJourneys) {
-                    const journeyRef = vj.Operational?.TicketMachine?.JourneyCode ?? vj.VehicleJourneyCode;
+                    // FIX: Use the official VehicleJourneyCode, not the internal TicketMachine.JourneyCode
+                    const journeyRef = vj.VehicleJourneyCode;
                     const departureTimeStr = vj.DepartureTime;
                     const journeyPatternRef = vj.JourneyPatternRef;
 
