@@ -75,56 +75,67 @@ export async function GET() {
 
         const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
 
-        // --- Robust Delay Calculation ---
+        // --- New Robust Delay Calculation ---
         let delayInMinutes: number | undefined;
 
         // Method 1: Attempt to parse the 'Delay' field (ISO 8601 duration).
-        if (journey.Delay) {
-            const rawDelay = typeof journey.Delay === 'string' ? journey.Delay : journey.Delay['#text'];
-            if (rawDelay && typeof rawDelay === 'string') {
-                // Regex for ISO 8601 duration format, e.g., 'PT1M30S' or 'P1M'. The 'T' is now optional.
-                const match = rawDelay.match(/(-)?P(?:T)?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(\.\d+)?)S)?/);
-                if (match) {
-                    try {
-                        const sign = match[1] === '-' ? -1 : 1;
-                        const hours = parseInt(match[2] || '0', 10);
-                        const minutes = parseInt(match[3] || '0', 10);
-                        const seconds = parseFloat(match[4] || '0');
-                        
-                        if (!isNaN(hours) && !isNaN(minutes) && !isNaN(seconds)) {
-                            // We only calculate a delay if at least one time component was present.
-                            if (hours > 0 || minutes > 0 || seconds > 0) {
-                                const totalSeconds = (hours * 3600 + minutes * 60 + seconds) * sign;
-                                delayInMinutes = Math.round(totalSeconds / 60);
-                            } else if (rawDelay.includes('PT0S') || rawDelay.includes('P0S') || rawDelay === 'P0D') { // Explicitly on time
-                                delayInMinutes = 0;
-                            }
+        const rawDelay = typeof journey.Delay === 'string' 
+            ? journey.Delay 
+            : (journey.Delay && typeof journey.Delay === 'object' && '#text' in journey.Delay) 
+                ? journey.Delay['#text'] 
+                : null;
+                
+        if (rawDelay && typeof rawDelay === 'string') {
+            const match = rawDelay.match(/(-)?P(?:T)?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(\.\d+)?)S)?/);
+            if (match) {
+                try {
+                    const sign = match[1] === '-' ? -1 : 1;
+                    const hours = parseInt(match[2] || '0', 10);
+                    const minutes = parseInt(match[3] || '0', 10);
+                    const seconds = parseFloat(match[4] || '0');
+                    
+                    if (!isNaN(hours) && !isNaN(minutes) && !isNaN(seconds)) {
+                        if (hours > 0 || minutes > 0 || seconds > 0) {
+                            const totalSeconds = (hours * 3600 + minutes * 60 + seconds) * sign;
+                            delayInMinutes = Math.round(totalSeconds / 60);
+                        } else if (rawDelay.includes('PT0S') || rawDelay.includes('P0S') || rawDelay === 'P0D') {
+                            delayInMinutes = 0;
                         }
-                    } catch {
-                        // Ignore parsing errors, will fallback to other methods.
                     }
+                } catch {
+                    // Ignore parsing errors, will fallback.
                 }
             }
         }
 
         const calculateDelayFromTimes = (call: any): number | undefined => {
-            if (call && call.AimedArrivalTime && call.ExpectedArrivalTime) {
-                const aimed = new Date(call.AimedArrivalTime);
-                const expected = new Date(call.ExpectedArrivalTime);
+            if (!call) return undefined;
+
+            let aimed: Date | undefined, expected: Date | undefined;
+
+            // Prefer arrival times, but fallback to departure times
+            if (call.AimedArrivalTime && call.ExpectedArrivalTime) {
+                aimed = new Date(call.AimedArrivalTime);
+                expected = new Date(call.ExpectedArrivalTime);
+            } else if (call.AimedDepartureTime && call.ExpectedDepartureTime) {
+                aimed = new Date(call.AimedDepartureTime);
+                expected = new Date(call.ExpectedDepartureTime);
+            } else {
+                return undefined;
+            }
                 
-                if (!isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
-                    const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
-                    
-                    // Sanity check: A huge delay is likely a data error.
-                    if (Math.abs(diffSeconds) < 86400) { // less than 1 day
-                        return Math.round(diffSeconds / 60);
-                    }
+            if (aimed && expected && !isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
+                const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
+                
+                // Sanity check: A huge delay is likely a data error (e.g., > 1 day)
+                if (Math.abs(diffSeconds) < 86400) { 
+                    return Math.round(diffSeconds / 60);
                 }
             }
             return undefined;
         }
 
-        // Method 2: Check the 'MonitoredCall' (next stop).
+        // Method 2: Check the 'MonitoredCall' (next stop) if no delay found yet.
         if (delayInMinutes === undefined) {
             delayInMinutes = calculateDelayFromTimes(journey.MonitoredCall);
         }
