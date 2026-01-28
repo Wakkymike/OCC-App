@@ -73,37 +73,38 @@ export async function POST(req: NextRequest) {
                     }
 
                     const pattern = journeyPatterns[journeyPatternRef];
-                    // TransXChange times don't have timezone, so parse them relative to a base date
                     const departureTime = dateFnsParse(departureTimeStr, 'HH:mm:ss', new Date(0));
-
                     if (isNaN(departureTime.getTime())) continue;
 
-                    let currentTime = departureTime;
+                    let currentTime = departureTime; // Represents the departure time from the current stop in the loop
                     const stopTimes: { stop: string; time: string }[] = [];
-
                     const sections = ensureArray(pattern.JourneyPatternSection);
+
+                    let isFirstLinkOfJourney = true;
+
                     for (const section of sections) {
                         const timingLinks = ensureArray(section.JourneyPatternTimingLink);
-                        for (let i = 0; i < timingLinks.length; i++) {
-                            const link = timingLinks[i];
-                            const fromStop = link.From.StopPointRef;
-                            
-                            // Add the first stop of the first section
-                            if (i === 0 && stopTimes.length === 0) {
+                        for (const link of timingLinks) {
+                            // For the very first stop of the journey, its event time is the departure time.
+                            if (isFirstLinkOfJourney) {
                                 stopTimes.push({
-                                    stop: fromStop,
-                                    time: currentTime.toTimeString().split(' ')[0]
+                                    stop: link.From.StopPointRef,
+                                    time: currentTime.toTimeString().split(' ')[0],
                                 });
+                                isFirstLinkOfJourney = false;
                             }
-                            
-                            const runTimeDuration = parseISO8601Duration(link.RunTime);
-                            currentTime = add(currentTime, runTimeDuration);
-                            
-                            const toStop = link.To.StopPointRef;
-                             stopTimes.push({
-                                stop: toStop,
-                                time: currentTime.toTimeString().split(' ')[0]
+
+                            // Add RunTime to get arrival time at the 'To' stop.
+                            const runTime = parseISO8601Duration(link.RunTime);
+                            const arrivalAtTo = add(currentTime, runTime);
+                            stopTimes.push({
+                                stop: link.To.StopPointRef,
+                                time: arrivalAtTo.toTimeString().split(' ')[0],
                             });
+
+                            // The next `currentTime` is the departure from this 'To' stop, which includes wait time.
+                            const waitTime = link.To.WaitTime ? parseISO8601Duration(link.To.WaitTime) : {};
+                            currentTime = add(arrivalAtTo, waitTime);
                         }
                     }
                     timetable[journeyRef] = stopTimes;
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (filesProcessed === 0) {
-            return NextResponse.json({ error: 'No valid TransXchange XML files found in the ZIP.' }, { status: 400 });
+            return NextResponse.json({ error: 'No valid Transxchange XML files found in the ZIP.' }, { status: 400 });
         }
 
         const filePath = path.join(process.cwd(), 'src', 'lib', 'timetable-data.json');

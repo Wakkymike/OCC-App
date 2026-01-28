@@ -159,7 +159,7 @@ export async function GET() {
           const onwardCallsRaw = journey.OnwardCalls?.OnwardCall;
           const onwardCalls = onwardCallsRaw ? ensureArray(onwardCallsRaw) : [];
 
-          // --- NEW TIMETABLE-BASED DELAY CALCULATION ---
+          // --- TIMETABLE-BASED DELAY CALCULATION (PRIMARY) ---
           const scheduledJourney = journeyRef ? (timetable as Record<string, any>)[journeyRef] : undefined;
           if (scheduledJourney && Array.isArray(scheduledJourney)) {
             const nextCall = onwardCalls[0];
@@ -169,13 +169,31 @@ export async function GET() {
               const scheduledStopTime = scheduledJourney.find((s: any) => s.stop === nextStopRef);
 
               if (scheduledStopTime && expectedTimeStr) {
-                // Re-anchor scheduled time to the date of the expected time for accurate comparison
                 const expectedTime = new Date(expectedTimeStr);
-                const scheduledTime = dateFnsParse(scheduledStopTime.time, 'HH:mm:ss', expectedTime);
+                
+                // Create three versions of the scheduled time: for today, yesterday, and tomorrow to handle midnight crossings
+                const scheduledToday = dateFnsParse(scheduledStopTime.time, 'HH:mm:ss', expectedTime);
+                const scheduledYesterday = new Date(scheduledToday.getTime() - 24 * 60 * 60 * 1000);
+                const scheduledTomorrow = new Date(scheduledToday.getTime() + 24 * 60 * 60 * 1000);
 
-                if (!isNaN(scheduledTime.getTime()) && !isNaN(expectedTime.getTime())) {
-                    const diffSeconds = (expectedTime.getTime() - scheduledTime.getTime()) / 1000;
-                    delayInMinutes = Math.round(diffSeconds / 60);
+                // Calculate the difference for each and find the one with the smallest absolute value
+                const diffToday = expectedTime.getTime() - scheduledToday.getTime();
+                const diffYesterday = expectedTime.getTime() - scheduledYesterday.getTime();
+                const diffTomorrow = expectedTime.getTime() - scheduledTomorrow.getTime();
+                
+                let bestDiff = diffToday;
+                if (Math.abs(diffYesterday) < Math.abs(bestDiff)) {
+                    bestDiff = diffYesterday;
+                }
+                if (Math.abs(diffTomorrow) < Math.abs(bestDiff)) {
+                    bestDiff = diffTomorrow;
+                }
+                
+                const finalDelayInMinutes = Math.round(bestDiff / (1000 * 60));
+
+                // Sanity check to avoid huge, erroneous delays (e.g. > 1 day)
+                if (Math.abs(finalDelayInMinutes) < 1440) { 
+                    delayInMinutes = finalDelayInMinutes;
                 }
               }
             }
@@ -185,7 +203,7 @@ export async function GET() {
               lastStop = getText(monitoredCall.StopPointName)?.replace(/_/g, ' ');
           }
 
-          // --- FALLBACK DELAY CALCULATION & NEXT STOP FINDER ---
+          // --- FALLBACK DELAY CALCULATION (FROM LIVE FEED AIMED/EXPECTED) ---
           if (delayInMinutes === undefined) {
               for (const call of onwardCalls) {
                   const aimedTime = getText(call.AimedArrivalTime) ?? getText(call.AimedDepartureTime);
