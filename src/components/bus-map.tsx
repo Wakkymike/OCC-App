@@ -44,13 +44,59 @@ export default function BusMap({
 
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
-      style: 'mapbox://styles/mapbox/light-v11',
+      style: 'mapbox://styles/mapbox/dark-v11',
       center: [-2.24, 53.48],
-      zoom: 11,
+      zoom: 15,
+      pitch: 45,
+      bearing: -17.6,
+      antialias: true,
     });
 
     mapRef.current = map;
     map.addControl(new mapboxgl.NavigationControl());
+
+    map.on('load', () => {
+      // Insert the layer beneath any symbol layer.
+      const layers = map.getStyle().layers;
+      const labelLayerId = layers.find(
+          (layer) => layer.type === 'symbol' && layer.layout && layer.layout['text-field']
+      )?.id;
+
+      // Add a 3D buildings layer
+      map.addLayer(
+          {
+              'id': '3d-buildings',
+              'source': 'composite',
+              'source-layer': 'building',
+              'filter': ['==', 'extrude', 'true'],
+              'type': 'fill-extrusion',
+              'minzoom': 15,
+              'paint': {
+                  'fill-extrusion-color': '#aaa',
+                  'fill-extrusion-height': [
+                      'interpolate',
+                      ['linear'],
+                      ['zoom'],
+                      15,
+                      0,
+                      15.05,
+                      ['get', 'height']
+                  ],
+                  'fill-extrusion-base': [
+                      'interpolate',
+                      ['linear'],
+                      ['zoom'],
+                      15,
+                      0,
+                      15.05,
+                      ['get', 'min_height']
+                  ],
+                  'fill-extrusion-opacity': 0.6
+              }
+          },
+          labelLayerId
+      );
+    });
 
     map.on('error', (e) => {
       console.error('A Mapbox error occurred:', e.error);
@@ -66,9 +112,10 @@ export default function BusMap({
       animationFrameRefs.current = {};
       if (mapRef.current) {
         mapRef.current.remove();
+        mapRef.current = null;
       }
-      mapRef.current = null; // Explicitly clear the ref to prevent race conditions
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---------------------------
@@ -219,7 +266,7 @@ export default function BusMap({
         circle.setAttribute('stroke', isSelected ? '#00008B' : 'black'); // Dark Blue
 
         if (isSelected) {
-          infoFlag.innerHTML = `Last Stop: ${bus.lastStop || 'N/A'}<br>Next: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
+          infoFlag.innerHTML = `Last Stop: ${bus.lastStop || 'N/A'}<br>Next Stop: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';
