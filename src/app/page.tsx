@@ -33,14 +33,14 @@ export default function Page() {
     const results = buses.filter((bus) => {
       let match = false;
       if (searchType === 'fleetNumber') {
-        match = bus.fleetNumber.toLowerCase().includes(lowerCaseQuery);
+        match = String(bus.fleetNumber).toLowerCase().includes(lowerCaseQuery);
       } else if (searchType === 'service') {
-        match = bus.service.toLowerCase() === lowerCaseQuery;
+        match = String(bus.service).toLowerCase() === lowerCaseQuery;
         if (match && direction !== 'all') {
-          return bus.direction.toLowerCase() === direction;
+          return String(bus.direction).toLowerCase() === direction;
         }
       } else if (searchType === 'journey') {
-        match = bus.journeyRef?.toLowerCase().includes(lowerCaseQuery) ?? false;
+        match = String(bus.journeyRef ?? '').toLowerCase().includes(lowerCaseQuery);
       }
       return match;
     });
