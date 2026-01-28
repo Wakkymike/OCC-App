@@ -37,6 +37,10 @@ export default function BusMap({
   // ---------------------------
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
+    if (!mapboxgl.accessToken) {
+      console.error('Mapbox access token is not set. The map cannot be initialized.');
+      return;
+    }
 
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
@@ -47,6 +51,12 @@ export default function BusMap({
 
     mapRef.current = map;
     map.addControl(new mapboxgl.NavigationControl());
+
+    map.on('error', (e) => {
+      // Prevent the error from propagating and causing a crash.
+      // Log the specific error from Mapbox for better debugging.
+      console.error('A Mapbox error occurred:', e.error);
+    });
 
     map.on('click', () => {
       setSelectedBusId(null);
