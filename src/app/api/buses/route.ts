@@ -15,6 +15,50 @@ const getText = (field: any): string | undefined => {
     return undefined;
 };
 
+// New, more robust parser for ISO 8601 duration strings (e.g., PT1H5M, -PT2M30S)
+// Also handles raw seconds as a fallback.
+const parseISODuration = (duration: string): number | undefined => {
+    if (!duration) return undefined;
+
+    // Handle case where duration is just a number (in seconds)
+    const secondsAsNumber = parseFloat(duration);
+    if (!isNaN(secondsAsNumber) && !duration.startsWith('P')) {
+        if (Math.abs(secondsAsNumber) < 86400) { // Sanity check
+            return Math.round(secondsAsNumber / 60);
+        }
+    }
+    
+    // Handle ISO 8601 Duration format
+    if (!duration.startsWith('P') && !duration.startsWith('-P')) {
+        return undefined;
+    }
+    
+    const isNegative = duration.startsWith('-');
+    // Remove P or -P from the start
+    const durationStr = isNegative ? duration.substring(2) : duration.substring(1);
+    
+    // Check if there is a time component
+    const timePart = durationStr.includes('T') ? durationStr.split('T')[1] : durationStr;
+    
+    if (!timePart) return undefined;
+    
+    let totalSeconds = 0;
+    
+    const hoursMatch = timePart.match(/(\d+(?:\.\d+)?)H/);
+    const minutesMatch = timePart.match(/(\d+(?:\.\d+)?)M/);
+    const secondsMatch = timePart.match(/(\d+(?:\.\d+)?)S/);
+
+    if (hoursMatch) totalSeconds += parseFloat(hoursMatch[1]) * 3600;
+    if (minutesMatch) totalSeconds += parseFloat(minutesMatch[1]) * 60;
+    if (secondsMatch) totalSeconds += parseFloat(secondsMatch[1]);
+    
+    if (totalSeconds === 0 && duration.length > 3) return undefined; // Invalid parse
+
+    if (isNegative) totalSeconds = -totalSeconds;
+    
+    return Math.round(totalSeconds / 60);
+}
+
 
 // Helper to calculate delay by comparing aimed vs expected times.
 const calculateDelayFromTimes = (call: any): number | undefined => {
@@ -87,6 +131,10 @@ export async function GET() {
       ignoreAttributes: false,
       attributeNamePrefix: '',
       removeNSPrefix: true,
+      // The following option is crucial for handling inconsistent values
+      parseNodeValue: true, 
+      parseAttributeValue: true,
+      trimValues: true,
     });
 
     const data = parser.parse(xmlText);
@@ -120,9 +168,9 @@ export async function GET() {
         const destination = getText(journey.DestinationName)?.replace(/_/g, ' ');
         const direction = getText(journey.DirectionRef);
         const journeyRef = getText(journey.FramedVehicleJourneyRef?.DatedVehicleJourneyRef);
+        const progressStatusText = getText(journey.ProgressStatus)?.toLowerCase() ?? '';
 
         // --- CANCELLATION CHECK ---
-        const progressStatusText = getText(journey.ProgressStatus)?.toLowerCase() ?? '';
         if (progressStatusText.includes('cancelled')) {
           return {
             fleetNumber: fleetNumber ?? 'unknown',
@@ -150,9 +198,15 @@ export async function GET() {
         
         const bearing = journey.Bearing ? parseFloat(getText(journey.Bearing)!) : undefined;
         
+        // --- ROBUST NEXT STOP LOGIC ---
         const monitoredCall = journey.MonitoredCall;
-        const nextStop = getText(monitoredCall?.StopPointName)?.replace(/_/g, ' ');
-
+        const onwardCalls = journey.OnwardCalls?.OnwardCall ? (Array.isArray(journey.OnwardCalls.OnwardCall) ? journey.OnwardCalls.OnwardCall : [journey.OnwardCalls.OnwardCall]) : [];
+        let nextStop: string | undefined = getText(monitoredCall?.StopPointName)?.replace(/_/g, ' ');
+        
+        // Fallback to first onward call if monitored call has no name
+        if (!nextStop && onwardCalls.length > 0) {
+            nextStop = getText(onwardCalls[0]?.StopPointName)?.replace(/_/g, ' ');
+        }
 
         // --- MULTI-LAYERED STATUS CALCULATION ---
         let delayInMinutes: number | undefined;
@@ -160,12 +214,8 @@ export async function GET() {
 
         // Method 1: Calculate from scheduled vs expected times. This is often the most reliable.
         const callsToCheck = [];
-        if (journey.MonitoredCall) callsToCheck.push(journey.MonitoredCall);
-        
-        if (journey.OnwardCalls?.OnwardCall) {
-            const onward = Array.isArray(journey.OnwardCalls.OnwardCall) ? journey.OnwardCalls.OnwardCall : [journey.OnwardCalls.OnwardCall];
-            callsToCheck.push(...onward);
-        }
+        if (monitoredCall) callsToCheck.push(monitoredCall);
+        callsToCheck.push(...onwardCalls);
 
         for (const call of callsToCheck) {
             const calculatedDelay = calculateDelayFromTimes(call);
@@ -175,33 +225,13 @@ export async function GET() {
             }
         }
 
-        // Method 2: Fallback to the <Delay> field if calculation fails.
+        // Method 2: Fallback to the <Delay> field with robust parsing.
         if (delayInMinutes === undefined) {
             const delayText = getText(journey.Delay);
             if (delayText) {
-                // Handle ISO 8601 Duration format (e.g., 'PT2M30S', '-PT1M')
-                if (delayText.startsWith('PT') || delayText.startsWith('-PT')) {
-                    const isNegative = delayText.startsWith('-');
-                    const durationStr = isNegative ? delayText.substring(1) : delayText;
-                    try {
-                        const minutesMatch = durationStr.match(/(\d+)M/);
-                        const secondsMatch = durationStr.match(/(\d+)S/);
-                        const minutes = minutesMatch ? parseInt(minutesMatch[1], 10) : 0;
-                        const seconds = secondsMatch ? parseInt(secondsMatch[1], 10) : 0;
-                        let totalSeconds = (minutes * 60) + seconds;
-                        if (isNegative) totalSeconds = -totalSeconds;
-                        
-                        if (Math.abs(totalSeconds) < 86400) {
-                            delayInMinutes = Math.round(totalSeconds / 60);
-                        }
-                    } catch (e) { /* Parsing failed, continue */ }
-                } 
-                // Handle raw seconds format
-                else if (!isNaN(Number(delayText))) {
-                    const delaySeconds = Number(delayText);
-                    if (Math.abs(delaySeconds) < 86400) { 
-                        delayInMinutes = Math.round(delaySeconds / 60);
-                    }
+                const parsedDelay = parseISODuration(delayText);
+                if (parsedDelay !== undefined) {
+                    delayInMinutes = parsedDelay;
                 }
             }
         }
