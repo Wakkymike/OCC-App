@@ -23,7 +23,8 @@ const parseISODuration = (duration: string): number | undefined => {
     // Handle case where duration is just a number (in seconds)
     const secondsAsNumber = parseFloat(duration);
     if (!isNaN(secondsAsNumber) && !duration.startsWith('P')) {
-        if (Math.abs(secondsAsNumber) < 86400) { // Sanity check
+        // A duration of 0 is valid.
+        if (Math.abs(secondsAsNumber) < 86400) { // Sanity check for less than a day
             return Math.round(secondsAsNumber / 60);
         }
     }
@@ -83,16 +84,21 @@ const calculateDelayFromTimes = (call: any): number | undefined => {
         return undefined;
     }
 
-    const aimed = new Date(aimedTimeStr);
-    const expected = new Date(expectedTimeStr);
-        
-    if (!isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
-        const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
-        
-        // Sanity check: A huge delay is likely a data error (e.g., > 1 day)
-        if (Math.abs(diffSeconds) < 86400) { 
-            return Math.round(diffSeconds / 60);
+    try {
+        const aimed = new Date(aimedTimeStr);
+        const expected = new Date(expectedTimeStr);
+            
+        if (!isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
+            const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
+            
+            // Sanity check: A huge delay is likely a data error (e.g., > 1 day)
+            if (Math.abs(diffSeconds) < 86400) { 
+                return Math.round(diffSeconds / 60);
+            }
         }
+    } catch (e) {
+      // Date parsing can fail
+      return undefined;
     }
     return undefined;
 }
@@ -195,30 +201,22 @@ export async function GET() {
         
         const bearing = journey.Bearing ? parseFloat(getText(journey.Bearing)!) : undefined;
         
-        // --- ROBUST NEXT STOP LOGIC ---
-        const monitoredCall = journey.MonitoredCall;
-        const onwardCalls = journey.OnwardCalls?.OnwardCall ? (Array.isArray(journey.OnwardCalls.OnwardCall) ? journey.OnwardCalls.OnwardCall : [journey.OnwardCalls.OnwardCall]) : [];
-        let nextStop: string | undefined = getText(monitoredCall?.StopPointName)?.replace(/_/g, ' ');
-        
-        // Fallback to first onward call if monitored call has no name
-        if (!nextStop && onwardCalls.length > 0) {
-            nextStop = getText(onwardCalls[0]?.StopPointName)?.replace(/_/g, ' ');
-        }
-
-        // --- NEW MULTI-LAYERED STATUS CALCULATION ---
+        // --- MULTI-LAYERED STATUS AND NEXT STOP CALCULATION ---
         let delayInMinutes: number | undefined;
         let status: string = 'Unknown';
+        let nextStop: string | undefined;
 
+        // --- Delay Calculation ---
         // Method 1: Use the <Delay> field. This is the most direct data source.
         const delayText = getText(journey.Delay);
         if (delayText) {
-            const parsedDelay = parseISODuration(delayText);
-            if (parsedDelay !== undefined) {
-                delayInMinutes = parsedDelay;
-            }
+            delayInMinutes = parseISODuration(delayText);
         }
         
-        // Method 2: Fallback to calculating from scheduled vs expected times.
+        const monitoredCall = journey.MonitoredCall;
+        const onwardCalls = journey.OnwardCalls?.OnwardCall ? (Array.isArray(journey.OnwardCalls.OnwardCall) ? journey.OnwardCalls.OnwardCall : [journey.OnwardCalls.OnwardCall]) : [];
+        
+        // Method 2: Fallback to calculating from scheduled vs expected times if <Delay> failed.
         if (delayInMinutes === undefined) {
             const callsToCheck = [];
             if (monitoredCall) callsToCheck.push(monitoredCall);
@@ -232,20 +230,8 @@ export async function GET() {
                 }
             }
         }
-
-        // Method 3: Final fallback to text-based status indicators.
-        if (delayInMinutes === undefined) {
-            if (progressStatusText.includes('on time')) {
-                status = 'On Time';
-                delayInMinutes = 0; // Set to 0 so the formatter below provides a consistent message
-            } else if (progressStatusText.includes('late')) {
-                status = 'Late';
-            } else if (progressStatusText.includes('early')) {
-                status = 'Early';
-            }
-        }
-
-        // Finally, set the specific status string based on the numeric delay, if we have one.
+        
+        // --- Status String Generation ---
         if (delayInMinutes !== undefined) {
             if (delayInMinutes > 2) {
               status = `${delayInMinutes} min late`;
@@ -254,7 +240,24 @@ export async function GET() {
             } else {
               status = 'On Time';
             }
+        } else {
+            // Method 3: Final fallback to text-based status if numeric delay failed.
+            if (progressStatusText.includes('on time')) {
+                status = 'On Time';
+                delayInMinutes = 0; 
+            } else if (progressStatusText.includes('late')) {
+                status = 'Late';
+            } else if (progressStatusText.includes('early')) {
+                status = 'Early';
+            }
         }
+
+        // --- Next Stop Calculation ---
+        nextStop = getText(monitoredCall?.StopPointName)?.replace(/_/g, ' ');
+        if (!nextStop && onwardCalls.length > 0) {
+            nextStop = getText(onwardCalls[0]?.StopPointName)?.replace(/_/g, ' ');
+        }
+
 
         return {
           fleetNumber: fleetNumber ?? 'unknown',
