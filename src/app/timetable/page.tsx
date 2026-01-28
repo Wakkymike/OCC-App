@@ -54,18 +54,21 @@ export default function LiveServicePage() {
 
   const getStatusBadge = (status: string, delay: number | undefined) => {
     let variant: "default" | "destructive" | "secondary" | "outline" = "outline";
-    if (status !== 'Unknown') {
-        if (delay !== undefined) {
-            if (delay > 2) variant = 'destructive';
-            else if (delay < -2) variant = 'secondary';
-            else variant = 'default';
-        } else {
-          // Handle cases where delay is undefined but we have a status string
-          if (status.includes('late')) variant = 'destructive';
-          else if (status.includes('early')) variant = 'secondary';
-          else if (status === 'On Time') variant = 'default';
-        }
+
+    if (status === 'On Time') {
+        variant = 'default';
+    } else if (status.includes('late') || status === 'Late') {
+        variant = 'destructive';
+    } else if (status.includes('early') || status === 'Early') {
+        variant = 'secondary';
+    } 
+    // Fallback to using delay number if status is something else but delay is present
+    else if (delay !== undefined) {
+        if (delay > 2) variant = 'destructive';
+        else if (delay < -2) variant = 'secondary';
+        else variant = 'default';
     }
+    
     return <Badge variant={variant}>{status}</Badge>;
   };
   

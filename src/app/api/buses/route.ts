@@ -113,19 +113,18 @@ export async function GET() {
         
         const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
 
-        // --- New Robust Status Calculation ---
+        // --- NEW, MOST ROBUST STATUS CALCULATION ---
         let delayInMinutes: number | undefined;
-        let status: string = 'Unknown';
+        let status: string = 'Unknown'; // Default status
 
-        // Method 1: Parse the 'Delay' field (ISO 8601 duration or raw seconds).
+        // Method 1: Use the <Delay> field if present and valid.
         const delayValue = journey.Delay;
-        if (delayValue !== undefined && delayValue !== null) {
+        if (delayInMinutes === undefined && delayValue !== undefined && delayValue !== null) {
             const rawDelay = (typeof delayValue === 'object' && '#text' in delayValue) 
               ? delayValue['#text'] 
               : delayValue;
-
+            
             if (typeof rawDelay === 'string' && (rawDelay.startsWith('P') || rawDelay.startsWith('-P'))) {
-              // It's likely an ISO 8601 duration string like "PT2M3S" or "-PT1M"
               try {
                   const match = rawDelay.match(/(-)?P(?:T)?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(\.\d+)?)S)?/);
                   if (match) {
@@ -134,44 +133,50 @@ export async function GET() {
                       const minutes = parseInt(match[3] || '0', 10);
                       const seconds = parseFloat(match[4] || '0');
                       
-                      if (!isNaN(hours) && !isNaN(minutes) && !isNaN(seconds)) {
-                          const totalSeconds = (hours * 3600 + minutes * 60 + seconds);
-                          if (totalSeconds >= 0) {
-                             delayInMinutes = Math.round((totalSeconds * sign) / 60);
-                          }
-                      }
+                      const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+                      delayInMinutes = Math.round((totalSeconds * sign) / 60);
                   }
               } catch { /* Ignore parsing errors, will fallback. */ }
             } else if (!isNaN(Number(rawDelay))) {
-                // It's likely a number of seconds, which could be a string '120' or a number 120.
                 const delaySeconds = Number(rawDelay);
                 delayInMinutes = Math.round(delaySeconds / 60);
             }
         }
-        
-        // Method 2: Calculate from Aimed vs Expected times (if delay still unknown).
+
+        // Method 2: Calculate from Aimed vs Expected times (if delay still not found).
         if (delayInMinutes === undefined) {
-          // Check the 'MonitoredCall' (next stop)
           delayInMinutes = calculateDelayFromTimes(journey.MonitoredCall);
 
-          // If still no delay, check the 'OnwardCalls' (subsequent stops)
           if (delayInMinutes === undefined && journey.OnwardCalls?.OnwardCall) {
             const onwardCalls = Array.isArray(journey.OnwardCalls.OnwardCall)
               ? journey.OnwardCalls.OnwardCall
               : [journey.OnwardCalls.OnwardCall];
             
             for (const call of onwardCalls) {
-                const delay = calculateDelayFromTimes(call);
-                if (delay !== undefined) {
-                    delayInMinutes = delay;
-                    break; // Use the first valid delay we find
+                const calculatedDelay = calculateDelayFromTimes(call);
+                if (calculatedDelay !== undefined) {
+                    delayInMinutes = calculatedDelay;
+                    break; 
                 }
             }
           }
         }
+
+        // Method 3: Check for ProgressStatus as a text indicator (another fallback)
+        if (delayInMinutes === undefined && journey.ProgressStatus) {
+            const statusText = String(journey.ProgressStatus).toLowerCase();
+            if (statusText.includes('on time') || statusText.includes('on-time')) {
+                status = 'On Time';
+                delayInMinutes = 0; 
+            } else if (statusText.includes('late')) {
+                status = 'Late'; 
+            } else if (statusText.includes('early')) {
+                status = 'Early';
+            }
+        }
         
-        // Final step: Convert numeric delay to a status string
-        if (delayInMinutes !== undefined) {
+        // Final step: Convert the numeric delay (from Method 1 or 2) into a human-readable status string.
+        if (delayInMinutes !== undefined && status === 'Unknown') {
           if (delayInMinutes > 2) {
             status = `${delayInMinutes} min late`;
           } else if (delayInMinutes < -2) {
