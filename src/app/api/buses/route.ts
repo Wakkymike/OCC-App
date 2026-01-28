@@ -8,17 +8,26 @@ const calculateDelayFromTimes = (call: any): number | undefined => {
     if (!call) return undefined;
 
     let aimed: Date | undefined, expected: Date | undefined;
+    let aimedTimeStr: string | undefined, expectedTimeStr: string | undefined;
 
     // Prefer arrival times, but fallback to departure times
     if (call.AimedArrivalTime && call.ExpectedArrivalTime) {
-        aimed = new Date(call.AimedArrivalTime);
-        expected = new Date(call.ExpectedArrivalTime);
+        aimedTimeStr = call.AimedArrivalTime;
+        expectedTimeStr = call.ExpectedArrivalTime;
     } else if (call.AimedDepartureTime && call.ExpectedDepartureTime) {
-        aimed = new Date(call.AimedDepartureTime);
-        expected = new Date(call.ExpectedDepartureTime);
+        aimedTimeStr = call.AimedDepartureTime;
+        expectedTimeStr = call.ExpectedDepartureTime;
     } else {
         return undefined;
     }
+
+    // Ensure we have non-empty strings before creating Date objects
+    if (!aimedTimeStr || !expectedTimeStr) {
+        return undefined;
+    }
+
+    aimed = new Date(aimedTimeStr);
+    expected = new Date(expectedTimeStr);
         
     if (aimed && expected && !isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
         const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
