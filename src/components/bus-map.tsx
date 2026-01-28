@@ -203,18 +203,7 @@ export default function BusMap({
         circle.setAttribute('stroke', isSelected ? '#00008B' : 'black'); // Dark Blue
 
         if (isSelected) {
-          let delayText: string;
-          if (bus.delay === undefined) {
-            delayText = 'Status Unknown';
-          } else if (bus.delay === 0) {
-            delayText = 'On Time';
-          } else if (bus.delay > 0) {
-            delayText = `${bus.delay} min late`;
-          } else { // bus.delay < 0
-            delayText = `${Math.abs(bus.delay)} min early`;
-          }
-
-          infoFlag.innerHTML = `Journey: ${bus.journeyRef || 'N/A'}<br>${delayText}`;
+          infoFlag.innerHTML = `Journey: ${bus.journeyRef || 'N/A'}<br>${bus.status}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';

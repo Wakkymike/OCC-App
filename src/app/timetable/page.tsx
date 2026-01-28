@@ -52,17 +52,21 @@ export default function LiveServicePage() {
     return a.localeCompare(b);
   });
 
-  const getStatusBadge = (delay: number | undefined) => {
-    if (delay === undefined) {
-      return <Badge variant="outline">Unknown</Badge>;
+  const getStatusBadge = (status: string, delay: number | undefined) => {
+    let variant: "default" | "destructive" | "secondary" | "outline" = "outline";
+    if (status !== 'Unknown') {
+        if (delay !== undefined) {
+            if (delay > 2) variant = 'destructive';
+            else if (delay < -2) variant = 'secondary';
+            else variant = 'default';
+        } else {
+          // Handle cases where delay is undefined but we have a status string
+          if (status.includes('late')) variant = 'destructive';
+          else if (status.includes('early')) variant = 'secondary';
+          else if (status === 'On Time') variant = 'default';
+        }
     }
-    if (delay > 2) {
-      return <Badge variant="destructive">{delay} min late</Badge>;
-    }
-    if (delay < -2) {
-      return <Badge variant="secondary">{Math.abs(delay)} min early</Badge>;
-    }
-    return <Badge variant="default">On Time</Badge>;
+    return <Badge variant={variant}>{status}</Badge>;
   };
   
   const getDirectionLabel = (direction: string) => {
@@ -116,7 +120,7 @@ export default function LiveServicePage() {
                               <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
                               <TableCell>{bus.fleetNumber}</TableCell>
                               <TableCell className="text-right">
-                                {getStatusBadge(bus.delay)}
+                                {getStatusBadge(bus.status, bus.delay)}
                               </TableCell>
                             </TableRow>
                           ))}

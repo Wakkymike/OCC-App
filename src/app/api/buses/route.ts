@@ -104,8 +104,9 @@ export async function GET() {
         
         const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
 
-        // --- New Robust Delay Calculation ---
+        // --- New Robust Status Calculation ---
         let delayInMinutes: number | undefined;
+        let status: string = 'Unknown';
 
         // Method 1: Parse the 'Delay' field (ISO 8601 duration or raw seconds).
         const delayValue = journey.Delay;
@@ -159,7 +160,17 @@ export async function GET() {
             }
           }
         }
-
+        
+        // Final step: Convert numeric delay to a status string
+        if (delayInMinutes !== undefined) {
+          if (delayInMinutes > 2) {
+            status = `${delayInMinutes} min late`;
+          } else if (delayInMinutes < -2) {
+            status = `${Math.abs(delayInMinutes)} min early`;
+          } else {
+            status = 'On Time';
+          }
+        }
 
         return {
           fleetNumber: journey.VehicleRef,
@@ -171,6 +182,7 @@ export async function GET() {
           bearing: bearing && !Number.isNaN(bearing) ? bearing : undefined,
           journeyRef: journey.FramedVehicleJourneyRef?.DatedVehicleJourneyRef,
           delay: delayInMinutes,
+          status: status,
         };
       })
       .filter((bus): bus is Bus => bus !== null);
