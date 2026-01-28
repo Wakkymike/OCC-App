@@ -6,6 +6,9 @@ import { useBusTracker } from '@/hooks/use-bus-tracker';
 import type { Bus, LatLng } from '@/lib/types';
 import SearchBar from '@/components/search-bar';
 import mapboxgl from 'mapbox-gl';
+import Link from 'next/link';
+import { Home } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function Page() {
   const { buses, error } = useBusTracker();
@@ -97,6 +100,13 @@ export default function Page() {
   
   return (
     <div className="h-screen w-screen relative">
+      <div className="absolute top-4 left-4 z-10">
+        <Button asChild variant="outline" size="icon" aria-label="Home">
+          <Link href="/">
+            <Home className="h-5 w-5" />
+          </Link>
+        </Button>
+      </div>
       <div className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-center">
         <SearchBar onSearch={handleSearch} onClear={handleClear} />
       </div>
