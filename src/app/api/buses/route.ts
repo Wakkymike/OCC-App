@@ -72,6 +72,33 @@ export async function GET() {
           skippedCount++;
           return null;
         }
+        
+        const calculateDelayFromTimes = (call: any): number | undefined => {
+            if (!call) return undefined;
+
+            let aimed: Date | undefined, expected: Date | undefined;
+
+            // Prefer arrival times, but fallback to departure times
+            if (call.AimedArrivalTime && call.ExpectedArrivalTime) {
+                aimed = new Date(call.AimedArrivalTime);
+                expected = new Date(call.ExpectedArrivalTime);
+            } else if (call.AimedDepartureTime && call.ExpectedDepartureTime) {
+                aimed = new Date(call.AimedDepartureTime);
+                expected = new Date(call.ExpectedDepartureTime);
+            } else {
+                return undefined;
+            }
+                
+            if (aimed && expected && !isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
+                const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
+                
+                // Sanity check: A huge delay is likely a data error (e.g., > 1 day)
+                if (Math.abs(diffSeconds) < 86400) { 
+                    return Math.round(diffSeconds / 60);
+                }
+            }
+            return undefined;
+        }
 
         const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
 
@@ -106,33 +133,6 @@ export async function GET() {
                     // Ignore parsing errors, will fallback.
                 }
             }
-        }
-
-        const calculateDelayFromTimes = (call: any): number | undefined => {
-            if (!call) return undefined;
-
-            let aimed: Date | undefined, expected: Date | undefined;
-
-            // Prefer arrival times, but fallback to departure times
-            if (call.AimedArrivalTime && call.ExpectedArrivalTime) {
-                aimed = new Date(call.AimedArrivalTime);
-                expected = new Date(call.ExpectedArrivalTime);
-            } else if (call.AimedDepartureTime && call.ExpectedDepartureTime) {
-                aimed = new Date(call.AimedDepartureTime);
-                expected = new Date(call.ExpectedDepartureTime);
-            } else {
-                return undefined;
-            }
-                
-            if (aimed && expected && !isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
-                const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
-                
-                // Sanity check: A huge delay is likely a data error (e.g., > 1 day)
-                if (Math.abs(diffSeconds) < 86400) { 
-                    return Math.round(diffSeconds / 60);
-                }
-            }
-            return undefined;
         }
 
         // Method 2: Check the 'MonitoredCall' (next stop) if no delay found yet.
