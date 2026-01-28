@@ -14,5 +14,6 @@ export interface Bus {
   journeyRef?: string;
   delay?: number; // Delay in minutes, for internal logic/styling
   status: string; // The display text for status: "On Time", "5 min late", "Unknown"
+  currentStop?: string;
   nextStop?: string;
 }

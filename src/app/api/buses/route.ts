@@ -158,29 +158,34 @@ export async function GET() {
         
         const bearing = journey.Bearing ? parseFloat(getText(journey.Bearing)!) : undefined;
         
-        // --- NEW ROBUST STATUS & NEXT STOP LOGIC ---
         let delayInMinutes: number | undefined;
         let status: string = 'Unknown';
+        let currentStop: string | undefined;
         let nextStop: string | undefined;
 
         const monitoredCall = journey.MonitoredCall;
         const onwardCalls = journey.OnwardCalls?.OnwardCall ? (Array.isArray(journey.OnwardCalls.OnwardCall) ? journey.OnwardCalls.OnwardCall : [journey.OnwardCalls.OnwardCall]) : [];
         
+        if (monitoredCall) {
+            currentStop = getText(monitoredCall.StopPointName)?.replace(/_/g, ' ');
+        }
+        if (onwardCalls.length > 0) {
+            // The first onward call is the next stop
+            nextStop = getText(onwardCalls[0].StopPointName)?.replace(/_/g, ' ');
+        }
+
         const potentialCalls = [...onwardCalls];
-        // Add MonitoredCall as a final fallback if no OnwardCalls exist or are useful
+        // Use MonitoredCall as a final fallback for delay calculation
         if (monitoredCall) {
             potentialCalls.push(monitoredCall);
         }
 
-        // Iterate through potential stops to find the first one with complete data
+        // Iterate through potential stops to find the first one with a valid delay
         for (const call of potentialCalls) {
-             const stopName = getText(call.StopPointName);
              const calculatedDelay = calculateDelayFromTimes(call);
-
-             if (stopName && calculatedDelay !== undefined) {
-                 nextStop = stopName.replace(/_/g, ' ');
+             if (calculatedDelay !== undefined) {
                  delayInMinutes = calculatedDelay;
-                 break; // Exit loop once we have a valid stop and delay
+                 break; // Exit loop once we have a valid delay
              }
         }
         
@@ -215,6 +220,7 @@ export async function GET() {
           journeyRef: journeyRef,
           delay: delayInMinutes,
           status: status,
+          currentStop: currentStop,
           nextStop: nextStop,
         };
       })

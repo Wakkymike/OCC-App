@@ -160,7 +160,8 @@ export default function LiveServicePage() {
                             <TableHead>Running Board</TableHead>
                             <TableHead>Journey Ref</TableHead>
                             <TableHead>Destination</TableHead>
-                            <TableHead>Approaching</TableHead>
+                            <TableHead>Current Stop</TableHead>
+                            <TableHead>Next Stop</TableHead>
                             <TableHead>Direction</TableHead>
                             <TableHead className="text-right">Status</TableHead>
                           </TableRow>
@@ -178,6 +179,7 @@ export default function LiveServicePage() {
                               <TableCell>{bus.runningBoard}</TableCell>
                               <TableCell>{bus.journeyRef || 'N/A'}</TableCell>
                               <TableCell className="font-medium">{bus.destination}</TableCell>
+                              <TableCell>{bus.currentStop || 'N/A'}</TableCell>
                               <TableCell>{bus.nextStop || 'N/A'}</TableCell>
                               <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
                               <TableCell className="text-right">

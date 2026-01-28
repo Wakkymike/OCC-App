@@ -200,7 +200,7 @@ export default function BusMap({
         directionLabel = ` <span style="color:blue">[O]</span>`;
       }
 
-      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel} | To: ${bus.nextStop || bus.destination}`;
+      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel} | Approaching: ${bus.nextStop || bus.destination}`;
 
       // Rotate arrow based on bearing
       const svg = markerElement.querySelector('svg');
@@ -219,7 +219,7 @@ export default function BusMap({
         circle.setAttribute('stroke', isSelected ? '#00008B' : 'black'); // Dark Blue
 
         if (isSelected) {
-          infoFlag.innerHTML = `Next Stop: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
+          infoFlag.innerHTML = `Current: ${bus.currentStop || 'N/A'}<br>Next: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';
@@ -239,7 +239,7 @@ export default function BusMap({
       }
       if (id === selectedBusId) setSelectedBusId(null);
     });
-  }, [buses, selectedBusId]);
+  }, [buses, selectedBusId, setSelectedBusId]);
 
   // ---------------------------
   // Searched place marker & map view changes
