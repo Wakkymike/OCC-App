@@ -53,8 +53,6 @@ export default function BusMap({
     map.addControl(new mapboxgl.NavigationControl());
 
     map.on('error', (e) => {
-      // Prevent the error from propagating and causing a crash.
-      // Log the specific error from Mapbox for better debugging.
       console.error('A Mapbox error occurred:', e.error);
     });
 
@@ -63,10 +61,13 @@ export default function BusMap({
     });
 
     return () => {
-      // Clean up animations when map is removed
+      // Clean up animations and map instance
       Object.values(animationFrameRefs.current).forEach(cancelAnimationFrame);
       animationFrameRefs.current = {};
-      map.remove();
+      if (map) {
+        map.remove();
+      }
+      mapRef.current = null; // Explicitly clear the ref to prevent race conditions
     };
   }, []);
 
@@ -238,7 +239,7 @@ export default function BusMap({
       }
       if (id === selectedBusId) setSelectedBusId(null);
     });
-  }, [buses, selectedBusId, setSelectedBusId]);
+  }, [buses, selectedBusId]);
 
   // ---------------------------
   // Searched place marker & map view changes
