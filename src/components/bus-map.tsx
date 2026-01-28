@@ -30,6 +30,8 @@ export default function BusMap({
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
   const placeMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const previouslySelectedBusId = useRef<string | null>(null);
+
 
   // ---------------------------
   // Initialize map
@@ -190,14 +192,23 @@ export default function BusMap({
       if (mapView.bounds) {
         map.fitBounds(mapView.bounds, { padding: 100, maxZoom: 15 });
       } else if (mapView.center) {
-        map.flyTo({
-          center: mapView.center,
-          zoom: mapView.zoom || 14,
-          essential: true,
-        });
+        const isNewSelection = previouslySelectedBusId.current !== selectedBusId;
+
+        if (isNewSelection && selectedBusId) {
+          map.flyTo({
+            center: mapView.center,
+            zoom: mapView.zoom || 16,
+            essential: true,
+          });
+        } else if (!isNewSelection && selectedBusId) {
+          map.easeTo({
+            center: mapView.center,
+          });
+        }
       }
     }
-  }, [searchedPlace, mapView]);
+    previouslySelectedBusId.current = selectedBusId;
+  }, [searchedPlace, mapView, selectedBusId]);
 
   return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />;
 }
