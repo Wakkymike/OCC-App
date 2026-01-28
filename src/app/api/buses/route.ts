@@ -162,10 +162,10 @@ export async function GET() {
           // --- TIMETABLE-BASED DELAY CALCULATION (PRIMARY) ---
           const scheduledJourney = journeyRef ? (timetable as Record<string, any>)[journeyRef] : undefined;
           if (scheduledJourney && Array.isArray(scheduledJourney)) {
-            const nextCall = onwardCalls[0];
-            if (nextCall) {
-              const nextStopRef = getText(nextCall.StopPointRef);
-              const expectedTimeStr = getText(nextCall.ExpectedArrivalTime);
+            // Iterate through all upcoming stops to find the first one with enough data
+            for (const call of onwardCalls) {
+              const nextStopRef = getText(call.StopPointRef);
+              const expectedTimeStr = getText(call.ExpectedArrivalTime);
               const scheduledStopTime = scheduledJourney.find((s: any) => s.stop === nextStopRef);
 
               if (scheduledStopTime && expectedTimeStr) {
@@ -194,6 +194,8 @@ export async function GET() {
                 // Sanity check to avoid huge, erroneous delays (e.g. > 1 day)
                 if (Math.abs(finalDelayInMinutes) < 1440) { 
                     delayInMinutes = finalDelayInMinutes;
+                    // Once we have a valid delay, we can stop searching.
+                    break;
                 }
               }
             }
