@@ -7,29 +7,32 @@ import type { Bus } from '@/lib/types';
 const calculateDelayFromTimes = (call: any): number | undefined => {
     if (!call) return undefined;
 
-    let aimed: Date | undefined, expected: Date | undefined;
-    let aimedTimeStr: string | undefined, expectedTimeStr: string | undefined;
+    let aimedTimeVal: any, expectedTimeVal: any;
 
     // Prefer arrival times, but fallback to departure times
     if (call.AimedArrivalTime && call.ExpectedArrivalTime) {
-        aimedTimeStr = call.AimedArrivalTime;
-        expectedTimeStr = call.ExpectedArrivalTime;
+        aimedTimeVal = call.AimedArrivalTime;
+        expectedTimeVal = call.ExpectedArrivalTime;
     } else if (call.AimedDepartureTime && call.ExpectedDepartureTime) {
-        aimedTimeStr = call.AimedDepartureTime;
-        expectedTimeStr = call.ExpectedDepartureTime;
+        aimedTimeVal = call.AimedDepartureTime;
+        expectedTimeVal = call.ExpectedDepartureTime;
     } else {
         return undefined;
     }
+    
+    // Handle cases where the value is in a '#text' property due to XML attributes
+    const aimedTimeStr = (typeof aimedTimeVal === 'object' && aimedTimeVal !== null && '#text' in aimedTimeVal) ? aimedTimeVal['#text'] : aimedTimeVal;
+    const expectedTimeStr = (typeof expectedTimeVal === 'object' && expectedTimeVal !== null && '#text' in expectedTimeVal) ? expectedTimeVal['#text'] : expectedTimeVal;
 
-    // Ensure we have non-empty strings before creating Date objects
-    if (!aimedTimeStr || !expectedTimeStr) {
+    // Ensure we have valid, non-empty strings before creating Date objects
+    if (typeof aimedTimeStr !== 'string' || typeof expectedTimeStr !== 'string' || !aimedTimeStr || !expectedTimeStr) {
         return undefined;
     }
 
-    aimed = new Date(aimedTimeStr);
-    expected = new Date(expectedTimeStr);
+    const aimed = new Date(aimedTimeStr);
+    const expected = new Date(expectedTimeStr);
         
-    if (aimed && expected && !isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
+    if (!isNaN(aimed.getTime()) && !isNaN(expected.getTime())) {
         const diffSeconds = (expected.getTime() - aimed.getTime()) / 1000;
         
         // Sanity check: A huge delay is likely a data error (e.g., > 1 day)
@@ -119,7 +122,7 @@ export async function GET() {
 
         // Method 1: Use the <Delay> field if present and valid.
         const delayValue = journey.Delay;
-        if (delayInMinutes === undefined && delayValue !== undefined && delayValue !== null) {
+        if (delayValue !== undefined && delayValue !== null) {
             const rawDelay = (typeof delayValue === 'object' && '#text' in delayValue) 
               ? delayValue['#text'] 
               : delayValue;
@@ -176,7 +179,7 @@ export async function GET() {
         }
         
         // Final step: Convert the numeric delay (from Method 1 or 2) into a human-readable status string.
-        if (delayInMinutes !== undefined && status === 'Unknown') {
+        if (delayInMinutes !== undefined && status === 'Unknown') { // Only set if not already set by ProgressStatus
           if (delayInMinutes > 2) {
             status = `${delayInMinutes} min late`;
           } else if (delayInMinutes < -2) {
