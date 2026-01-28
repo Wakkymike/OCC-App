@@ -58,7 +58,7 @@ export default function BusMap({
       animationFrameRefs.current = {};
       map.remove();
     };
-  }, [setSelectedBusId]);
+  }, []);
 
   // ---------------------------
   // Update bus markers with animation
