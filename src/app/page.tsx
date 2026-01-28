@@ -23,7 +23,8 @@ export default function Page() {
     query: string,
     direction: 'all' | 'inbound' | 'outbound'
   ) => {
-    if (!query) {
+    // Allow search if query is present, or if it's a direction-only search for a service
+    if (!query && (searchType !== 'service' || direction === 'all')) {
       setSelectedBusId(null);
       setMapView({}); // Reset map view if query is cleared
       return;
@@ -31,18 +32,16 @@ export default function Page() {
     const lowerCaseQuery = query.toLowerCase();
 
     const results = buses.filter((bus) => {
-      let match = false;
       if (searchType === 'fleetNumber') {
-        match = String(bus.fleetNumber).toLowerCase().includes(lowerCaseQuery);
-      } else if (searchType === 'service') {
-        match = String(bus.service).toLowerCase() === lowerCaseQuery;
-        if (match && direction !== 'all') {
-          return String(bus.direction).toLowerCase() === direction;
-        }
+        return String(bus.fleetNumber).toLowerCase().includes(lowerCaseQuery);
       } else if (searchType === 'journey') {
-        match = String(bus.journeyRef ?? '').toLowerCase().includes(lowerCaseQuery);
+        return String(bus.journeyRef ?? '').toLowerCase().includes(lowerCaseQuery);
+      } else if (searchType === 'service') {
+        const serviceMatch = !query || String(bus.service).toLowerCase() === lowerCaseQuery;
+        const directionMatch = direction === 'all' || String(bus.direction).toLowerCase() === direction;
+        return serviceMatch && directionMatch;
       }
-      return match;
+      return false;
     });
 
     if (results.length === 1) {
