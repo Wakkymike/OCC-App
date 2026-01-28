@@ -9,7 +9,7 @@ export interface Bus {
   service: string;          // PublishedLineName
   destination: string;      // DestinationName
   direction: string;        // DirectionRef
-  position: LatLng;
+  position?: LatLng;
   bearing?: number;
   journeyRef?: string;
   delay?: number; // Delay in minutes, for internal logic/styling

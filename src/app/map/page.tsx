@@ -8,6 +8,7 @@ import SearchBar from '@/components/search-bar';
 import mapboxgl from 'mapbox-gl';
 import { Home } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
+import Link from 'next/link';
 
 export default function Page() {
   const { buses, error } = useBusTracker();
@@ -58,7 +59,7 @@ export default function Page() {
         return busId === selectedBusId;
     }) : undefined;
 
-    if (busToTrack) {
+    if (busToTrack && busToTrack.position) {
         setMapView({ center: busToTrack.position, zoom: 16 });
         return;
     }
@@ -66,16 +67,22 @@ export default function Page() {
     if (isSearching) {
       if (results.length === 1) {
         const bus = results[0];
-        const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
-        setSelectedBusId(busId);
-        setMapView({ center: bus.position, zoom: 16 });
+        if (bus.position) {
+          const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
+          setSelectedBusId(busId);
+          setMapView({ center: bus.position, zoom: 16 });
+        }
       } else if (results.length > 1) {
         const newBounds = new mapboxgl.LngLatBounds();
         results.forEach((bus) => {
-          newBounds.extend([bus.position.lng, bus.position.lat]);
+          if (bus.position) {
+            newBounds.extend([bus.position.lng, bus.position.lat]);
+          }
         });
-        setSelectedBusId(null);
-        setMapView({ bounds: newBounds });
+        if (!newBounds.isEmpty()) {
+            setSelectedBusId(null);
+            setMapView({ bounds: newBounds });
+        }
       } else {
         setSelectedBusId(null);
       }
@@ -100,13 +107,13 @@ export default function Page() {
   return (
     <div className="h-screen w-screen relative">
       <div className="absolute top-4 left-4 z-50">
-        <a
+        <Link
           href="/"
           className={buttonVariants({ variant: 'outline', size: 'icon' })}
           aria-label="Home"
         >
           <Home className="h-5 w-5" />
-        </a>
+        </Link>
       </div>
       <div className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-center">
         <SearchBar onSearch={handleSearch} onClear={handleClear} />

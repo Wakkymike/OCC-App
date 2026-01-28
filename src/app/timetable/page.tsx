@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { Bus } from '@/lib/types';
 import {
@@ -21,9 +22,16 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 export default function LiveServicePage() {
   const { buses, error } = useBusTracker();
+  const [serviceFilters, setServiceFilters] = useState<Record<string, 'all' | 'inbound' | 'outbound'>>({});
+
+  const handleFilterChange = (serviceNumber: string, value: 'all' | 'inbound' | 'outbound') => {
+    setServiceFilters(prev => ({ ...prev, [serviceNumber]: value }));
+  };
 
   const services = buses.reduce((acc, bus) => {
     const serviceKey = String(bus.service);
@@ -53,6 +61,10 @@ export default function LiveServicePage() {
   });
 
   const getStatusBadge = (status: string, delay: number | undefined) => {
+    if (status === 'Cancelled') {
+      return <Badge variant="destructive">Cancelled</Badge>;
+    }
+    
     let variant: "default" | "destructive" | "secondary" | "outline" = "outline";
 
     if (status === 'On Time') {
@@ -103,10 +115,33 @@ export default function LiveServicePage() {
                     <AccordionTrigger className="text-xl">
                       <div className="flex items-center gap-4">
                         <span>Service {serviceNumber}</span>
-                        <Badge variant="outline">{services[serviceNumber].length} buses running</Badge>
+                        <Badge variant="outline">{services[serviceNumber].length} buses active</Badge>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
+                      <div className="flex items-center gap-6 px-4 py-3 border-b">
+                        <span className="text-sm font-medium text-muted-foreground">Filter by direction:</span>
+                        <RadioGroup
+                          value={serviceFilters[serviceNumber] || 'all'}
+                          onValueChange={(value: 'all' | 'inbound' | 'outbound') => {
+                              handleFilterChange(serviceNumber, value);
+                          }}
+                          className="flex items-center gap-4"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="all" id={`r-${serviceNumber}-all`} />
+                            <Label htmlFor={`r-${serviceNumber}-all`}>All</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="inbound" id={`r-${serviceNumber}-inbound`} />
+                            <Label htmlFor={`r-${serviceNumber}-inbound`}>Inbound</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="outbound" id={`r-${serviceNumber}-outbound`} />
+                            <Label htmlFor={`r-${serviceNumber}-outbound`}>Outbound</Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -117,7 +152,13 @@ export default function LiveServicePage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {services[serviceNumber].map((bus) => (
+                          {services[serviceNumber]
+                            .filter(bus => {
+                              const filter = serviceFilters[serviceNumber] || 'all';
+                              if (filter === 'all') return true;
+                              return bus.direction.toLowerCase() === filter;
+                            })
+                            .map((bus) => (
                             <TableRow key={`${bus.fleetNumber}-${bus.journeyRef}`}>
                               <TableCell className="font-medium">{bus.destination}</TableCell>
                               <TableCell>{getDirectionLabel(bus.direction)}</TableCell>

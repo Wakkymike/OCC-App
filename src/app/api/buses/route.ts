@@ -100,6 +100,22 @@ export async function GET() {
     const buses: Bus[] = vehicleActivities
       .map((activity): Bus | null => {
         const journey = activity.MonitoredVehicleJourney;
+        
+        // --- NEW CANCELLATION CHECK ---
+        const progressStatusText = (journey.ProgressStatus || '').toLowerCase();
+        if (progressStatusText.includes('cancelled')) {
+          return {
+            fleetNumber: journey.VehicleRef,
+            runningBoard: journey.BlockRef ?? 'unknown',
+            service: journey.PublishedLineName ?? 'unknown',
+            destination: (journey.DestinationName ?? 'unknown').replace(/_/g, ' '),
+            direction: journey.DirectionRef ?? 'unknown',
+            journeyRef: journey.FramedVehicleJourneyRef?.DatedVehicleJourneyRef,
+            status: 'Cancelled',
+            // No position data for cancelled buses
+          };
+        }
+
 
         if (!journey?.VehicleLocation?.Latitude || !journey?.VehicleLocation?.Longitude) {
           skippedCount++;

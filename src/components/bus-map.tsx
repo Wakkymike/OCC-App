@@ -107,6 +107,11 @@ export default function BusMap({
     const currentMarkerIds = new Set(Object.keys(markersRef.current));
 
     buses.forEach((bus) => {
+      // Don't render buses without a position (e.g. cancelled buses)
+      if (!bus.position) {
+        return;
+      }
+      
       const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
       currentMarkerIds.delete(markerId);
 
