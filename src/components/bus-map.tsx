@@ -200,7 +200,7 @@ export default function BusMap({
         directionLabel = ` <span style="color:blue">[O]</span>`;
       }
 
-      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel} | Approaching: ${bus.nextStop || bus.destination}`;
+      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel} | ${bus.destination}`;
 
       // Rotate arrow based on bearing
       const svg = markerElement.querySelector('svg');
