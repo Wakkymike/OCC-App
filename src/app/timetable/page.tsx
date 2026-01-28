@@ -20,8 +20,8 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ArrowLeft, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ArrowLeft, Loader2, Home } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
@@ -95,10 +95,21 @@ export default function LiveServicePage() {
       <div className="w-full max-w-4xl">
         <Card>
           <CardHeader>
-            <CardTitle className="text-3xl">Live Service Board</CardTitle>
-            <CardDescription>
-              Real-time status of all currently running services. Data refreshes automatically.
-            </CardDescription>
+             <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-3xl">Live Service Board</CardTitle>
+                <CardDescription>
+                  Real-time status of all currently running services. Data refreshes automatically.
+                </CardDescription>
+              </div>
+              <Link
+                  href="/"
+                  className={buttonVariants({ variant: 'outline', size: 'icon' })}
+                  aria-label="Home"
+                >
+                  <Home className="h-5 w-5" />
+                </Link>
+            </div>
           </CardHeader>
           <CardContent>
             {error && <p className="text-destructive">Error fetching live data: {error}</p>}
