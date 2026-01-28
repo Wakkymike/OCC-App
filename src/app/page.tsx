@@ -9,7 +9,7 @@ import mapboxgl from 'mapbox-gl';
 
 export default function Page() {
   const { buses, error } = useBusTracker();
-
+  const [displayBuses, setDisplayBuses] = useState<Bus[]>([]);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const [searchedPlace, setSearchedPlace] = useState<LatLng | null>(null);
   const [mapView, setMapView] = useState<{
@@ -18,6 +18,10 @@ export default function Page() {
     zoom?: number;
   }>({});
 
+  useEffect(() => {
+    setDisplayBuses(buses);
+  }, [buses]);
+
   const handleSearch = (
     searchType: string,
     query: string,
@@ -25,6 +29,7 @@ export default function Page() {
   ) => {
     // Allow search if query is present, or if it's a direction-only search for a service
     if (!query && (searchType !== 'service' || direction === 'all')) {
+      setDisplayBuses(buses);
       setSelectedBusId(null);
       setMapView({}); // Reset map view if query is cleared
       return;
@@ -44,6 +49,8 @@ export default function Page() {
       return false;
     });
 
+    setDisplayBuses(results);
+
     if (results.length === 1) {
       const bus = results[0];
       const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
@@ -62,10 +69,16 @@ export default function Page() {
       setMapView({});
     }
   };
+
+  const handleClear = () => {
+    setDisplayBuses(buses);
+    setSelectedBusId(null);
+    setMapView({});
+  };
   
   useEffect(() => {
     if (selectedBusId) {
-      const bus = buses.find(b => {
+      const bus = displayBuses.find(b => {
         const busId = `${b.fleetNumber}-${b.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
         return busId === selectedBusId;
       });
@@ -73,21 +86,21 @@ export default function Page() {
         setMapView({ center: bus.position, zoom: 16 });
       }
     }
-  }, [selectedBusId, buses]);
+  }, [selectedBusId, displayBuses]);
 
 
   return (
     <div className="h-screen w-screen relative">
       <div className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-center">
-        <SearchBar onSearch={handleSearch} />
+        <SearchBar onSearch={handleSearch} onClear={handleClear} />
       </div>
       {error && (
-        <p className="absolute top-24 left-4 z-10 text-red-600 bg-white p-2 rounded-lg shadow-md">
+        <p className="absolute top-24 left-4 z-10 text-destructive bg-card p-2 rounded-lg shadow-md">
           {error}
         </p>
       )}
       <BusMap
-        buses={buses}
+        buses={displayBuses}
         selectedBusId={selectedBusId}
         setSelectedBusId={setSelectedBusId}
         searchedPlace={searchedPlace}

@@ -12,7 +12,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 interface SearchBarProps {
   onSearch: (
@@ -20,9 +20,10 @@ interface SearchBarProps {
     query: string,
     direction: 'all' | 'inbound' | 'outbound'
   ) => void;
+  onClear: () => void;
 }
 
-export default function SearchBar({ onSearch }: SearchBarProps) {
+export default function SearchBar({ onSearch, onClear }: SearchBarProps) {
   const [searchType, setSearchType] = useState('fleetNumber');
   const [query, setQuery] = useState('');
   const [direction, setDirection] = useState<'all' | 'inbound' | 'outbound'>(
@@ -32,6 +33,12 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault();
     onSearch(searchType, query, direction);
+  };
+
+  const handleClear = () => {
+    setQuery('');
+    setDirection('all');
+    onClear();
   };
 
   const handleSearchTypeChange = (value: string) => {
@@ -100,6 +107,15 @@ export default function SearchBar({ onSearch }: SearchBarProps) {
 
       <Button type="submit" size="icon" aria-label="Search">
         <Search className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        aria-label="Clear Search"
+        onClick={handleClear}
+      >
+        <X className="h-4 w-4" />
       </Button>
     </form>
   );
