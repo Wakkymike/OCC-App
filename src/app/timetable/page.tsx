@@ -145,11 +145,12 @@ export default function LiveServicePage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Destination</TableHead>
-                            <TableHead>Direction</TableHead>
                             <TableHead>Fleet No.</TableHead>
                             <TableHead>Running Board</TableHead>
                             <TableHead>Journey Ref</TableHead>
+                            <TableHead>Destination</TableHead>
+                            <TableHead>Next Stop</TableHead>
+                            <TableHead>Direction</TableHead>
                             <TableHead className="text-right">Status</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -162,11 +163,12 @@ export default function LiveServicePage() {
                             })
                             .map((bus) => (
                             <TableRow key={`${bus.fleetNumber}-${bus.journeyRef}`}>
-                              <TableCell className="font-medium">{bus.destination}</TableCell>
-                              <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
                               <TableCell>{bus.fleetNumber}</TableCell>
                               <TableCell>{bus.runningBoard}</TableCell>
                               <TableCell>{bus.journeyRef || 'N/A'}</TableCell>
+                              <TableCell className="font-medium">{bus.destination}</TableCell>
+                              <TableCell>{bus.nextStop || 'N/A'}</TableCell>
+                              <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
                               <TableCell className="text-right">
                                 {getStatusBadge(bus.status, bus.delay)}
                               </TableCell>

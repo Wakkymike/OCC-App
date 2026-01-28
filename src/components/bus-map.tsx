@@ -208,7 +208,7 @@ export default function BusMap({
         circle.setAttribute('stroke', isSelected ? '#00008B' : 'black'); // Dark Blue
 
         if (isSelected) {
-          infoFlag.innerHTML = `Journey: ${bus.journeyRef || 'N/A'}<br>${bus.status}`;
+          infoFlag.innerHTML = `Next Stop: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';

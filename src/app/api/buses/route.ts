@@ -131,6 +131,13 @@ export async function GET() {
         }
         
         const bearing = journey.Bearing ? parseFloat(journey.Bearing) : undefined;
+        
+        const monitoredCall = journey.MonitoredCall;
+        const nextStopName = monitoredCall?.StopPointName;
+        const nextStop = (typeof nextStopName === 'object' && nextStopName !== null && '#text' in nextStopName) 
+            ? nextStopName['#text'] 
+            : nextStopName;
+
 
         // --- NEW, MOST ROBUST STATUS CALCULATION ---
         let delayInMinutes: number | undefined;
@@ -212,6 +219,7 @@ export async function GET() {
           journeyRef: journey.FramedVehicleJourneyRef?.DatedVehicleJourneyRef,
           delay: delayInMinutes,
           status: status,
+          nextStop: nextStop ? nextStop.replace(/_/g, ' ') : undefined,
         };
       })
       .filter((bus): bus is Bus => bus !== null);
