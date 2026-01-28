@@ -134,6 +134,21 @@ export default function BusMap({
         flag.style.fontWeight = 'bold';
         flag.style.whiteSpace = 'nowrap';
         el.appendChild(flag);
+        
+        // Info flag for selected bus
+        const infoFlag = document.createElement('div');
+        infoFlag.className = 'bus-info-flag'; // Use a class for easy selection
+        infoFlag.style.display = 'none'; // Hidden by default
+        infoFlag.style.background = 'white';
+        infoFlag.style.padding = '2px 6px';
+        infoFlag.style.border = '1px solid black';
+        infoFlag.style.borderRadius = '4px';
+        infoFlag.style.fontSize = '10px';
+        infoFlag.style.whiteSpace = 'nowrap';
+        infoFlag.style.marginTop = '2px';
+        infoFlag.style.textAlign = 'center';
+        el.appendChild(infoFlag);
+
 
         // Arrow outside circle
         const arrowContainer = document.createElement('div');
@@ -177,13 +192,33 @@ export default function BusMap({
         svg.style.transform = `rotate(${bus.bearing}deg)`;
       }
 
-      // Highlight selected bus
+      // Highlight selected bus and update info flag
       const isSelected = markerId === selectedBusId;
       const circle = markerElement.querySelector('circle');
-      if (circle) {
+      const infoFlag = markerElement.querySelector('.bus-info-flag') as HTMLDivElement;
+
+      if (circle && infoFlag) {
         circle.setAttribute('fill', isSelected ? '#00FFFF' : 'yellow'); // Cyan
         circle.setAttribute('r', isSelected ? '11' : '9');
         circle.setAttribute('stroke', isSelected ? '#00008B' : 'black'); // Dark Blue
+
+        if (isSelected) {
+          let delayText: string;
+          if (bus.delay === undefined) {
+            delayText = 'Status Unknown';
+          } else if (bus.delay === 0) {
+            delayText = 'On Time';
+          } else if (bus.delay > 0) {
+            delayText = `${bus.delay} min late`;
+          } else { // bus.delay < 0
+            delayText = `${Math.abs(bus.delay)} min early`;
+          }
+
+          infoFlag.innerHTML = `Journey: ${bus.journeyRef || 'N/A'}<br>${delayText}`;
+          infoFlag.style.display = 'block';
+        } else {
+          infoFlag.style.display = 'none';
+        }
       }
     });
 

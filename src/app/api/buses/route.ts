@@ -78,15 +78,18 @@ export async function GET() {
         let delayInMinutes: number | undefined;
         if (journey.Delay) {
           const raw = typeof journey.Delay === 'string' ? journey.Delay : journey.Delay['#text'];
-          if (raw && raw !== 'PT0S') {
-            const match = raw.match(/(-)?PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-            if (match) {
-              const sign = match[1] === '-' ? -1 : 1;
-              const hours = parseInt(match[2] || '0', 10);
-              const minutes = parseInt(match[3] || '0', 10);
-              const seconds = parseInt(match[4] || '0', 10);
-              const totalMinutes = Math.round((hours * 60 + minutes + seconds / 60) * sign);
-              if (totalMinutes !== 0) delayInMinutes = totalMinutes;
+          if (raw) {
+            if (raw === 'PT0S') {
+              delayInMinutes = 0;
+            } else {
+              const match = raw.match(/(-)?PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+              if (match) {
+                const sign = match[1] === '-' ? -1 : 1;
+                const hours = parseInt(match[2] || '0', 10);
+                const minutes = parseInt(match[3] || '0', 10);
+                const seconds = parseInt(match[4] || '0', 10);
+                delayInMinutes = Math.round((hours * 60 + minutes + seconds / 60) * sign);
+              }
             }
           }
         }
