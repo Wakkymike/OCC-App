@@ -64,8 +64,8 @@ export default function BusMap({
       // Clean up animations and map instance
       Object.values(animationFrameRefs.current).forEach(cancelAnimationFrame);
       animationFrameRefs.current = {};
-      if (map) {
-        map.remove();
+      if (mapRef.current) {
+        mapRef.current.remove();
       }
       mapRef.current = null; // Explicitly clear the ref to prevent race conditions
     };
@@ -219,7 +219,7 @@ export default function BusMap({
         circle.setAttribute('stroke', isSelected ? '#00008B' : 'black'); // Dark Blue
 
         if (isSelected) {
-          infoFlag.innerHTML = `Current: ${bus.currentStop || 'N/A'}<br>Next: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
+          infoFlag.innerHTML = `Last Stop: ${bus.lastStop || 'N/A'}<br>Next: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';

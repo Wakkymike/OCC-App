@@ -144,7 +144,7 @@ export async function GET() {
           
           let delayInMinutes: number | undefined;
           let status: string = 'Unknown';
-          let currentStop: string | undefined;
+          let lastStop: string | undefined;
           let nextStop: string | undefined;
 
           const monitoredCall = journey.MonitoredCall;
@@ -152,7 +152,7 @@ export async function GET() {
           const onwardCalls = onwardCallsRaw ? (Array.isArray(onwardCallsRaw) ? onwardCallsRaw : [onwardCallsRaw]) : [];
           
           if (monitoredCall) {
-              currentStop = getText(monitoredCall.StopPointName)?.replace(/_/g, ' ');
+              lastStop = getText(monitoredCall.StopPointName)?.replace(/_/g, ' ');
           }
 
           const potentialCalls = [...onwardCalls];
@@ -171,7 +171,7 @@ export async function GET() {
                   
                   if (!nextStop) {
                     const stopName = getText(call.StopPointName)?.replace(/_/g, ' ');
-                    if (stopName && stopName !== currentStop) {
+                    if (stopName && stopName !== lastStop) {
                         nextStop = stopName;
                     }
                   }
@@ -215,7 +215,7 @@ export async function GET() {
             journeyRef: journeyRef,
             delay: delayInMinutes,
             status: status,
-            currentStop: currentStop,
+            lastStop: lastStop,
             nextStop: nextStop,
           };
         } catch (e) {
