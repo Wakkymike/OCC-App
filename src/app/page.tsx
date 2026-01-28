@@ -51,11 +51,22 @@ export default function Page() {
 
     setDisplayBuses(results);
 
+    const busToTrack = selectedBusId ? results.find(b => {
+        const busId = `${b.fleetNumber}-${b.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
+        return busId === selectedBusId;
+    }) : undefined;
+
+    if (busToTrack) {
+        setMapView({ center: busToTrack.position, zoom: 16 });
+        return;
+    }
+
     if (isSearching) {
       if (results.length === 1) {
         const bus = results[0];
-        const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
+        const busId = `${bus.fleetNumber}-${bus.runningBoard}-${b.service}-${b.direction}-${bus.journeyRef || 'no-ref'}`;
         setSelectedBusId(busId);
+        setMapView({ center: bus.position, zoom: 16 });
       } else if (results.length > 1) {
         const newBounds = new mapboxgl.LngLatBounds();
         results.forEach((bus) => {
@@ -67,13 +78,14 @@ export default function Page() {
         setSelectedBusId(null);
       }
     }
-  }, [buses, currentSearch]);
+  }, [buses, currentSearch, selectedBusId]);
 
   const handleSearch = (
     searchType: string,
     query: string,
     direction: 'all' | 'inbound' | 'outbound'
   ) => {
+    setSelectedBusId(null); // Deselect bus on new search
     setCurrentSearch({ searchType, query, direction });
   };
 
@@ -83,19 +95,6 @@ export default function Page() {
     setMapView({});
   };
   
-  useEffect(() => {
-    if (selectedBusId) {
-      const bus = displayBuses.find(b => {
-        const busId = `${b.fleetNumber}-${b.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
-        return busId === selectedBusId;
-      });
-      if (bus) {
-        setMapView({ center: bus.position, zoom: 16 });
-      }
-    }
-  }, [selectedBusId, displayBuses]);
-
-
   return (
     <div className="h-screen w-screen relative">
       <div className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-center">
