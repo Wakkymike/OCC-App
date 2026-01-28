@@ -120,62 +120,51 @@ export async function GET() {
         let delayInMinutes: number | undefined;
         let status: string = 'Unknown'; // Default status
 
-        // Method 1: The <Delay> field is the most direct source.
-        const delayValue = journey.Delay;
-        if (delayInMinutes === undefined && delayValue !== undefined && delayValue !== null) {
-            const rawDelay = (typeof delayValue === 'object' && '#text' in delayValue) 
-              ? delayValue['#text'] 
-              : delayValue;
-            
-            if (typeof rawDelay === 'string' && (rawDelay.startsWith('P') || rawDelay.startsWith('-P'))) {
-              try {
-                  const match = rawDelay.match(/(-)?P(?:T)?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(\.\d+)?)S)?/);
-                  if (match) {
-                      const sign = match[1] === '-' ? -1 : 1;
-                      const hours = parseInt(match[2] || '0', 10);
-                      const minutes = parseInt(match[3] || '0', 10);
-                      const seconds = parseFloat(match[4] || '0');
-                      const totalSeconds = (hours * 3600 + minutes * 60 + seconds) * sign;
-                      if (Math.abs(totalSeconds) < 86400) {
-                          delayInMinutes = Math.round(totalSeconds / 60);
-                      }
-                  }
-              } catch { /* Fallback */ }
-            } else if (!isNaN(Number(rawDelay))) {
-                const delaySeconds = Number(rawDelay);
-                if (Math.abs(delaySeconds) < 86400) {
-                    delayInMinutes = Math.round(delaySeconds / 60);
-                }
+        // Method 1: Calculate from scheduled vs expected times. This is often the most reliable.
+        const callsToCheck = [];
+        if (journey.MonitoredCall) {
+            callsToCheck.push(journey.MonitoredCall);
+        }
+        if (journey.OnwardCalls?.OnwardCall) {
+            const onwardCalls = Array.isArray(journey.OnwardCalls.OnwardCall)
+              ? journey.OnwardCalls.OnwardCall
+              : [journey.OnwardCalls.OnwardCall];
+            callsToCheck.push(...onwardCalls);
+        }
+
+        for (const call of callsToCheck) {
+            const calculatedDelay = calculateDelayFromTimes(call);
+            if (calculatedDelay !== undefined) {
+                delayInMinutes = calculatedDelay;
+                break; // Use the first valid delay we find
             }
         }
 
-        // Method 2: Fallback to calculating from scheduled vs expected times.
+        // Method 2: Fallback to the <Delay> field if calculation fails.
+        // This field is often in seconds. We won't parse complex ISO durations.
         if (delayInMinutes === undefined) {
-            const callsToCheck = [];
-            if (journey.MonitoredCall) {
-                callsToCheck.push(journey.MonitoredCall);
-            }
-            if (journey.OnwardCalls?.OnwardCall) {
-                const onwardCalls = Array.isArray(journey.OnwardCalls.OnwardCall)
-                  ? journey.OnwardCalls.OnwardCall
-                  : [journey.OnwardCalls.OnwardCall];
-                callsToCheck.push(...onwardCalls);
-            }
-
-            for (const call of callsToCheck) {
-                const calculatedDelay = calculateDelayFromTimes(call);
-                if (calculatedDelay !== undefined) {
-                    delayInMinutes = calculatedDelay;
-                    break; // Use the first valid delay we find
+            const delayValue = journey.Delay;
+            if (delayValue !== undefined && delayValue !== null) {
+                const rawDelay = (typeof delayValue === 'object' && '#text' in delayValue) 
+                  ? delayValue['#text'] 
+                  : delayValue;
+                
+                if (!isNaN(Number(rawDelay))) {
+                    const delaySeconds = Number(rawDelay);
+                    // Only consider delays if they are less than a day
+                    if (Math.abs(delaySeconds) < 86400) { 
+                        delayInMinutes = Math.round(delaySeconds / 60);
+                    }
                 }
             }
         }
-
+        
         // Method 3: Final fallback to text-based status indicators.
         if (delayInMinutes === undefined) {
             const progressStatus = (journey.ProgressStatus || '').toLowerCase();
             if (progressStatus.includes('on time')) {
                 status = 'On Time';
+                delayInMinutes = 0; // Set to 0 so the formatter below provides a consistent message
             } else if (progressStatus.includes('late')) {
                 status = 'Late';
             } else if (progressStatus.includes('early')) {
@@ -183,8 +172,9 @@ export async function GET() {
             }
         }
 
+
         // Finally, set the status string based on the numeric delay, if we have one.
-        // This will override text statuses like 'Late' with a more specific 'X min late'.
+        // This will override generic statuses like 'Late' with a more specific 'X min late'.
         if (delayInMinutes !== undefined) {
             if (delayInMinutes > 2) {
               status = `${delayInMinutes} min late`;
