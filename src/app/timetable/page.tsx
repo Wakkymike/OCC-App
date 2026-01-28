@@ -148,6 +148,8 @@ export default function LiveServicePage() {
                             <TableHead>Destination</TableHead>
                             <TableHead>Direction</TableHead>
                             <TableHead>Fleet No.</TableHead>
+                            <TableHead>Running Board</TableHead>
+                            <TableHead>Journey Ref</TableHead>
                             <TableHead className="text-right">Status</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -163,6 +165,8 @@ export default function LiveServicePage() {
                               <TableCell className="font-medium">{bus.destination}</TableCell>
                               <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
                               <TableCell>{bus.fleetNumber}</TableCell>
+                              <TableCell>{bus.runningBoard}</TableCell>
+                              <TableCell>{bus.journeyRef || 'N/A'}</TableCell>
                               <TableCell className="text-right">
                                 {getStatusBadge(bus.status, bus.delay)}
                               </TableCell>
