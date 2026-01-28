@@ -160,7 +160,7 @@ export default function LiveServicePage() {
                             <TableHead>Running Board</TableHead>
                             <TableHead>Journey Ref</TableHead>
                             <TableHead>Destination</TableHead>
-                            <TableHead>Next Stop</TableHead>
+                            <TableHead>Approaching</TableHead>
                             <TableHead>Direction</TableHead>
                             <TableHead className="text-right">Status</TableHead>
                           </TableRow>
