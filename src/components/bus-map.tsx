@@ -294,7 +294,7 @@ export default function BusMap({
         infoFlag.style.textAlign = 'center';
         el.appendChild(infoFlag);
         const arrowContainer = document.createElement('div');
-        arrowContainer.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" style="transition: transform 0.2s linear, fill 0.2s, r 0.2s;"><circle cx="12" cy="12" r="9" fill="yellow" stroke="black" stroke-width="1.5" /><polygon points="12,0 16,6 8,6" fill="black" /></svg>`.trim();
+        arrowContainer.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="transition: transform 0.2s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.4));"><rect id="bus-body" x="5" y="2" width="14" height="20" rx="3" fill="#FFC107" stroke="black" stroke-width="1"/><rect x="7" y="4" width="10" height="4" fill="#333"/><rect x="7" y="16" width="10" height="4" fill="#333"/><line x1="5" y1="10" x2="19" y2="10" stroke="black" stroke-width="1"/></svg>`.trim();
         if (arrowContainer.firstChild) el.appendChild(arrowContainer.firstChild);
         marker = new mapboxgl.Marker(el).setLngLat([bus.position.lng, bus.position.lat]).addTo(map);
         markersRef.current[markerId] = marker;
@@ -315,12 +315,10 @@ export default function BusMap({
       const svg = markerElement.querySelector('svg');
       if (svg && bus.bearing !== undefined) svg.style.transform = `rotate(${bus.bearing}deg)`;
       const isSelected = markerId === selectedBusId;
-      const circle = markerElement.querySelector('circle');
+      const busBody = markerElement.querySelector('#bus-body');
       const infoFlag = markerElement.querySelector('.bus-info-flag') as HTMLDivElement;
-      if (circle && infoFlag) {
-        circle.setAttribute('fill', isSelected ? '#00FFFF' : 'yellow');
-        circle.setAttribute('r', isSelected ? '11' : '9');
-        circle.setAttribute('stroke', isSelected ? '#00008B' : 'black');
+      if (busBody && infoFlag) {
+        busBody.setAttribute('fill', isSelected ? '#00FFFF' : '#FFC107');
         if (isSelected) {
           const schoolInfo = isSchoolService ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[SCHOOL SERVICE]</div>` : '';
           const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
