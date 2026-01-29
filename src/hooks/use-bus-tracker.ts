@@ -8,6 +8,7 @@ const FETCH_INTERVAL = 5000;
 export function useBusTracker() {
   const [buses, setBuses] = useState<Bus[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const timeoutId = useRef<number | undefined>();
 
   const fetchBuses = useCallback(async () => {
@@ -48,6 +49,7 @@ export function useBusTracker() {
       }
       setBuses([]);
     } finally {
+      setLastRefreshed(new Date());
       // Schedule the next poll, regardless of success or failure
       timeoutId.current = window.setTimeout(fetchBuses, FETCH_INTERVAL);
     }
@@ -65,5 +67,5 @@ export function useBusTracker() {
     };
   }, [fetchBuses]); // useEffect depends on the memoized fetchBuses function
 
-  return { buses, error };
+  return { buses, error, lastRefreshed };
 }

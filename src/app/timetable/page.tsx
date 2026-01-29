@@ -29,7 +29,7 @@ const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
 const nightBusRunningBoards = ['3691', '3692', '3693', '1091', '1092', '1093', '21091', '21092', '21093', '23691', '23692', '23693', '11091', '11092', '11093', '13691', '13692', '13693'];
 
 export default function LiveServicePage() {
-  const { buses, error } = useBusTracker();
+  const { buses, error, lastRefreshed } = useBusTracker();
   const [serviceFilters, setServiceFilters] = useState<Record<string, 'all' | 'inbound' | 'outbound'>>({});
 
   const handleFilterChange = (serviceNumber: string, value: 'all' | 'inbound' | 'outbound') => {
@@ -89,6 +89,11 @@ export default function LiveServicePage() {
                   <Home className="h-5 w-5" />
                 </Link>
             </div>
+            {lastRefreshed && (
+                <div className="text-sm text-muted-foreground pt-2">
+                    Data last refreshed at: {lastRefreshed.toLocaleString()}
+                </div>
+            )}
           </CardHeader>
           <CardContent>
             {error && <p className="text-destructive">Error fetching live data: {error}</p>}
