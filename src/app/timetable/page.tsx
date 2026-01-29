@@ -69,8 +69,6 @@ export default function LiveServicePage() {
     return direction;
   }
   
-  const activeServicesCount = sortedServiceNumbers.length;
-
   return (
     <main className="flex min-h-screen flex-col items-center bg-background p-4 sm:p-8">
       <div className="w-full max-w-4xl">
@@ -81,7 +79,7 @@ export default function LiveServicePage() {
                 <CardTitle className="text-3xl flex items-center gap-4">
                   <span>Live Service Board</span>
                   {buses.length > 0 && (
-                    <Badge variant="secondary">{activeServicesCount} services active</Badge>
+                    <Badge variant="secondary">{buses.length} buses active</Badge>
                   )}
                 </CardTitle>
                 <CardDescription>
