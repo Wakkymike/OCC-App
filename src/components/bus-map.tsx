@@ -22,6 +22,8 @@ interface BusMapProps {
   showBusStops: boolean;
 }
 
+const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
+
 export default function BusMap({
   buses,
   selectedBusId,
@@ -247,6 +249,9 @@ export default function BusMap({
       if (!bus.position) return;
       const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
       currentMarkerIds.delete(markerId);
+      
+      const isSchoolService = bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
+
       let marker = markersRef.current[markerId];
       if (!marker) {
         const el = document.createElement('div');
@@ -268,7 +273,7 @@ export default function BusMap({
         infoFlag.className = 'bus-info-flag';
         infoFlag.style.display = 'none';
         infoFlag.style.background = 'white';
-        infoFlag.style.padding = '2px 6px';
+        infoFlag.style.padding = '5px 8px';
         infoFlag.style.border = '1px solid black';
         infoFlag.style.borderRadius = '4px';
         infoFlag.style.fontSize = '10px';
@@ -289,7 +294,11 @@ export default function BusMap({
       let directionLabel = '';
       if (bus.direction.toLowerCase() === 'inbound') directionLabel = ` <span style="color:blue">[I]</span>`;
       else if (bus.direction.toLowerCase() === 'outbound') directionLabel = ` <span style="color:blue">[O]</span>`;
-      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel} | ${bus.destination}`;
+      
+      const schoolLabel = isSchoolService ? ` <span style="color:red">[SCH]</span>` : '';
+      
+      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel}${schoolLabel} | ${bus.destination}`;
+      
       const svg = markerElement.querySelector('svg');
       if (svg && bus.bearing !== undefined) svg.style.transform = `rotate(${bus.bearing}deg)`;
       const isSelected = markerId === selectedBusId;
@@ -300,7 +309,8 @@ export default function BusMap({
         circle.setAttribute('r', isSelected ? '11' : '9');
         circle.setAttribute('stroke', isSelected ? '#00008B' : 'black');
         if (isSelected) {
-          infoFlag.innerHTML = `Last Stop: ${bus.lastStop || 'N/A'}<br>Next Stop: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
+          const schoolInfo = isSchoolService ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[SCHOOL SERVICE]</div>` : '';
+          infoFlag.innerHTML = `${schoolInfo}Last Stop: ${bus.lastStop || 'N/A'}<br>Next Stop: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';
