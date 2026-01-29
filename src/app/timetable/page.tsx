@@ -68,6 +68,8 @@ export default function LiveServicePage() {
     if (direction.toLowerCase() === 'outbound') return 'Outbound';
     return direction;
   }
+  
+  const activeServicesCount = sortedServiceNumbers.length;
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-background p-4 sm:p-8">
@@ -76,7 +78,12 @@ export default function LiveServicePage() {
           <CardHeader>
              <div className="flex items-start justify-between gap-4">
               <div>
-                <CardTitle className="text-3xl">Live Service Board</CardTitle>
+                <CardTitle className="text-3xl flex items-center gap-4">
+                  <span>Live Service Board</span>
+                  {buses.length > 0 && (
+                    <Badge variant="secondary">{activeServicesCount} services active</Badge>
+                  )}
+                </CardTitle>
                 <CardDescription>
                   Real-time status of all currently running services. Data refreshes automatically.
                 </CardDescription>
