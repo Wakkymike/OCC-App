@@ -4,13 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { Layers3, Satellite, Sun, Building } from 'lucide-react';
+import { Layers3, Satellite, Sun, Building, TrafficCone, Bus } from 'lucide-react';
 
 interface MapControlsProps {
   mapStyle: string;
   setMapStyle: (style: string) => void;
   show3DBuildings: boolean;
   setShow3DBuildings: (show: boolean) => void;
+  showTraffic: boolean;
+  setShowTraffic: (show: boolean) => void;
+  showBusStops: boolean;
+  setShowBusStops: (show: boolean) => void;
 }
 
 const styleOptions = [
@@ -24,6 +28,10 @@ export default function MapControls({
   setMapStyle,
   show3DBuildings,
   setShow3DBuildings,
+  showTraffic,
+  setShowTraffic,
+  showBusStops,
+  setShowBusStops,
 }: MapControlsProps) {
   const currentStyleId = mapStyle.split('/').pop();
 
@@ -70,6 +78,28 @@ export default function MapControls({
                     id="show-3d-buildings"
                     checked={show3DBuildings}
                     onCheckedChange={setShow3DBuildings}
+                />
+           </div>
+           <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center space-x-2">
+                    <TrafficCone className="h-5 w-5" />
+                    <Label htmlFor="show-traffic" className="cursor-pointer">Live Traffic</Label>
+                </div>
+                <Switch
+                    id="show-traffic"
+                    checked={showTraffic}
+                    onCheckedChange={setShowTraffic}
+                />
+           </div>
+           <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center space-x-2">
+                    <Bus className="h-5 w-5" />
+                    <Label htmlFor="show-bus-stops" className="cursor-pointer">Bus Stops</Label>
+                </div>
+                <Switch
+                    id="show-bus-stops"
+                    checked={showBusStops}
+                    onCheckedChange={setShowBusStops}
                 />
            </div>
         </div>

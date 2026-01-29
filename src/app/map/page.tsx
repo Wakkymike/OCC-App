@@ -31,6 +31,8 @@ export default function Page() {
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/dark-v11');
   const [show3DBuildings, setShow3DBuildings] = useState(true);
   const [controlsVisible, setControlsVisible] = useState(false);
+  const [showTraffic, setShowTraffic] = useState(false);
+  const [showBusStops, setShowBusStops] = useState(false);
 
   useEffect(() => {
     let results = buses;
@@ -140,6 +142,10 @@ export default function Page() {
             setMapStyle={setMapStyle}
             show3DBuildings={show3DBuildings}
             setShow3DBuildings={setShow3DBuildings}
+            showTraffic={showTraffic}
+            setShowTraffic={setShowTraffic}
+            showBusStops={showBusStops}
+            setShowBusStops={setShowBusStops}
           />
         ) : (
           <Button variant="outline" size="icon" aria-label="Map Layers">
@@ -155,6 +161,8 @@ export default function Page() {
         mapView={mapView}
         mapStyle={mapStyle}
         show3DBuildings={show3DBuildings}
+        showTraffic={showTraffic}
+        showBusStops={showBusStops}
       />
     </div>
   );

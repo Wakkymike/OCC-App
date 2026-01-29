@@ -119,3 +119,17 @@
     bottom: 0;
     position: absolute;
 }
+
+.bus-stop-popup .mapboxgl-popup-content {
+  background-color: rgba(30, 30, 30, 0.85);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.bus-stop-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip { border-bottom-color: rgba(30, 30, 30, 0.85); }
+.bus-stop-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip { border-top-color: rgba(30, 30, 30, 0.85); }
+.bus-stop-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: rgba(30, 30, 30, 0.85); }
+.bus-stop-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: rgba(30, 30, 30, 0.85); }
+

@@ -19,6 +19,8 @@ interface BusMapProps {
   };
   mapStyle: string;
   show3DBuildings: boolean;
+  showTraffic: boolean;
+  showBusStops: boolean;
 }
 
 export default function BusMap({
@@ -29,6 +31,8 @@ export default function BusMap({
   mapView,
   mapStyle,
   show3DBuildings,
+  showTraffic,
+  showBusStops,
 }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -37,39 +41,6 @@ export default function BusMap({
   const animationFrameRefs = useRef<Record<string, number>>({});
   const [styleRevision, setStyleRevision] = useState(0);
   const currentStyleRef = useRef(mapStyle);
-
-  const update3DBuildingsLayer = (map: mapboxgl.Map | null, show: boolean) => {
-    if (!map) return;
-    const layerId = '3d-buildings';
-    const layerExists = map.getLayer(layerId);
-
-    if (show && !layerExists) {
-      const layers = map.getStyle().layers;
-      const labelLayerId = layers.find(
-        (layer) => layer.type === 'symbol' && layer.layout && layer.layout['text-field']
-      )?.id;
-
-      map.addLayer(
-        {
-          'id': layerId,
-          'source': 'composite',
-          'source-layer': 'building',
-          'filter': ['==', 'extrude', 'true'],
-          'type': 'fill-extrusion',
-          'minzoom': 15,
-          'paint': {
-            'fill-extrusion-color': '#aaa',
-            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'height']],
-            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'min_height']],
-            'fill-extrusion-opacity': 0.6,
-          },
-        },
-        labelLayerId
-      );
-    } else if (!show && layerExists) {
-      map.removeLayer(layerId);
-    }
-  };
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -90,12 +61,83 @@ export default function BusMap({
 
     mapRef.current = map;
     map.addControl(new mapboxgl.NavigationControl());
+
+    const setupOptionalLayers = (map: mapboxgl.Map) => {
+        // 3D Buildings
+        if (!map.getLayer('3d-buildings')) {
+            const layers = map.getStyle().layers;
+            const labelLayerId = layers.find(
+                (layer) => layer.type === 'symbol' && layer.layout && layer.layout['text-field']
+            )?.id;
+            map.addLayer({
+                'id': '3d-buildings',
+                'source': 'composite',
+                'source-layer': 'building',
+                'filter': ['==', 'extrude', 'true'],
+                'type': 'fill-extrusion',
+                'minzoom': 15,
+                'paint': {
+                    'fill-extrusion-color': '#aaa',
+                    'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'height']],
+                    'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.05, ['get', 'min_height']],
+                    'fill-extrusion-opacity': 0.6,
+                },
+                'layout': { 'visibility': 'none' },
+            }, labelLayerId);
+        }
+        // Traffic
+        if (!map.getSource('mapbox-traffic')) {
+            map.addSource('mapbox-traffic', { type: 'vector', url: 'mapbox://mapbox.mapbox-traffic-v1' });
+        }
+        if (!map.getLayer('traffic-layer')) {
+            map.addLayer({
+                id: 'traffic-layer',
+                type: 'line',
+                source: 'mapbox-traffic',
+                'source-layer': 'traffic',
+                paint: {
+                    'line-width': 2,
+                    'line-color': ['case',
+                        ['boolean', ['feature-state', 'hover'], false], '#ff0000',
+                        ['match', ['get', 'congestion'],
+                            'low', '#55c57a',
+                            'moderate', '#f2d40d',
+                            'heavy', '#ff9900',
+                            'severe', '#ff4d4d',
+                            '#000000'
+                        ]
+                    ],
+                },
+                layout: { 'visibility': 'none' },
+            });
+        }
+        // Bus Stops
+        if (!map.getLayer('bus-stops')) {
+            map.addLayer({
+                id: 'bus-stops',
+                type: 'symbol',
+                source: 'composite',
+                'source-layer': 'transit_stop_label',
+                filter: ['all', ['==', 'subclass', 'bus']],
+                minzoom: 14.5,
+                layout: {
+                    'icon-image': 'bus',
+                    'icon-size': 0.8,
+                    'icon-allow-overlap': false,
+                    'visibility': 'none',
+                },
+                paint: {
+                    'icon-color': mapStyle.includes('dark') ? '#a9a9a9' : '#555555'
+                }
+            });
+        }
+    };
     
     const handleStyleLoad = () => {
       if (!mapRef.current) return;
       Object.values(markersRef.current).forEach(marker => marker.remove());
       markersRef.current = {};
-      update3DBuildingsLayer(mapRef.current, show3DBuildings);
+      setupOptionalLayers(mapRef.current);
       setStyleRevision(rev => rev + 1);
     };
 
@@ -124,9 +166,65 @@ export default function BusMap({
   }, [mapStyle]);
 
   useEffect(() => {
-    if (!mapRef.current?.isStyleLoaded()) return;
-    update3DBuildingsLayer(mapRef.current, show3DBuildings);
-  }, [show3DBuildings]);
+    const map = mapRef.current;
+    if (!map?.isStyleLoaded() || !map.getLayer('3d-buildings')) return;
+    map.setLayoutProperty('3d-buildings', 'visibility', show3DBuildings ? 'visible' : 'none');
+  }, [show3DBuildings, styleRevision]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.isStyleLoaded() || !map.getLayer('traffic-layer')) return;
+    map.setLayoutProperty('traffic-layer', 'visibility', showTraffic ? 'visible' : 'none');
+  }, [showTraffic, styleRevision]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.isStyleLoaded()) return;
+
+    const stopLayerId = 'bus-stops';
+    if (!map.getLayer(stopLayerId)) return;
+    
+    map.setLayoutProperty(stopLayerId, 'visibility', showBusStops ? 'visible' : 'none');
+
+    const popup = new mapboxgl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        className: 'bus-stop-popup'
+    });
+
+    const handleMouseEnter = (e: mapboxgl.MapLayerMouseEvent) => {
+        if (!e.features?.length) return;
+        map.getCanvas().style.cursor = 'pointer';
+        const feature = e.features[0];
+        if (feature.geometry.type === 'Point' && feature.properties?.name) {
+             const coordinates = feature.geometry.coordinates.slice();
+             const stopName = feature.properties.name;
+             while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+            }
+            popup.setLngLat(coordinates as [number, number]).setHTML(stopName).addTo(map);
+        }
+    };
+
+    const handleMouseLeave = () => {
+        map.getCanvas().style.cursor = '';
+        popup.remove();
+    };
+
+    if (showBusStops) {
+        map.on('mouseenter', stopLayerId, handleMouseEnter);
+        map.on('mouseleave', stopLayerId, handleMouseLeave);
+    }
+
+    return () => {
+        if (map.isStyleLoaded()) {
+            map.off('mouseenter', stopLayerId, handleMouseEnter);
+            map.off('mouseleave', stopLayerId, handleMouseLeave);
+        }
+        if (popup.isOpen()) popup.remove();
+    }
+  }, [showBusStops, styleRevision]);
+
 
   useEffect(() => {
     const map = mapRef.current;
