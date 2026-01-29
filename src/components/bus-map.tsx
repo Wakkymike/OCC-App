@@ -324,11 +324,18 @@ export default function BusMap({
         if (isSelected) {
           const schoolInfo = isSchoolService ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[SCHOOL SERVICE]</div>` : '';
           const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
-          const locationInfo = bus.roadName 
-            ? `<div>${bus.roadName}${bus.postcode ? `, ${bus.postcode}` : ''}</div>`
-            : '<div>Location unavailable</div>';
+          
+          let locationDisplay;
+          if (bus.roadName) {
+            locationDisplay = `<div style="font-weight: bold; color: blue;">Current Location</div><div>${bus.roadName}${bus.postcode ? `, ${bus.postcode}` : ''}</div>`;
+          } else {
+            locationDisplay = '<div>Location unavailable</div>';
+          }
 
-          infoFlag.innerHTML = `${schoolInfo}${nightBusInfo}${locationInfo}<br>${bus.status}`;
+          const statusDisplay = bus.status && bus.status !== 'Unknown' ? bus.status : '';
+          const statusDisplayWithBr = statusDisplay ? `<br>${statusDisplay}` : '';
+
+          infoFlag.innerHTML = `${schoolInfo}${nightBusInfo}${locationDisplay}${statusDisplayWithBr}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';
