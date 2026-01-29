@@ -6,8 +6,8 @@ import { useBusTracker } from '@/hooks/use-bus-tracker';
 import type { Bus, LatLng } from '@/lib/types';
 import SearchBar from '@/components/search-bar';
 import mapboxgl from 'mapbox-gl';
-import { Home } from 'lucide-react';
-import { buttonVariants } from '@/components/ui/button';
+import { Home, Layers3 } from 'lucide-react';
+import { buttonVariants, Button } from '@/components/ui/button';
 import Link from 'next/link';
 import MapControls from '@/components/map-controls';
 
@@ -30,6 +30,7 @@ export default function Page() {
   // New state for map layers
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/dark-v11');
   const [show3DBuildings, setShow3DBuildings] = useState(true);
+  const [controlsVisible, setControlsVisible] = useState(false);
 
   useEffect(() => {
     let results = buses;
@@ -128,13 +129,23 @@ export default function Page() {
           {error}
         </p>
       )}
-      <div className="absolute bottom-4 right-4 z-10">
-        <MapControls
-          mapStyle={mapStyle}
-          setMapStyle={setMapStyle}
-          show3DBuildings={show3DBuildings}
-          setShow3DBuildings={setShow3DBuildings}
-        />
+      <div
+        className="absolute bottom-4 right-4 z-10"
+        onMouseEnter={() => setControlsVisible(true)}
+        onMouseLeave={() => setControlsVisible(false)}
+      >
+        {controlsVisible ? (
+          <MapControls
+            mapStyle={mapStyle}
+            setMapStyle={setMapStyle}
+            show3DBuildings={show3DBuildings}
+            setShow3DBuildings={setShow3DBuildings}
+          />
+        ) : (
+          <Button variant="outline" size="icon" aria-label="Map Layers">
+            <Layers3 className="h-5 w-5" />
+          </Button>
+        )}
       </div>
       <BusMap
         buses={displayBuses}
