@@ -25,6 +25,9 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
+const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
+const nightBusRunningBoards = ['3691', '3692', '3693', '1091', '1092', '1093', '21091', '21092', '21093', '23691', '23692', '23693', '11091', '11092', '11093', '13691', '13692', '13693'];
+
 export default function LiveServicePage() {
   const { buses, error } = useBusTracker();
   const [serviceFilters, setServiceFilters] = useState<Record<string, 'all' | 'inbound' | 'outbound'>>({});
@@ -173,20 +176,29 @@ export default function LiveServicePage() {
                               if (filter === 'all') return true;
                               return bus.direction.toLowerCase() === filter;
                             })
-                            .map((bus) => (
-                            <TableRow key={`${bus.fleetNumber}-${bus.journeyRef}`}>
-                              <TableCell>{bus.fleetNumber}</TableCell>
-                              <TableCell>{bus.runningBoard}</TableCell>
-                              <TableCell>{bus.journeyRef || 'N/A'}</TableCell>
-                              <TableCell className="font-medium">{bus.destination}</TableCell>
-                              <TableCell>{bus.lastStop || 'N/A'}</TableCell>
-                              <TableCell>{bus.nextStop || 'N/A'}</TableCell>
-                              <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
-                              <TableCell className="text-right">
-                                {getStatusBadge(bus.status, bus.delay)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                            .map((bus) => {
+                                const isSchoolService = bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
+                                const isNightBus = bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
+                                
+                                return (
+                                    <TableRow key={`${bus.fleetNumber}-${bus.journeyRef}`}>
+                                    <TableCell>{bus.fleetNumber}</TableCell>
+                                    <TableCell>{bus.runningBoard}</TableCell>
+                                    <TableCell>{bus.journeyRef || 'N/A'}</TableCell>
+                                    <TableCell className="font-medium">
+                                        {bus.destination}
+                                        {isSchoolService && <span className="ml-2 text-destructive font-semibold">[SCHOOL SERVICE]</span>}
+                                        {isNightBus && <span className="ml-2 text-destructive font-semibold">[NIGHT BUS]</span>}
+                                    </TableCell>
+                                    <TableCell>{bus.lastStop || 'N/A'}</TableCell>
+                                    <TableCell>{bus.nextStop || 'N/A'}</TableCell>
+                                    <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
+                                    <TableCell className="text-right">
+                                        {getStatusBadge(bus.status, bus.delay)}
+                                    </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                       </Table>
                     </AccordionContent>
