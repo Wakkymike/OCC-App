@@ -310,7 +310,7 @@ export default function BusMap({
       const schoolLabel = isSchoolService ? ` <span style="color:red">[SCH]</span>` : '';
       const nightBusLabel = isNightBus ? ` <span style="color:red">[NIGHT BUS]</span>` : '';
       
-      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel}${schoolLabel}${nightBusLabel} | ${bus.destination} | ${bus.runningBoard}`;
+      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel}${schoolLabel}${nightBusLabel} | ${bus.destination} | RB: ${bus.runningBoard}`;
       
       const svg = markerElement.querySelector('svg');
       if (svg && bus.bearing !== undefined) svg.style.transform = `rotate(${bus.bearing}deg)`;
