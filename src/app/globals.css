@@ -133,3 +133,16 @@
 .bus-stop-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: rgba(30, 30, 30, 0.85); }
 .bus-stop-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: rgba(30, 30, 30, 0.85); }
 
+
+@keyframes blink-red {
+  50% {
+    background-color: red;
+    color: white;
+  }
+}
+
+.blinking-rb {
+  animation: blink-red 1s infinite;
+  border-radius: 3px;
+  padding: 0 2px;
+}
