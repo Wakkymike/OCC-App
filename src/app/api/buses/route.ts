@@ -170,27 +170,10 @@ export async function GET() {
           
           let delayInMinutes: number | undefined;
           let status: string = 'Unknown';
-          let lastStop: string | undefined;
-          let nextStop: string | undefined;
 
           const monitoredCall = journey.MonitoredCall;
           const onwardCallsRaw = journey.OnwardCalls?.OnwardCall;
           const onwardCalls = onwardCallsRaw ? ensureArray(onwardCallsRaw) : [];
-
-          // --- STOP NAME EXTRACTION ---
-          if (monitoredCall) {
-              lastStop = getText(monitoredCall.StopPointName)?.replace(/_/g, ' ');
-          }
-          if (onwardCalls.length > 0) {
-              // Try to find the first onward call with a name to set the next stop
-              for (const call of onwardCalls) {
-                  const stopName = getText(call.StopPointName);
-                  if (stopName) {
-                      nextStop = stopName.replace(/_/g, ' ');
-                      break;
-                  }
-              }
-          }
 
           // --- TIMETABLE-BASED DELAY CALCULATION (PRIMARY) ---
           const calculateDelayWithTimetable = (
@@ -312,8 +295,6 @@ export async function GET() {
             journeyRef: journeyRef,
             delay: delayInMinutes,
             status: status,
-            lastStop: lastStop,
-            nextStop: nextStop,
           };
         } catch (e) {
           // If processing a single bus record fails, log it and continue instead of crashing

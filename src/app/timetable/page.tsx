@@ -139,8 +139,6 @@ export default function LiveServicePage() {
                             <TableHead>Running Board</TableHead>
                             <TableHead>Journey Ref</TableHead>
                             <TableHead>Destination</TableHead>
-                            <TableHead>Last Stop</TableHead>
-                            <TableHead>Next Stop</TableHead>
                             <TableHead>Direction</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -165,8 +163,6 @@ export default function LiveServicePage() {
                                         {isSchoolService && <span className="ml-2 text-destructive font-semibold">[SCHOOL SERVICE]</span>}
                                         {isNightBus && <span className="ml-2 text-destructive font-semibold">[NIGHT BUS]</span>}
                                     </TableCell>
-                                    <TableCell>{bus.lastStop || 'N/A'}</TableCell>
-                                    <TableCell>{bus.nextStop || 'N/A'}</TableCell>
                                     <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
                                     </TableRow>
                                 );

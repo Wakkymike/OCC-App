@@ -42,6 +42,7 @@ export default function BusMap({
   const animationFrameRefs = useRef<Record<string, number>>({});
   const [styleRevision, setStyleRevision] = useState(0);
   const currentStyleRef = useRef(mapStyle);
+  const [nearestStopName, setNearestStopName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -116,20 +117,26 @@ export default function BusMap({
         if (!map.getLayer('bus-stops')) {
             map.addLayer({
                 id: 'bus-stops',
-                type: 'symbol',
+                type: 'circle',
                 source: 'composite',
                 'source-layer': 'transit_stop_label',
                 filter: ['all', ['==', 'subclass', 'bus']],
                 minzoom: 14.5,
+                paint: {
+                    'circle-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        14.5, 2,
+                        18, 5
+                    ],
+                    'circle-color': mapStyle.includes('dark') ? '#4dabf7' : '#1971c2',
+                    'circle-stroke-color': 'white',
+                    'circle-stroke-width': 1.5
+                },
                 layout: {
-                    'icon-image': 'bus',
-                    'icon-size': 0.8,
-                    'icon-allow-overlap': false,
                     'visibility': 'none',
                 },
-                paint: {
-                    'icon-color': mapStyle.includes('dark') ? '#a9a9a9' : '#555555'
-                }
             });
         }
     };
@@ -187,9 +194,8 @@ export default function BusMap({
         className: 'bus-stop-popup'
     });
 
-    const handleMouseEnter = (e: mapboxgl.MapLayerMouseEvent) => {
+    const handleStopClick = (e: mapboxgl.MapLayerMouseEvent) => {
         if (!e.features?.length) return;
-        map.getCanvas().style.cursor = 'pointer';
         const feature = e.features[0];
         if (feature.geometry.type === 'Point' && feature.properties?.name) {
              const coordinates = feature.geometry.coordinates.slice();
@@ -201,18 +207,23 @@ export default function BusMap({
         }
     };
 
+    const handleMouseEnter = (e: mapboxgl.MapLayerMouseEvent) => {
+        if (e.features?.length) map.getCanvas().style.cursor = 'pointer';
+    };
     const handleMouseLeave = () => {
         map.getCanvas().style.cursor = '';
         popup.remove();
     };
 
     if (showBusStops) {
+        map.on('click', stopLayerId, handleStopClick);
         map.on('mouseenter', stopLayerId, handleMouseEnter);
         map.on('mouseleave', stopLayerId, handleMouseLeave);
     }
 
     return () => {
         if (map.isStyleLoaded()) {
+            map.off('click', stopLayerId, handleStopClick);
             map.off('mouseenter', stopLayerId, handleMouseEnter);
             map.off('mouseleave', stopLayerId, handleMouseLeave);
         }
@@ -314,7 +325,8 @@ export default function BusMap({
         if (isSelected) {
           const schoolInfo = isSchoolService ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[SCHOOL SERVICE]</div>` : '';
           const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
-          infoFlag.innerHTML = `${schoolInfo}${nightBusInfo}Last Stop: ${bus.lastStop || 'N/A'}<br>Next Stop: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
+          const nearestStopInfo = nearestStopName ? `<div>Nearest Stop: ${nearestStopName}</div>` : '<div>Finding nearest stop...</div>';
+          infoFlag.innerHTML = `${schoolInfo}${nightBusInfo}${nearestStopInfo}<br>${bus.status}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';
@@ -333,7 +345,77 @@ export default function BusMap({
       }
       if (id === selectedBusId) setSelectedBusId(null);
     });
-  }, [buses, selectedBusId, setSelectedBusId, styleRevision]);
+  }, [buses, selectedBusId, setSelectedBusId, styleRevision, nearestStopName]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectedBusId || !map.isStyleLoaded()) {
+      setNearestStopName(null);
+      return;
+    }
+
+    const selectedBus = buses.find(bus => {
+        const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
+        return markerId === selectedBusId;
+    });
+
+    if (!selectedBus || !selectedBus.position) {
+      setNearestStopName(null);
+      return;
+    }
+
+    const busPosition = selectedBus.position;
+    const busPoint = map.project(busPosition);
+    const searchRadius = 100; // pixels
+    const bbox: [mapboxgl.PointLike, mapboxgl.PointLike] = [
+        [busPoint.x - searchRadius, busPoint.y - searchRadius],
+        [busPoint.x + searchRadius, busPoint.y + searchRadius],
+    ];
+
+    const features = map.queryRenderedFeatures(bbox, { layers: ['bus-stops'] });
+
+    if (!features.length) {
+      setNearestStopName('N/A');
+      return;
+    }
+    
+    let closestStop: mapboxgl.MapboxGeoJSONFeature | null = null;
+    let minDistance = Infinity;
+
+    const toRad = (value: number) => (value * Math.PI) / 180;
+
+    features.forEach(feature => {
+        if (feature.geometry.type === 'Point') {
+            const stopCoords = (feature.geometry as GeoJSON.Point).coordinates;
+            const stopPosition = { lng: stopCoords[0], lat: stopCoords[1] };
+            
+            // Haversine formula for distance
+            const R = 6371e3; // metres
+            const φ1 = toRad(busPosition.lat);
+            const φ2 = toRad(stopPosition.lat);
+            const Δφ = toRad(stopPosition.lat - busPosition.lat);
+            const Δλ = toRad(stopPosition.lng - busPosition.lng);
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestStop = feature;
+            }
+        }
+    });
+
+    if (closestStop && closestStop.properties?.name) {
+        setNearestStopName(closestStop.properties.name);
+    } else {
+        setNearestStopName('N/A');
+    }
+
+  }, [selectedBusId, buses, styleRevision]);
 
   useEffect(() => {
     const map = mapRef.current;
