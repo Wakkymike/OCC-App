@@ -37,6 +37,17 @@ export default function Page() {
   const { toast } = useToast();
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const busIdFromQuery = params.get('busId');
+    if (busIdFromQuery) {
+      setSelectedBusId(decodeURIComponent(busIdFromQuery));
+      // Clean the URL so a refresh doesn't re-select the bus
+      const newUrl = window.location.pathname;
+      window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
+    }
+  }, []);
+
+  useEffect(() => {
     let results = buses;
     let isSearching = false;
 
@@ -78,7 +89,7 @@ export default function Page() {
       if (results.length === 1) {
         const bus = results[0];
         if (bus.position) {
-          const busId = `${bus.fleetNumber}-${bus.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
+          const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
           setSelectedBusId(busId);
           setMapView({ center: bus.position, zoom: 16 });
         }

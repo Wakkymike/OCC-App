@@ -149,12 +149,17 @@ export default function LiveServicePage() {
                               return bus.direction.toLowerCase() === filter;
                             })
                             .map((bus) => {
+                                const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
                                 const isSchoolService = bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
                                 const isNightBus = bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
                                 
                                 return (
                                     <TableRow key={`${bus.fleetNumber}-${bus.journeyRef}`}>
-                                    <TableCell>{bus.fleetNumber}</TableCell>
+                                    <TableCell>
+                                      <Link href={`/map?busId=${encodeURIComponent(busId)}`} className={buttonVariants({ variant: 'link', size: 'sm' })}>
+                                        {bus.fleetNumber}
+                                      </Link>
+                                    </TableCell>
                                     <TableCell className="font-medium">
                                         {bus.destination}
                                         {isSchoolService && <span className="ml-2 text-destructive font-semibold">[SCHOOL SERVICE]</span>}
