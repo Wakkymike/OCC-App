@@ -62,30 +62,6 @@ export default function LiveServicePage() {
     }
     return a.localeCompare(b);
   });
-
-  const getStatusBadge = (status: string, delay: number | undefined) => {
-    if (status === 'Cancelled') {
-      return <Badge variant="destructive">Cancelled</Badge>;
-    }
-    
-    let variant: "default" | "destructive" | "secondary" | "outline" = "outline";
-
-    if (status === 'On Time') {
-        variant = 'default';
-    } else if (status.includes('late') || status === 'Late') {
-        variant = 'destructive';
-    } else if (status.includes('early') || status === 'Early') {
-        variant = 'secondary';
-    } 
-    // Fallback to using delay number if status is something else but delay is present
-    else if (delay !== undefined) {
-        if (delay > 2) variant = 'destructive';
-        else if (delay < -2) variant = 'secondary';
-        else variant = 'default';
-    }
-    
-    return <Badge variant={variant}>{status}</Badge>;
-  };
   
   const getDirectionLabel = (direction: string) => {
     if (direction.toLowerCase() === 'inbound') return 'Inbound';
@@ -166,7 +142,6 @@ export default function LiveServicePage() {
                             <TableHead>Last Stop</TableHead>
                             <TableHead>Next Stop</TableHead>
                             <TableHead>Direction</TableHead>
-                            <TableHead className="text-right">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -193,9 +168,6 @@ export default function LiveServicePage() {
                                     <TableCell>{bus.lastStop || 'N/A'}</TableCell>
                                     <TableCell>{bus.nextStop || 'N/A'}</TableCell>
                                     <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
-                                    <TableCell className="text-right">
-                                        {getStatusBadge(bus.status, bus.delay)}
-                                    </TableCell>
                                     </TableRow>
                                 );
                             })}
