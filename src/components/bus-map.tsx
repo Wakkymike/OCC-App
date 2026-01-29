@@ -323,17 +323,28 @@ export default function BusMap({
           const schoolInfo = isSchoolService ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[SCHOOL SERVICE]</div>` : '';
           const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
           
-          let locationDisplay;
+          const journeyInfo = bus.journeyRef ? `
+            <div style="margin-bottom: 4px;">
+              <div style="font-weight: bold; color: green;">Journey Number</div>
+              <div>${bus.journeyRef}</div>
+            </div>
+          ` : '';
+
+          let locationInfo;
           if (bus.roadName) {
-            locationDisplay = `<div style="font-weight: bold; color: blue;">Current Location</div><div>${bus.roadName}${bus.postcode ? `, ${bus.postcode}` : ''}</div>`;
+            locationInfo = `
+              <div>
+                <div style="font-weight: bold; color: blue;">Current Location</div>
+                <div>${bus.roadName}${bus.postcode ? `, ${bus.postcode}` : ''}</div>
+              </div>
+            `;
           } else {
-            locationDisplay = '<div>Location unavailable</div>';
+            locationInfo = '<div>Location unavailable</div>';
           }
 
-          const statusDisplay = bus.status && bus.status !== 'Unknown' ? bus.status : '';
-          const statusDisplayWithBr = statusDisplay ? `<br>${statusDisplay}` : '';
+          const statusDisplay = bus.status && bus.status !== 'Unknown' ? `<div style="margin-top: 4px;">${bus.status}</div>` : '';
 
-          infoFlag.innerHTML = `${schoolInfo}${nightBusInfo}${locationDisplay}${statusDisplayWithBr}`;
+          infoFlag.innerHTML = `${schoolInfo}${nightBusInfo}${journeyInfo}${locationInfo}${statusDisplay}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';
