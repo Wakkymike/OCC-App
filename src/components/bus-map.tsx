@@ -324,7 +324,7 @@ export default function BusMap({
           const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
           
           const journeyInfo = bus.journeyRef ? `
-            <div style="margin-bottom: 4px;">
+            <div>
               <div style="font-weight: bold; color: green;">Journey Number</div>
               <div>${bus.journeyRef}</div>
             </div>
