@@ -106,7 +106,7 @@ export async function GET() {
 
     let skippedCount = 0;
 
-    const buses: Bus[] = vehicleActivities
+    const busesWithoutLocationData: Bus[] = vehicleActivities
       .map((activity): Bus | null => {
         try {
           const recordedAtTimeStr = getText(activity.RecordedAtTime);
@@ -307,6 +307,37 @@ export async function GET() {
     if (skippedCount > 0) {
       console.log(`Skipped ${skippedCount} buses due to missing or invalid location data.`);
     }
+
+    const geocodingPromises = busesWithoutLocationData.map(bus => {
+      if (!bus.position) return Promise.resolve(bus);
+      
+      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+      if (!mapboxToken) return Promise.resolve(bus);
+
+      const { lng, lat } = bus.position;
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=address,postcode&limit=1&access_token=${mapboxToken}`;
+
+      return fetch(url)
+          .then(res => {
+              if (!res.ok) return bus;
+              return res.json();
+          })
+          .then(data => {
+              if (!data || !data.features) return bus;
+
+              const addressFeature = data.features.find((f: any) => f.id.startsWith('address'));
+              const postcodeFeature = data.features.find((f: any) => f.id.startsWith('postcode'));
+
+              return {
+                  ...bus,
+                  roadName: addressFeature?.text,
+                  postcode: postcodeFeature?.text,
+              };
+          })
+          .catch(() => bus);
+    });
+
+    const buses = await Promise.all(geocodingPromises);
 
     return NextResponse.json({ buses });
   } catch (error) {

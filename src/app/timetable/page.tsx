@@ -136,10 +136,9 @@ export default function LiveServicePage() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Fleet No.</TableHead>
-                            <TableHead>Running Board</TableHead>
-                            <TableHead>Journey Ref</TableHead>
                             <TableHead>Destination</TableHead>
                             <TableHead>Direction</TableHead>
+                            <TableHead>Current Location</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -156,14 +155,22 @@ export default function LiveServicePage() {
                                 return (
                                     <TableRow key={`${bus.fleetNumber}-${bus.journeyRef}`}>
                                     <TableCell>{bus.fleetNumber}</TableCell>
-                                    <TableCell>{bus.runningBoard}</TableCell>
-                                    <TableCell>{bus.journeyRef || 'N/A'}</TableCell>
                                     <TableCell className="font-medium">
                                         {bus.destination}
                                         {isSchoolService && <span className="ml-2 text-destructive font-semibold">[SCHOOL SERVICE]</span>}
                                         {isNightBus && <span className="ml-2 text-destructive font-semibold">[NIGHT BUS]</span>}
                                     </TableCell>
                                     <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
+                                    <TableCell>
+                                      {bus.roadName ? (
+                                        <div>
+                                          <div>{bus.roadName}</div>
+                                          <div className="text-xs text-muted-foreground">{bus.postcode}</div>
+                                        </div>
+                                      ) : (
+                                        'N/A'
+                                      )}
+                                    </TableCell>
                                     </TableRow>
                                 );
                             })}
