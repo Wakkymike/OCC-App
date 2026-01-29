@@ -94,13 +94,22 @@ export default function LiveServicePage() {
                     Data last refreshed at: {lastRefreshed.toLocaleString()}
                 </div>
             )}
+            {error && (
+                <div className="text-sm text-destructive pt-1">
+                    Error receiving data: {error}
+                </div>
+            )}
           </CardHeader>
           <CardContent>
-            {error && <p className="text-destructive">Error fetching live data: {error}</p>}
             {!error && buses.length === 0 && (
               <div className="flex items-center justify-center py-10 text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 <span>Loading live bus data...</span>
+              </div>
+            )}
+             {error && buses.length === 0 && (
+              <div className="flex items-center justify-center py-10 text-destructive">
+                <span>Could not load bus data.</span>
               </div>
             )}
             {buses.length > 0 && (
