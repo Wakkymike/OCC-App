@@ -109,6 +109,25 @@ export async function GET() {
     const buses: Bus[] = vehicleActivities
       .map((activity): Bus | null => {
         try {
+          const recordedAtTimeStr = getText(activity.RecordedAtTime);
+          // If the record has no timestamp, we can't verify its freshness, so we skip it.
+          if (!recordedAtTimeStr) {
+            return null;
+          }
+
+          const recordedAt = new Date(recordedAtTimeStr);
+          // If the timestamp is invalid, skip it.
+          if (isNaN(recordedAt.getTime())) {
+            return null;
+          }
+
+          const ageInMinutes = (new Date().getTime() - recordedAt.getTime()) / (1000 * 60);
+
+          // If data is older than 3 minutes, consider it stale and remove the bus from the map.
+          if (ageInMinutes > 3) {
+            return null;
+          }
+
           const journey = activity.MonitoredVehicleJourney;
           if (!journey) return null;
 
