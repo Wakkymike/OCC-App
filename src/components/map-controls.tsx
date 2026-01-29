@@ -11,8 +11,6 @@ interface MapControlsProps {
   setMapStyle: (style: string) => void;
   show3DBuildings: boolean;
   setShow3DBuildings: (show: boolean) => void;
-  showTraffic: boolean;
-  setShowTraffic: (show: boolean) => void;
   showBusStops: boolean;
   setShowBusStops: (show: boolean) => void;
 }
@@ -28,8 +26,6 @@ export default function MapControls({
   setMapStyle,
   show3DBuildings,
   setShow3DBuildings,
-  showTraffic,
-  setShowTraffic,
   showBusStops,
   setShowBusStops,
 }: MapControlsProps) {
@@ -78,17 +74,6 @@ export default function MapControls({
                     id="show-3d-buildings"
                     checked={show3DBuildings}
                     onCheckedChange={setShow3DBuildings}
-                />
-           </div>
-           <div className="flex items-center justify-between rounded-lg border p-3">
-                <div className="flex items-center space-x-2">
-                    <TrafficCone className="h-5 w-5" />
-                    <Label htmlFor="show-traffic" className="cursor-pointer">Live Traffic</Label>
-                </div>
-                <Switch
-                    id="show-traffic"
-                    checked={showTraffic}
-                    onCheckedChange={setShowTraffic}
                 />
            </div>
            <div className="flex items-center justify-between rounded-lg border p-3">

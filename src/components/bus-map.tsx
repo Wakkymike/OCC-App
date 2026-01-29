@@ -19,7 +19,6 @@ interface BusMapProps {
   };
   mapStyle: string;
   show3DBuildings: boolean;
-  showTraffic: boolean;
   showBusStops: boolean;
 }
 
@@ -31,7 +30,6 @@ export default function BusMap({
   mapView,
   mapStyle,
   show3DBuildings,
-  showTraffic,
   showBusStops,
 }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -108,7 +106,7 @@ export default function BusMap({
                         ]
                     ],
                 },
-                layout: { 'visibility': 'none' },
+                layout: { 'visibility': 'visible' },
             });
         }
         // Bus Stops
@@ -170,12 +168,6 @@ export default function BusMap({
     if (!map?.isStyleLoaded() || !map.getLayer('3d-buildings')) return;
     map.setLayoutProperty('3d-buildings', 'visibility', show3DBuildings ? 'visible' : 'none');
   }, [show3DBuildings, styleRevision]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map?.isStyleLoaded() || !map.getLayer('traffic-layer')) return;
-    map.setLayoutProperty('traffic-layer', 'visibility', showTraffic ? 'visible' : 'none');
-  }, [showTraffic, styleRevision]);
 
   useEffect(() => {
     const map = mapRef.current;
