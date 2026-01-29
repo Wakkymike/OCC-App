@@ -23,6 +23,7 @@ interface BusMapProps {
 }
 
 const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
+const nightBusRunningBoards = ['3691', '3692', '3693', '1091', '1092', '1093', '21091', '21092', '21093', '23691', '23692', '23693', '11091', '11092', '11093', '13691', '13692', '13693'];
 
 export default function BusMap({
   buses,
@@ -251,6 +252,7 @@ export default function BusMap({
       currentMarkerIds.delete(markerId);
       
       const isSchoolService = bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
+      const isNightBus = bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
 
       let marker = markersRef.current[markerId];
       if (!marker) {
@@ -296,8 +298,9 @@ export default function BusMap({
       else if (bus.direction.toLowerCase() === 'outbound') directionLabel = ` <span style="color:blue">[O]</span>`;
       
       const schoolLabel = isSchoolService ? ` <span style="color:red">[SCH]</span>` : '';
+      const nightBusLabel = isNightBus ? ` <span style="color:red">[NIGHT BUS]</span>` : '';
       
-      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel}${schoolLabel} | ${bus.destination}`;
+      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel}${schoolLabel}${nightBusLabel} | ${bus.destination}`;
       
       const svg = markerElement.querySelector('svg');
       if (svg && bus.bearing !== undefined) svg.style.transform = `rotate(${bus.bearing}deg)`;
@@ -310,7 +313,8 @@ export default function BusMap({
         circle.setAttribute('stroke', isSelected ? '#00008B' : 'black');
         if (isSelected) {
           const schoolInfo = isSchoolService ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[SCHOOL SERVICE]</div>` : '';
-          infoFlag.innerHTML = `${schoolInfo}Last Stop: ${bus.lastStop || 'N/A'}<br>Next Stop: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
+          const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
+          infoFlag.innerHTML = `${schoolInfo}${nightBusInfo}Last Stop: ${bus.lastStop || 'N/A'}<br>Next Stop: ${bus.nextStop || 'N/A'}<br>${bus.status}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';
