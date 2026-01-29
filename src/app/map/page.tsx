@@ -10,6 +10,7 @@ import { Home, Layers3 } from 'lucide-react';
 import { buttonVariants, Button } from '@/components/ui/button';
 import Link from 'next/link';
 import MapControls from '@/components/map-controls';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Page() {
   const { buses, error } = useBusTracker();
@@ -31,7 +32,8 @@ export default function Page() {
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/streets-v12');
   const [show3DBuildings, setShow3DBuildings] = useState(true);
   const [controlsVisible, setControlsVisible] = useState(false);
-  const [showBusStops, setShowBusStops] = useState(false);
+  const [showBusStops, setShowBusStops] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     let results = buses;
@@ -96,18 +98,48 @@ export default function Page() {
     }
   }, [buses, currentSearch, selectedBusId]);
 
-  const handleSearch = (
+  const handleSearch = async (
     searchType: string,
     query: string,
     direction: 'all' | 'inbound' | 'outbound'
   ) => {
-    setSelectedBusId(null); // Deselect bus on new search
-    setCurrentSearch({ searchType, query, direction });
+    setSelectedBusId(null); // Always deselect bus on new search
+
+    if (searchType === 'location' && query) {
+      setCurrentSearch(null); // Clear bus search state
+      setSearchedPlace(null); // Clear old place before new search
+      try {
+        const response = await fetch(`/api/geocode?query=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        if (response.ok && data.coordinates) {
+          setSearchedPlace(data.coordinates);
+        } else {
+          setSearchedPlace(null);
+          toast({
+            variant: 'destructive',
+            title: 'Location not found',
+            description: `Could not find a location for "${query}". Please try another search.`,
+          });
+        }
+      } catch (error) {
+        console.error('Geocoding error:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Search Error',
+          description: 'An error occurred while searching for the location.',
+        });
+      }
+    } else {
+      setSearchedPlace(null); // Clear location if performing a bus search
+      setCurrentSearch({ searchType, query, direction });
+    }
   };
 
   const handleClear = () => {
     setCurrentSearch(null);
     setSelectedBusId(null);
+    setSearchedPlace(null);
     setMapView({});
   };
   

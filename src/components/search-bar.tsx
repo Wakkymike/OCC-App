@@ -24,7 +24,7 @@ interface SearchBarProps {
 }
 
 export default function SearchBar({ onSearch, onClear }: SearchBarProps) {
-  const [searchType, setSearchType] = useState('fleetNumber');
+  const [searchType, setSearchType] = useState('location');
   const [query, setQuery] = useState('');
   const [direction, setDirection] = useState<'all' | 'inbound' | 'outbound'>(
     'all'
@@ -67,6 +67,7 @@ export default function SearchBar({ onSearch, onClear }: SearchBarProps) {
           <SelectValue placeholder="Search by..." />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="location">Location / Postcode</SelectItem>
           <SelectItem value="fleetNumber">Fleet Number</SelectItem>
           <SelectItem value="service">Service Number</SelectItem>
           <SelectItem value="journey">Journey Number</SelectItem>
@@ -75,7 +76,7 @@ export default function SearchBar({ onSearch, onClear }: SearchBarProps) {
 
       <Input
         type="text"
-        placeholder="Enter search term..."
+        placeholder={searchType === 'location' ? "e.g., 'Piccadilly Gardens' or 'M1 1AF'" : 'Enter search term...'}
         value={query}
         onChange={handleQueryChange}
         className="flex-grow"
