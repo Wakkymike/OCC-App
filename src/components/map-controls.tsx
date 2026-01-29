@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { Layers3, Satellite, Sun, Building, TrafficCone, Bus } from 'lucide-react';
+import { Layers3, Satellite, Map, Building, Bus } from 'lucide-react';
 
 interface MapControlsProps {
   mapStyle: string;
@@ -16,8 +16,8 @@ interface MapControlsProps {
 }
 
 const styleOptions = [
+  { id: 'streets-v12', name: 'Streets', icon: <Map className="h-5 w-5" /> },
   { id: 'dark-v11', name: 'Dark', icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 12C2 6.47715 6.47715 2 12 2V22C6.47715 22 2 17.5228 2 12Z" fill="currentColor"/></svg> },
-  { id: 'light-v11', name: 'Light', icon: <Sun className="h-5 w-5" /> },
   { id: 'satellite-streets-v12', name: 'Satellite', icon: <Satellite className="h-5 w-5" /> },
 ];
 

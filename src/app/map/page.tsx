@@ -28,7 +28,7 @@ export default function Page() {
   } | null>(null);
 
   // New state for map layers
-  const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/dark-v11');
+  const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/streets-v12');
   const [show3DBuildings, setShow3DBuildings] = useState(true);
   const [controlsVisible, setControlsVisible] = useState(false);
   const [showBusStops, setShowBusStops] = useState(false);
