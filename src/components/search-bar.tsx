@@ -24,7 +24,7 @@ interface SearchBarProps {
 }
 
 export default function SearchBar({ onSearch, onClear }: SearchBarProps) {
-  const [searchType, setSearchType] = useState('location');
+  const [searchType, setSearchType] = useState('service');
   const [query, setQuery] = useState('');
   const [direction, setDirection] = useState<'all' | 'inbound' | 'outbound'>(
     'all'
@@ -60,14 +60,13 @@ export default function SearchBar({ onSearch, onClear }: SearchBarProps) {
   return (
     <form
       onSubmit={handleSearch}
-      className="flex items-center gap-2 bg-card p-2 rounded-lg shadow-md w-full max-w-2xl"
+      className="flex items-center gap-2 bg-card p-2 rounded-lg shadow-md w-full max-w-xl"
     >
       <Select value={searchType} onValueChange={handleSearchTypeChange}>
         <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="Search by..." />
+          <SelectValue placeholder="Search buses by..." />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="location">Location / Postcode</SelectItem>
           <SelectItem value="fleetNumber">Fleet Number</SelectItem>
           <SelectItem value="service">Service Number</SelectItem>
           <SelectItem value="journey">Journey Number</SelectItem>
@@ -76,7 +75,7 @@ export default function SearchBar({ onSearch, onClear }: SearchBarProps) {
 
       <Input
         type="text"
-        placeholder={searchType === 'location' ? "e.g., 'Piccadilly Gardens' or 'M1 1AF'" : 'Enter search term...'}
+        placeholder={'Enter search term...'}
         value={query}
         onChange={handleQueryChange}
         className="flex-grow"

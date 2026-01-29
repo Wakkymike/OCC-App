@@ -5,6 +5,7 @@ import BusMap from '@/components/bus-map';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import type { Bus, LatLng } from '@/lib/types';
 import SearchBar from '@/components/search-bar';
+import LocationSearchBar from '@/components/location-search-bar';
 import mapboxgl from 'mapbox-gl';
 import { Home, Layers3 } from 'lucide-react';
 import { buttonVariants, Button } from '@/components/ui/button';
@@ -77,7 +78,7 @@ export default function Page() {
       if (results.length === 1) {
         const bus = results[0];
         if (bus.position) {
-          const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
+          const busId = `${bus.fleetNumber}-${bus.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
           setSelectedBusId(busId);
           setMapView({ center: bus.position, zoom: 16 });
         }
@@ -98,48 +99,52 @@ export default function Page() {
     }
   }, [buses, currentSearch, selectedBusId]);
 
-  const handleSearch = async (
+  const handleLocationSearch = async (query: string) => {
+    setSelectedBusId(null);
+    setCurrentSearch(null); 
+    setSearchedPlace(null);
+    try {
+      const response = await fetch(`/api/geocode?query=${encodeURIComponent(query)}`);
+      const data = await response.json();
+
+      if (response.ok && data.coordinates) {
+        setSearchedPlace(data.coordinates);
+      } else {
+        setSearchedPlace(null);
+        toast({
+          variant: 'destructive',
+          title: 'Location not found',
+          description: `Could not find a location for "${query}". Please try another search.`,
+        });
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Search Error',
+        description: 'An error occurred while searching for the location.',
+      });
+    }
+  };
+
+  const handleBusSearch = (
     searchType: string,
     query: string,
     direction: 'all' | 'inbound' | 'outbound'
   ) => {
-    setSelectedBusId(null); // Always deselect bus on new search
-
-    if (searchType === 'location' && query) {
-      setCurrentSearch(null); // Clear bus search state
-      setSearchedPlace(null); // Clear old place before new search
-      try {
-        const response = await fetch(`/api/geocode?query=${encodeURIComponent(query)}`);
-        const data = await response.json();
-
-        if (response.ok && data.coordinates) {
-          setSearchedPlace(data.coordinates);
-        } else {
-          setSearchedPlace(null);
-          toast({
-            variant: 'destructive',
-            title: 'Location not found',
-            description: `Could not find a location for "${query}". Please try another search.`,
-          });
-        }
-      } catch (error) {
-        console.error('Geocoding error:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Search Error',
-          description: 'An error occurred while searching for the location.',
-        });
-      }
-    } else {
-      setSearchedPlace(null); // Clear location if performing a bus search
-      setCurrentSearch({ searchType, query, direction });
-    }
-  };
-
-  const handleClear = () => {
-    setCurrentSearch(null);
     setSelectedBusId(null);
     setSearchedPlace(null);
+    setCurrentSearch({ searchType, query, direction });
+  };
+  
+  const handleLocationClear = () => {
+    setSearchedPlace(null);
+    setMapView({});
+  };
+
+  const handleBusClear = () => {
+    setCurrentSearch(null);
+    setSelectedBusId(null);
     setMapView({});
   };
   
@@ -154,8 +159,9 @@ export default function Page() {
           <Home className="h-5 w-5" />
         </Link>
       </div>
-      <div className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-center">
-        <SearchBar onSearch={handleSearch} onClear={handleClear} />
+      <div className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-center items-start gap-4">
+        <LocationSearchBar onSearch={handleLocationSearch} onClear={handleLocationClear} />
+        <SearchBar onSearch={handleBusSearch} onClear={handleBusClear} />
       </div>
       {error && (
         <p className="absolute top-24 left-4 z-10 text-destructive bg-card p-2 rounded-lg shadow-md">
