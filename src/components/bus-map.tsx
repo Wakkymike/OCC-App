@@ -310,7 +310,7 @@ export default function BusMap({
       const schoolLabel = isSchoolService ? ` <span style="color:red">[SCH]</span>` : '';
       const nightBusLabel = isNightBus ? ` <span style="color:red">[NIGHT BUS]</span>` : '';
       
-      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel}${schoolLabel}${nightBusLabel} | ${bus.destination}`;
+      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel}${schoolLabel}${nightBusLabel} | ${bus.destination} | ${bus.runningBoard}`;
       
       const svg = markerElement.querySelector('svg');
       if (svg && bus.bearing !== undefined) svg.style.transform = `rotate(${bus.bearing}deg)`;
@@ -323,21 +323,11 @@ export default function BusMap({
           const schoolInfo = isSchoolService ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[SCHOOL SERVICE]</div>` : '';
           const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
           
-          const journeyInfo = bus.journeyRef ? `
-            <div>
-              <div style="font-weight: bold; color: green;">Journey Number</div>
-              <div>${bus.journeyRef}</div>
-            </div>
-          ` : '';
+          const journeyInfo = bus.journeyRef ? `<div><div style="font-weight: bold; color: green;">Journey Number</div><div>${bus.journeyRef}</div></div>` : '';
 
           let locationInfo;
           if (bus.roadName) {
-            locationInfo = `
-              <div>
-                <div style="font-weight: bold; color: blue;">Current Location</div>
-                <div>${bus.roadName}${bus.postcode ? `, ${bus.postcode}` : ''}</div>
-              </div>
-            `;
+            locationInfo = `<div><div style="font-weight: bold; color: blue;">Current Location</div><div>${bus.roadName}${bus.postcode ? `, ${bus.postcode}` : ''}</div></div>`;
           } else {
             locationInfo = '<div>Location unavailable</div>';
           }
