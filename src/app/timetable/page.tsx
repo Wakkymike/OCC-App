@@ -79,7 +79,9 @@ export default function LiveServicePage() {
                 <CardTitle className="text-3xl flex items-center gap-4">
                   <span>Live Service Board</span>
                   {buses.length > 0 && (
-                    <Badge variant="secondary">{buses.length} buses active</Badge>
+                    <Badge className="bg-chart-2 text-primary-foreground">
+                      {buses.length} buses active over {sortedServiceNumbers.length} services
+                    </Badge>
                   )}
                 </CardTitle>
                 <CardDescription>
