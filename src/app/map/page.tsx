@@ -61,6 +61,8 @@ export default function Page() {
         results = buses.filter((bus) => {
           if (searchType === 'fleetNumber') {
             return String(bus.fleetNumber).toLowerCase().includes(lowerCaseQuery);
+          } else if (searchType === 'runningBoard') {
+            return String(bus.runningBoard).toLowerCase().includes(lowerCaseQuery);
           } else if (searchType === 'journey') {
             return String(bus.journeyRef ?? '').toLowerCase().includes(lowerCaseQuery);
           } else if (searchType === 'service') {

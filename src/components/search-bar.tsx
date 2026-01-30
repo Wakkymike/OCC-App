@@ -68,6 +68,7 @@ export default function SearchBar({ onSearch, onClear }: SearchBarProps) {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="fleetNumber">Fleet Number</SelectItem>
+          <SelectItem value="runningBoard">Running Board</SelectItem>
           <SelectItem value="service">Service Number</SelectItem>
           <SelectItem value="journey">Journey Number</SelectItem>
         </SelectContent>
