@@ -157,6 +157,7 @@ export default function LiveServicePage() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Fleet No.</TableHead>
+                            <TableHead>Running Board</TableHead>
                             <TableHead>Destination</TableHead>
                             <TableHead>Direction</TableHead>
                             <TableHead>Current Location</TableHead>
@@ -181,6 +182,7 @@ export default function LiveServicePage() {
                                         {bus.fleetNumber}
                                       </Link>
                                     </TableCell>
+                                    <TableCell>{bus.runningBoard}</TableCell>
                                     <TableCell className="font-medium">
                                         {bus.destination}
                                         {isSchoolService && <span className="ml-2 text-destructive font-semibold">[SCHOOL SERVICE]</span>}
