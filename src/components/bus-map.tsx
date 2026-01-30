@@ -334,16 +334,9 @@ export default function BusMap({
           
           const journeyInfo = bus.journeyRef ? `<div><div style="font-weight: bold; color: green;">Journey Number</div><div>${bus.journeyRef}</div></div>` : '';
 
-          let locationInfo;
-          if (bus.roadName) {
-            locationInfo = `<div><div style="font-weight: bold; color: blue;">Current Location</div><div>${bus.roadName}${bus.postcode ? `, ${bus.postcode}` : ''}</div></div>`;
-          } else {
-            locationInfo = '<div>Location unavailable</div>';
-          }
-
           const statusDisplay = bus.status && bus.status !== 'Unknown' ? `<div style="margin-top: 4px;">${bus.status}</div>` : '';
 
-          infoFlag.innerHTML = `${schoolInfo}${nightBusInfo}${journeyInfo}${locationInfo}${statusDisplay}`;
+          infoFlag.innerHTML = `${schoolInfo}${nightBusInfo}${journeyInfo}${statusDisplay}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';

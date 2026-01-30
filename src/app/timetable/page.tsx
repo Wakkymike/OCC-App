@@ -160,7 +160,6 @@ export default function LiveServicePage() {
                             <TableHead>Running Board</TableHead>
                             <TableHead>Destination</TableHead>
                             <TableHead>Direction</TableHead>
-                            <TableHead>Current Location</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -189,16 +188,6 @@ export default function LiveServicePage() {
                                         {isNightBus && <span className="ml-2 text-destructive font-semibold">[NIGHT BUS]</span>}
                                     </TableCell>
                                     <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
-                                    <TableCell>
-                                      {bus.roadName ? (
-                                        <div>
-                                          <div>{bus.roadName}</div>
-                                          <div className="text-xs text-muted-foreground">{bus.postcode}</div>
-                                        </div>
-                                      ) : (
-                                        'N/A'
-                                      )}
-                                    </TableCell>
                                     </TableRow>
                                 );
                             })}
