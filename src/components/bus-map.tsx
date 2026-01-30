@@ -25,6 +25,7 @@ interface BusMapProps {
 const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
 const nightBusRunningBoards = ['3691', '3692', '3693', '1091', '1092', '1093', '21091', '21092', '21093', '23691', '23692', '23693', '11091', '11092', '11093', '13691', '13692', '13693'];
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
+const lastJourneyRefs = ['8001', '8002', '8301', '8302', '8601', '8602'];
 
 export default function BusMap({
   buses,
@@ -312,8 +313,9 @@ export default function BusMap({
       const nightBusLabel = isNightBus ? ` <span style="color:red">[NIGHT BUS]</span>` : '';
       
       const isFirstJourney = bus.journeyRef ? firstJourneyRefs.includes(bus.journeyRef) : false;
+      const isLastJourney = bus.journeyRef ? lastJourneyRefs.includes(bus.journeyRef) : false;
       let runningBoardHtml = `RB: ${bus.runningBoard}`;
-      if (isFirstJourney) {
+      if (isFirstJourney || isLastJourney) {
         runningBoardHtml = `<span class="blinking-rb">${runningBoardHtml}</span>`;
       }
       
