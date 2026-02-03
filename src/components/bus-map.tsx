@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import type { Bus, LatLng } from '@/lib/types';
+import type { Bus, LatLng, MetrolinkData } from '@/lib/types';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
 
@@ -20,6 +20,7 @@ interface BusMapProps {
   mapStyle: string;
   show3DBuildings: boolean;
   showBusStops: boolean;
+  metrolinkData: MetrolinkData | null;
 }
 
 const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
@@ -36,6 +37,7 @@ export default function BusMap({
   mapStyle,
   show3DBuildings,
   showBusStops,
+  metrolinkData,
 }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -231,6 +233,117 @@ export default function BusMap({
         if (popup.isOpen()) popup.remove();
     }
   }, [showBusStops, styleRevision]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.isStyleLoaded() || !metrolinkData || (!metrolinkData.stops.length && !metrolinkData.lines.length)) return;
+
+    const stopsById = new Map(metrolinkData.stops.map(s => [s.id, [s.lng, s.lat] as [number, number]]));
+
+    const lineFeatures = metrolinkData.lines.map(line => ({
+        type: 'Feature' as const,
+        geometry: {
+            type: 'LineString' as const,
+            coordinates: line.path.map(stopId => stopsById.get(stopId)).filter((p): p is [number, number] => !!p)
+        },
+        properties: {
+            color: line.color,
+            name: line.name
+        }
+    }));
+    
+    const lineSourceId = 'metrolink-lines';
+    const lineSource = map.getSource(lineSourceId) as mapboxgl.GeoJSONSource;
+    if (lineSource) {
+        lineSource.setData({ type: 'FeatureCollection', features: lineFeatures });
+    } else {
+        map.addSource(lineSourceId, {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: lineFeatures }
+        });
+    }
+
+    const lineLayerId = 'metrolink-lines-layer';
+    if (!map.getLayer(lineLayerId)) {
+        map.addLayer({
+            id: lineLayerId,
+            type: 'line',
+            source: lineSourceId,
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': ['get', 'color'], 'line-width': 4, 'line-opacity': 0.8 }
+        }, 'bus-stops'); // Draw lines below bus stops
+    }
+    
+    const stopFeatures = metrolinkData.stops.map(stop => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [stop.lng, stop.lat] },
+        properties: { name: stop.name, lines: stop.lines.join(', ') }
+    }));
+    
+    const stopSourceId = 'metrolink-stops';
+    const stopSource = map.getSource(stopSourceId) as mapboxgl.GeoJSONSource;
+    if (stopSource) {
+        stopSource.setData({ type: 'FeatureCollection', features: stopFeatures });
+    } else {
+        map.addSource(stopSourceId, {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: stopFeatures }
+        });
+    }
+
+    const stopLayerId = 'metrolink-stops-layer';
+    if (!map.getLayer(stopLayerId)) {
+        map.addLayer({
+            id: stopLayerId,
+            type: 'circle',
+            source: stopSourceId,
+            paint: {
+                'circle-radius': 6,
+                'circle-color': '#ffffff',
+                'circle-stroke-color': '#000000',
+                'circle-stroke-width': 2.5
+            }
+        });
+    }
+    
+    const tramPopup = new mapboxgl.Popup({
+      className: 'bus-stop-popup', // reuse style
+      closeButton: false,
+      closeOnClick: false,
+    });
+    
+    const onTramStopEnter = (e: mapboxgl.MapLayerMouseEvent) => {
+      if (!e.features?.length) return;
+      map.getCanvas().style.cursor = 'pointer';
+      const feature = e.features[0];
+      if (feature.geometry.type === 'Point' && feature.properties) {
+        const coords = feature.geometry.coordinates.slice() as [number, number];
+        const { name, lines } = feature.properties;
+        const description = `<div class="font-bold">${name}</div><div>Lines: ${lines}</div>`;
+
+        while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
+            coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
+        }
+        tramPopup.setLngLat(coords).setHTML(description).addTo(map);
+      }
+    };
+    
+    const onTramStopLeave = () => {
+      map.getCanvas().style.cursor = '';
+      tramPopup.remove();
+    };
+
+    map.on('mouseenter', stopLayerId, onTramStopEnter);
+    map.on('mouseleave', stopLayerId, onTramStopLeave);
+    
+    return () => {
+      if (map.isStyleLoaded()) {
+        map.off('mouseenter', stopLayerId, onTramStopEnter);
+        map.off('mouseleave', stopLayerId, onTramStopLeave);
+      }
+      if (tramPopup.isOpen()) tramPopup.remove();
+    }
+  }, [metrolinkData, styleRevision]);
 
 
   useEffect(() => {

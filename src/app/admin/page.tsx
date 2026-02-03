@@ -6,25 +6,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, Home } from 'lucide-react';
+import { Loader2, Upload, Home, TramFront } from 'lucide-react';
 import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button';
 
-
 export default function AdminPage() {
-  const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  // State for TransXchange upload
+  const [txcFile, setTxcFile] = useState<File | null>(null);
+  const [isUploadingTxc, setIsUploadingTxc] = useState(false);
+  
+  // State for Metrolink upload
+  const [metroFile, setMetroFile] = useState<File | null>(null);
+  const [isUploadingMetro, setIsUploadingMetro] = useState(false);
+
   const { toast } = useToast();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTxcFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFile(e.target.files[0]);
+      setTxcFile(e.target.files[0]);
+    }
+  };
+  
+  const handleMetroFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setMetroFile(e.target.files[0]);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleTxcSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!file) {
+    if (!txcFile) {
       toast({
         variant: 'destructive',
         title: 'No file selected',
@@ -33,9 +44,9 @@ export default function AdminPage() {
       return;
     }
 
-    setIsUploading(true);
+    setIsUploadingTxc(true);
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', txcFile);
 
     try {
       const response = await fetch('/api/upload-transxchange', {
@@ -60,51 +71,99 @@ export default function AdminPage() {
         description: error.message,
       });
     } finally {
-      setIsUploading(false);
-      setFile(null);
-      // Reset the file input
-      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-      if (fileInput) {
-        fileInput.value = '';
+      setIsUploadingTxc(false);
+      setTxcFile(null);
+      const fileInput = document.getElementById('txc-file-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+    }
+  };
+  
+  const handleMetroSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!metroFile) {
+      toast({
+        variant: 'destructive',
+        title: 'No file selected',
+        description: 'Please select a Metrolink JSON file to upload.',
+      });
+      return;
+    }
+
+    setIsUploadingMetro(true);
+    const formData = new FormData();
+    formData.append('file', metroFile);
+
+    try {
+      const response = await fetch('/api/upload-metrolink', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'An unknown error occurred.');
       }
+
+      toast({
+        title: 'Upload Successful',
+        description: `${result.message}`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Upload Failed',
+        description: error.message,
+      });
+    } finally {
+      setIsUploadingMetro(false);
+      setMetroFile(null);
+      const fileInput = document.getElementById('metro-file-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
     }
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-8">
-       <div className="w-full max-w-2xl">
+    <main className="flex min-h-screen flex-col items-center bg-background p-8 gap-8">
+       <div className="w-full max-w-2xl space-y-8">
+        <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Admin Panel</h1>
+            <Link
+              href="/"
+              className={buttonVariants({ variant: 'outline' })}
+              aria-label="Home"
+            >
+              <Home className="mr-2 h-5 w-5" />
+              Back to Home
+            </Link>
+        </div>
+
         <Card>
            <CardHeader>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <CardTitle className="text-3xl">Admin Panel</CardTitle>
-                <CardDescription>
-                  Upload TransXchange data to update the bus timetable.
-                </CardDescription>
+              <div className="flex items-center gap-3">
+                <Upload className="h-6 w-6" />
+                <div>
+                    <CardTitle className="text-xl">Bus Timetable Upload</CardTitle>
+                    <CardDescription>
+                      Upload TransXchange data to update the bus timetable reference.
+                    </CardDescription>
+                </div>
               </div>
-              <Link
-                href="/"
-                className={buttonVariants({ variant: 'outline', size: 'icon' })}
-                aria-label="Home"
-              >
-                <Home className="h-5 w-5" />
-              </Link>
-            </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleTxcSubmit} className="space-y-4">
               <div className="grid w-full items-center gap-1.5">
-                <Label htmlFor="file-upload">TransXchange ZIP File</Label>
+                <Label htmlFor="txc-file-upload">TransXchange ZIP File</Label>
                 <Input
-                  id="file-upload"
+                  id="txc-file-upload"
                   type="file"
                   accept=".zip"
-                  onChange={handleFileChange}
-                  disabled={isUploading}
+                  onChange={handleTxcFileChange}
+                  disabled={isUploadingTxc}
                 />
               </div>
-              <Button type="submit" disabled={isUploading || !file}>
-                {isUploading ? (
+              <Button type="submit" disabled={isUploadingTxc || !txcFile}>
+                {isUploadingTxc ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Uploading...
@@ -112,13 +171,55 @@ export default function AdminPage() {
                 ) : (
                   <>
                     <Upload className="mr-2 h-4 w-4" />
-                    Upload Timetable
+                    Upload Bus Timetable
                   </>
                 )}
               </Button>
             </form>
           </CardContent>
         </Card>
+        
+        <Card>
+           <CardHeader>
+              <div className="flex items-center gap-3">
+                <TramFront className="h-6 w-6" />
+                <div>
+                    <CardTitle className="text-xl">Metrolink Data Upload</CardTitle>
+                    <CardDescription>
+                      Upload Metrolink stops and lines information in JSON format.
+                    </CardDescription>
+                </div>
+              </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleMetroSubmit} className="space-y-4">
+              <div className="grid w-full items-center gap-1.5">
+                <Label htmlFor="metro-file-upload">Metrolink JSON File</Label>
+                <Input
+                  id="metro-file-upload"
+                  type="file"
+                  accept=".json"
+                  onChange={handleMetroFileChange}
+                  disabled={isUploadingMetro}
+                />
+              </div>
+              <Button type="submit" disabled={isUploadingMetro || !metroFile}>
+                {isUploadingMetro ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Metrolink Data
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
       </div>
     </main>
   );

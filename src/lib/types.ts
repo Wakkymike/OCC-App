@@ -15,3 +15,23 @@ export interface Bus {
   delay?: number; // Delay in minutes, for internal logic/styling
   status: string; // The display text for status: "On Time", "5 min late", "Unknown"
 }
+
+export interface MetrolinkStop {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  lines: string[];
+}
+
+export interface MetrolinkLine {
+  id: string;
+  name: string;
+  color: string;
+  path: string[]; // Array of stop IDs
+}
+
+export interface MetrolinkData {
+  stops: MetrolinkStop[];
+  lines: MetrolinkLine[];
+}

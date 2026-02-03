@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import BusMap from '@/components/bus-map';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
-import type { Bus, LatLng } from '@/lib/types';
+import type { Bus, LatLng, MetrolinkData } from '@/lib/types';
 import SearchBar from '@/components/search-bar';
 import LocationSearchBar from '@/components/location-search-bar';
 import mapboxgl from 'mapbox-gl';
@@ -36,6 +36,8 @@ export default function Page() {
   const [showBusStops, setShowBusStops] = useState(true);
   const { toast } = useToast();
 
+  const [metrolinkData, setMetrolinkData] = useState<MetrolinkData | null>(null);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const busIdFromQuery = params.get('busId');
@@ -45,6 +47,24 @@ export default function Page() {
       const newUrl = window.location.pathname;
       window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
     }
+
+    // Fetch metrolink data
+    const fetchMetrolinkData = async () => {
+      try {
+        const response = await fetch('/api/metrolink');
+        if (response.ok) {
+          const data = await response.json();
+          setMetrolinkData(data);
+        } else {
+          console.error('Failed to fetch Metrolink data');
+        }
+      } catch (err) {
+        console.error('Error fetching Metrolink data:', err);
+      }
+    };
+
+    fetchMetrolinkData();
+
   }, []);
 
   useEffect(() => {
@@ -210,6 +230,7 @@ export default function Page() {
         mapStyle={mapStyle}
         show3DBuildings={show3DBuildings}
         showBusStops={showBusStops}
+        metrolinkData={metrolinkData}
       />
     </div>
   );
