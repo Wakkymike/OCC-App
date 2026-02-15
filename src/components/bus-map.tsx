@@ -21,6 +21,8 @@ interface BusMapProps {
   show3DBuildings: boolean;
   showBusStops: boolean;
   metrolinkData: MetrolinkData | null;
+  recordedRoute: LatLng[] | null;
+  showRecordedRoute: boolean;
 }
 
 const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
@@ -38,6 +40,8 @@ export default function BusMap({
   show3DBuildings,
   showBusStops,
   metrolinkData,
+  recordedRoute,
+  showRecordedRoute,
 }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -345,6 +349,53 @@ export default function BusMap({
     }
   }, [metrolinkData, styleRevision]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.isStyleLoaded()) return;
+
+    const sourceId = 'recorded-route-source';
+    const layerId = 'recorded-route-layer';
+
+    const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource;
+
+    const lineString: GeoJSON.Feature<GeoJSON.LineString> = {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+            type: 'LineString',
+            coordinates: recordedRoute ? recordedRoute.map(p => [p.lng, p.lat]) : []
+        }
+    };
+    
+    if (source) {
+        source.setData(lineString);
+    } else {
+        map.addSource(sourceId, {
+            type: 'geojson',
+            data: lineString
+        });
+    }
+
+    if (!map.getLayer(layerId)) {
+        map.addLayer({
+            id: layerId,
+            type: 'line',
+            source: sourceId,
+            layout: {
+                'line-join': 'round',
+                'line-cap': 'round'
+            },
+            paint: {
+                'line-color': '#8a2be2', // A distinct color like blue-violet
+                'line-width': 5,
+                'line-opacity': 0.8
+            }
+        }, 'metrolink-lines-layer'); // Draw it above metrolink but below buses/stops
+    }
+    
+    map.setLayoutProperty(layerId, 'visibility', showRecordedRoute && recordedRoute && recordedRoute.length > 1 ? 'visible' : 'none');
+
+  }, [recordedRoute, showRecordedRoute, styleRevision]);
 
   useEffect(() => {
     const map = mapRef.current;

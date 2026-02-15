@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import BusMap from '@/components/bus-map';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import type { Bus, LatLng, MetrolinkData } from '@/lib/types';
 import SearchBar from '@/components/search-bar';
 import LocationSearchBar from '@/components/location-search-bar';
 import mapboxgl from 'mapbox-gl';
-import { Home, Layers3 } from 'lucide-react';
+import { Home, Layers3, Radio } from 'lucide-react';
 import { buttonVariants, Button } from '@/components/ui/button';
 import Link from 'next/link';
 import MapControls from '@/components/map-controls';
 import { useToast } from '@/hooks/use-toast';
+import RouteRecorderDialog from '@/components/route-recorder';
 
 export default function Page() {
   const { buses, error } = useBusTracker();
@@ -37,6 +38,21 @@ export default function Page() {
   const { toast } = useToast();
 
   const [metrolinkData, setMetrolinkData] = useState<MetrolinkData | null>(null);
+  
+  // State for route recording
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedRoute, setRecordedRoute] = useState<LatLng[]>([]);
+  const [recordingBusId, setRecordingBusId] = useState<string | null>(null);
+  const [recordingService, setRecordingService] = useState<string | null>(null);
+  const [showRecordedRoute, setShowRecordedRoute] = useState(true);
+  const [isRecorderOpen, setIsRecorderOpen] = useState(false);
+
+  // Memoize last known position to avoid adding duplicate points
+  const lastRecordedPosition = useMemo(() => {
+    if (recordedRoute.length === 0) return null;
+    return recordedRoute[recordedRoute.length - 1];
+  }, [recordedRoute]);
+
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -97,6 +113,37 @@ export default function Page() {
 
     setDisplayBuses(results);
 
+    // Route recording logic
+    if (isRecording) {
+      if (!recordingBusId) {
+        // Find the first bus for the service to start tracking
+        const busToStartTracking = results.find(b => b.service === recordingService);
+        if (busToStartTracking) {
+          const busId = `${busToStartTracking.fleetNumber}-${busToStartTracking.runningBoard}-${busToStartTracking.service}-${busToStartTracking.direction}-${busToStartTracking.journeyRef || 'no-ref'}`;
+          setRecordingBusId(busId);
+          setRecordedRoute([]); // Reset route when a new journey is picked up
+          toast({ title: 'Recording Started', description: `Now recording route for bus ${busToStartTracking.fleetNumber} on service ${recordingService}.`});
+        }
+      } else {
+        // Continue tracking the specific bus
+        const trackedBus = results.find(b => {
+           const busId = `${b.fleetNumber}-${b.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
+           return busId === recordingBusId;
+        });
+        if (trackedBus && trackedBus.position) {
+          // Add point if it has moved
+          if (!lastRecordedPosition || trackedBus.position.lat !== lastRecordedPosition.lat || trackedBus.position.lng !== lastRecordedPosition.lng) {
+             setRecordedRoute(prev => [...prev, trackedBus.position!]);
+          }
+        } else {
+          // Bus is no longer in the feed, stop recording
+          handleStopRecording();
+          toast({ title: 'Recording Stopped', description: `Bus ${recordingBusId.split('-')[0]} is no longer being tracked. Route saved.`});
+        }
+      }
+    }
+
+
     const busToTrack = selectedBusId ? results.find(b => {
         const busId = `${b.fleetNumber}-${b.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
         return busId === selectedBusId;
@@ -130,7 +177,7 @@ export default function Page() {
         setSelectedBusId(null);
       }
     }
-  }, [buses, currentSearch, selectedBusId]);
+  }, [buses, currentSearch, selectedBusId, isRecording, recordingBusId, recordingService, toast, lastRecordedPosition]);
 
   const handleLocationSearch = async (query: string) => {
     setSelectedBusId(null);
@@ -180,10 +227,52 @@ export default function Page() {
     setSelectedBusId(null);
     setMapView({});
   };
+
+  const handleStartRecording = (service: string) => {
+    setIsRecording(true);
+    setRecordingService(service);
+    setRecordingBusId(null);
+    setRecordedRoute([]);
+  };
+
+  const handleStopRecording = () => {
+    setIsRecording(false);
+  };
+
+  const handleExport = () => {
+    if (recordedRoute.length === 0) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: 'No route points have been recorded.'});
+      return;
+    };
+    
+    const geoJson = {
+        type: "Feature",
+        properties: {
+            service: recordingService || 'unknown',
+            busId: recordingBusId,
+            recordedAt: new Date().toISOString(),
+        },
+        geometry: {
+            type: "LineString",
+            coordinates: recordedRoute.map(p => [p.lng, p.lat]),
+        }
+    };
+
+    const blob = new Blob([JSON.stringify(geoJson, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `route-${recordingService || 'export'}-${Date.now()}.geojson`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: 'Export Successful', description: 'The recorded route has been downloaded as a GeoJSON file.' });
+  };
   
   return (
     <div className="h-screen w-screen relative">
-      <div className="absolute top-4 left-4 z-50">
+      <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
         <Link
           href="/"
           className={buttonVariants({ variant: 'outline', size: 'icon' })}
@@ -191,6 +280,14 @@ export default function Page() {
         >
           <Home className="h-5 w-5" />
         </Link>
+         <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setIsRecorderOpen(true)}
+            aria-label="Open Route Recorder"
+          >
+            <Radio className="h-5 w-5" />
+         </Button>
       </div>
       <div className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-center items-start gap-4">
         <LocationSearchBar onSearch={handleLocationSearch} onClear={handleLocationClear} />
@@ -214,6 +311,9 @@ export default function Page() {
             setShow3DBuildings={setShow3DBuildings}
             showBusStops={showBusStops}
             setShowBusStops={setShowBusStops}
+            showRecordedRoute={showRecordedRoute}
+            setShowRecordedRoute={setShowRecordedRoute}
+            isRouteDataAvailable={recordedRoute.length > 0}
           />
         ) : (
           <Button variant="outline" size="icon" aria-label="Map Layers">
@@ -231,6 +331,18 @@ export default function Page() {
         show3DBuildings={show3DBuildings}
         showBusStops={showBusStops}
         metrolinkData={metrolinkData}
+        recordedRoute={recordedRoute}
+        showRecordedRoute={showRecordedRoute}
+      />
+      <RouteRecorderDialog
+        isOpen={isRecorderOpen}
+        onClose={() => setIsRecorderOpen(false)}
+        onStartRecording={handleStartRecording}
+        onStopRecording={handleStopRecording}
+        onExport={handleExport}
+        isRecording={isRecording}
+        recordedPointsCount={recordedRoute.length}
+        recordingService={recordingService}
       />
     </div>
   );

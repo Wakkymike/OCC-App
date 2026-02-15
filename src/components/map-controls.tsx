@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { Layers3, Satellite, Map, Building, Bus } from 'lucide-react';
+import { Layers3, Satellite, Map, Building, Bus, Route } from 'lucide-react';
 
 interface MapControlsProps {
   mapStyle: string;
@@ -13,6 +13,9 @@ interface MapControlsProps {
   setShow3DBuildings: (show: boolean) => void;
   showBusStops: boolean;
   setShowBusStops: (show: boolean) => void;
+  showRecordedRoute: boolean;
+  setShowRecordedRoute: (show: boolean) => void;
+  isRouteDataAvailable: boolean;
 }
 
 const styleOptions = [
@@ -28,6 +31,9 @@ export default function MapControls({
   setShow3DBuildings,
   showBusStops,
   setShowBusStops,
+  showRecordedRoute,
+  setShowRecordedRoute,
+  isRouteDataAvailable,
 }: MapControlsProps) {
   const currentStyleId = mapStyle.split('/').pop();
 
@@ -85,6 +91,18 @@ export default function MapControls({
                     id="show-bus-stops"
                     checked={showBusStops}
                     onCheckedChange={setShowBusStops}
+                />
+           </div>
+           <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center space-x-2">
+                    <Route className="h-5 w-5" />
+                    <Label htmlFor="show-recorded-route" className="cursor-pointer">Recorded Route</Label>
+                </div>
+                <Switch
+                    id="show-recorded-route"
+                    checked={showRecordedRoute}
+                    onCheckedChange={setShowRecordedRoute}
+                    disabled={!isRouteDataAvailable}
                 />
            </div>
         </div>
