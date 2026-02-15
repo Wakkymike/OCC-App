@@ -37,7 +37,14 @@ export async function POST(req: NextRequest) {
 
         const fileBuffer = Buffer.from(await file.arrayBuffer());
         const zip = await jszip.loadAsync(fileBuffer);
-        const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', removeNSPrefix: true });
+        const parser = new XMLParser({ 
+            ignoreAttributes: false, 
+            attributeNamePrefix: '', 
+            removeNSPrefix: true,
+            parseNodeValue: true, 
+            parseAttributeValue: true,
+            trimValues: true,
+        });
 
         const timetable: any = {};
         const routeGeometry: any = {};
