@@ -101,7 +101,6 @@ export async function POST(req: NextRequest) {
         
         let firstFailingStopPoint: any = null;
         let stopPointsProcessed = 0;
-        let stopPointsSampleForDebug: any = null;
 
         const stats = {
             stopPoints: 0,
@@ -115,13 +114,8 @@ export async function POST(req: NextRequest) {
             const data = parser.parse(xmlContent)?.TransXChange;
             if (!data) continue;
 
-            const stopPointsContainer = data.StopPoints || data.Stops;
-            if (!stopPointsSampleForDebug && stopPointsContainer) {
-                stopPointsSampleForDebug = stopPointsContainer;
-            }
-
-            // Aggregate StopPoints
             const stopPoints = [];
+            const stopPointsContainer = data.StopPoints || data.Stops;
             if (stopPointsContainer) {
                 const annotatedStopPoints = ensureArray(stopPointsContainer.AnnotatedStopPointRef);
                 const plainStopPoints = ensureArray(stopPointsContainer.StopPoint);
@@ -325,7 +319,11 @@ export async function POST(req: NextRequest) {
         
         let debugSample: any = null;
 
-        if (routesFound === 0 && stats.journeyPatterns > 0) {
+        if (firstFailingStopPoint) {
+             message += `\n--- ANALYSIS ---\n`;
+             message += `The system failed to parse all stop points. The first failing record is included in the debug info below. This may be why some routes are missing.\n`;
+             debugSample = { stop_point_sample: firstFailingStopPoint };
+        } else if (routesFound === 0 && stats.journeyPatterns > 0) {
             message += `\n--- ANALYSIS ---\n`;
             if (stats.stopPoints === 0) {
                  message += `The root cause appears to be that the system could not find coordinates for any stop points. Without stop locations, routes cannot be constructed.\n`;
@@ -334,19 +332,11 @@ export async function POST(req: NextRequest) {
                  message += `The system found stop coordinates, but failed to construct routes. This usually means the link between route sections and stop coordinates is broken.\n`;
                  message += `Please verify that the StopPointRefs in your JourneyPatternSections correspond to AtcoCodes in your StopPoints.`;
             }
-             // Try to get a sample pattern to debug
             const firstPatternId = Object.keys(journeyPatternsById)[0];
             const patternSample = firstPatternId ? journeyPatternsById[firstPatternId] : null;
-            debugSample = {
-                analysis: "Stop points were found, but route construction failed. This is likely because the structure of the `JourneyPatternSection` and its `StopPointRef` is not what the system expects.",
-                sample_journey_pattern: patternSample,
-            };
-        } else if (firstFailingStopPoint) {
-             if (!message.includes('--- ANALYSIS ---')) message += `\n--- ANALYSIS ---\n`;
-             message += `The system failed to parse all stop points, which may be why some routes are missing.\n`;
-             debugSample = { ...debugSample, stop_point_sample: firstFailingStopPoint };
-        } else if (stats.stopPoints === 0 && stopPointsSampleForDebug) {
-             debugSample = { raw_stop_points_structure: stopPointsSampleForDebug };
+            if (patternSample) {
+                debugSample = { ...debugSample, sample_journey_pattern: patternSample };
+            }
         } else if (routesFound > 0) {
             message += `\nUpload successful. You can now select these routes on the map page.`;
         } else if (filesProcessed > 0) {
