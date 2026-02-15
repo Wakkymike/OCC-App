@@ -137,6 +137,7 @@ export async function POST(req: NextRequest) {
                                getText(sp.Location?.longitude) ??
                                getText(sp.Place?.Location?.longitude);
                 
+                let successfullyParsed = false;
                 if (atcoCode && latStr && lngStr) {
                     const lat = parseFloat(latStr);
                     const lng = parseFloat(lngStr);
@@ -144,8 +145,11 @@ export async function POST(req: NextRequest) {
                         if (!stopPointsCoords[atcoCode]) {
                             stopPointsCoords[atcoCode] = { lat, lng };
                         }
+                        successfullyParsed = true;
                     }
-                } else if (!firstFailingStopPoint) {
+                }
+                
+                if (!successfullyParsed && !firstFailingStopPoint) {
                     firstFailingStopPoint = sp;
                 }
             }
