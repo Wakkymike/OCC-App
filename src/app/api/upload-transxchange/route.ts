@@ -112,14 +112,14 @@ export async function POST(req: NextRequest) {
                 stopPointsSampleForDebug = data.StopPoints || data.Stops;
             }
 
-            // Aggregate StopPoints - Check for both <StopPoints> and <Stops>
-            const stopPointsRaw = data.StopPoints?.StopPoint ?? data.Stops?.StopPoint;
+            // Aggregate StopPoints - Check for both <StopPoints> and <Stops>, and the correct inner structure
+            const stopPointsRaw = data.StopPoints?.AnnotatedStopPointRef ?? data.Stops?.AnnotatedStopPointRef ?? data.StopPoints?.StopPoint ?? data.Stops?.StopPoint;
             const stopPoints = ensureArray(stopPointsRaw);
             for (const sp of stopPoints) {
                 stopPointsProcessed++;
-                const atcoCode = getText(sp.AtcoCode);
-                const latStr = getText(sp.Place?.Location?.Latitude);
-                const lngStr = getText(sp.Place?.Location?.Longitude);
+                const atcoCode = getText(sp.StopPointRef) ?? getText(sp.AtcoCode);
+                const latStr = getText(sp.Location?.Latitude) ?? getText(sp.Place?.Location?.Latitude);
+                const lngStr = getText(sp.Location?.Longitude) ?? getText(sp.Place?.Location?.Longitude);
                 let foundCoords = false;
 
                 if (atcoCode && latStr && lngStr) {
