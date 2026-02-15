@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
 import type { Bus } from '@/lib/types';
 import timetable from '@/lib/timetable-data.json';
+import { add, parse as dateFnsParse, Duration } from 'date-fns';
 
 // Helper to safely extract a text value from a field which might be a string or an object with a #text property.
 const getText = (field: any): string | undefined => {
