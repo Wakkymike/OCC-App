@@ -107,8 +107,9 @@ export async function POST(req: NextRequest) {
             const data = parser.parse(xmlContent)?.TransXChange;
             if (!data) continue;
 
-            // Aggregate StopPoints - This is the corrected, more robust logic.
-            const stopPoints = ensureArray(data.Stops?.StopPoint);
+            // Aggregate StopPoints - Check for both &lt;StopPoints&gt; and &lt;Stops&gt;
+            const stopPointsRaw = data.StopPoints?.StopPoint ?? data.Stops?.StopPoint;
+            const stopPoints = ensureArray(stopPointsRaw);
             for (const sp of stopPoints) {
                 stopPointsProcessed++;
                 const atcoCode = getText(sp.AtcoCode);
