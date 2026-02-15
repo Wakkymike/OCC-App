@@ -15,6 +15,7 @@ import MapControls from '@/components/map-controls';
 import { useToast } from '@/hooks/use-toast';
 import RouteRecorderDialog from '@/components/route-recorder';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
 
 export default function Page() {
   const { buses, error } = useBusTracker();
@@ -50,12 +51,15 @@ export default function Page() {
   const [userSavedRoutes, setUserSavedRoutes] = useState<Record<string, { name: string; route: LatLng[]; busId: string | null }>>({});
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
 
+  const [initialRoutes, setInitialRoutes] = useState<Record<string, { name: string; route: LatLng[]; busId: string | null }>>(preRecordedRoutes);
+
   const allAvailableRoutes = useMemo(() => {
     return {
+        ...initialRoutes,
         ...txcRoutes,
         ...userSavedRoutes,
     };
-  }, [userSavedRoutes, txcRoutes]);
+  }, [initialRoutes, userSavedRoutes, txcRoutes]);
 
 
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
