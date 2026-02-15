@@ -14,8 +14,6 @@ import MapControls from '@/components/map-controls';
 import { useToast } from '@/hooks/use-toast';
 import RouteRecorderDialog from '@/components/route-recorder';
 import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
-import txcRouteMetadata from '@/lib/route-metadata.json';
-import txcRouteGeometry from '@/lib/route-geometry.json';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 
 export default function Page() {
@@ -41,6 +39,7 @@ export default function Page() {
   const { toast } = useToast();
 
   const [metrolinkData, setMetrolinkData] = useState<MetrolinkData | null>(null);
+  const [txcRoutes, setTxcRoutes] = useState<Record<string, { name: string; route: LatLng[]; busId: string | null }>>({});
 
   // State for route recording
   const [isRecording, setIsRecording] = useState(false);
@@ -52,25 +51,12 @@ export default function Page() {
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
 
   const allAvailableRoutes = useMemo(() => {
-    const formattedTxcRoutes: Record<string, { name: string; route: LatLng[]; busId: string | null }> = {};
-    for (const id in txcRouteMetadata) {
-        const key = id as keyof typeof txcRouteMetadata;
-        if (txcRouteGeometry[key]) {
-            const metadata = txcRouteMetadata[key];
-            formattedTxcRoutes[id] = {
-                name: metadata.name,
-                route: txcRouteGeometry[key],
-                busId: null,
-            };
-        }
-    }
-
     return {
         ...preRecordedRoutes,
-        ...formattedTxcRoutes,
+        ...txcRoutes,
         ...userSavedRoutes,
     };
-  }, [userSavedRoutes]);
+  }, [userSavedRoutes, txcRoutes]);
 
 
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
@@ -135,10 +121,31 @@ export default function Page() {
         console.error('Error fetching Metrolink data:', err);
       }
     };
+    
+    // Fetch TXC routes data
+    const fetchTxcRoutes = async () => {
+      try {
+        const response = await fetch('/api/routes');
+        if (response.ok) {
+          const data = await response.json();
+          setTxcRoutes(data.txcRoutes || {});
+        } else {
+          console.error('Failed to fetch TransXchange routes');
+          toast({
+              variant: 'destructive',
+              title: 'Could not load routes',
+              description: 'Failed to load routes from TransXchange data.',
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching TransXchange routes:', err);
+      }
+    };
 
     fetchMetrolinkData();
+    fetchTxcRoutes();
 
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     let results = buses;
@@ -299,15 +306,14 @@ export default function Page() {
     };
     
     const routeToExport = allAvailableRoutes[selectedRouteId];
-    const metadata = txcRouteMetadata[selectedRouteId as keyof typeof txcRouteMetadata];
     
     const geoJson = {
         type: "Feature",
         properties: {
             name: routeToExport.name,
-            service: metadata?.service,
+            service: routeToExport.name.split(' ')[1], // basic parsing
             busId: routeToExport.busId,
-            recordedAt: selectedRouteId.includes('-') ? new Date(parseInt(selectedRouteId.split('-')[1])).toISOString() : new Date().toISOString(),
+            recordedAt: selectedRouteId.includes('-') && !isNaN(parseInt(selectedRouteId.split('-').pop()!)) ? new Date(parseInt(selectedRouteId.split('-').pop()!)).toISOString() : new Date().toISOString(),
         },
         geometry: {
             type: "LineString",
