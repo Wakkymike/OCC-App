@@ -60,14 +60,28 @@ export default function AdminPage() {
         throw new Error(result.error || 'An unknown error occurred.');
       }
 
+      const description = (
+          <div className="text-left">
+              <pre className="mt-2 w-full rounded-md bg-slate-950 p-4 text-white text-xs whitespace-pre-wrap">
+                  {result.message}
+              </pre>
+              {result.debug_info?.stop_point_sample && (
+                  <div className="mt-4">
+                      <p className="font-semibold text-amber-500">
+                          To help debug, here is the first StopPoint object the system failed to parse:
+                      </p>
+                      <pre className="mt-2 w-full rounded-md bg-slate-800 p-4 text-white text-xs whitespace-pre-wrap">
+                          {JSON.stringify(result.debug_info.stop_point_sample, null, 2)}
+                      </pre>
+                  </div>
+              )}
+          </div>
+      );
+
       toast({
-        title: 'Upload Report',
-        description: (
-            <pre className="mt-2 w-full rounded-md bg-slate-950 p-4 text-white text-xs whitespace-pre-wrap">
-                {result.message}
-            </pre>
-        ),
-        duration: 30000, // Give user more time to read
+          title: 'Upload Report',
+          description: description,
+          duration: 60000,
       });
     } catch (error: any) {
       toast({

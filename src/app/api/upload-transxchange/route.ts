@@ -92,6 +92,9 @@ export async function POST(req: NextRequest) {
         const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
         const vehicleJourneysList: any[] = [];
         
+        let firstFailingStopPoint: any = null;
+        let stopPointsProcessed = 0;
+
         const stats = {
             stopPoints: 0,
             services: new Set<string>(),
@@ -107,15 +110,25 @@ export async function POST(req: NextRequest) {
             // Aggregate StopPoints
             const stopPoints = ensureArray(data.StopPoints?.StopPoint);
             for (const sp of stopPoints) {
+                stopPointsProcessed++;
                 const atcoCode = getText(sp.AtcoCode);
                 const latStr = getText(sp.Place?.Location?.Latitude);
                 const lngStr = getText(sp.Place?.Location?.Longitude);
+                let foundCoords = false;
+
                 if (atcoCode && latStr && lngStr) {
                     const lat = parseFloat(latStr);
                     const lng = parseFloat(lngStr);
-                    if (!isNaN(lat) && !isNaN(lng) && !stopPointsCoords[atcoCode]) {
-                        stopPointsCoords[atcoCode] = { lat, lng };
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        if (!stopPointsCoords[atcoCode]) {
+                            stopPointsCoords[atcoCode] = { lat, lng };
+                        }
+                        foundCoords = true;
                     }
+                }
+                
+                if (!foundCoords && !firstFailingStopPoint) {
+                    firstFailingStopPoint = sp;
                 }
             }
 
@@ -283,20 +296,27 @@ export async function POST(req: NextRequest) {
         message += `SERVICES: Found ${stats.services.size} services (e.g., ${serviceNames}...).\n`;
         message += `TIMETABLES: Created timetable data for ${timetablesFound} unique journeys.\n`;
         message += `ROUTES: Successfully constructed ${routesFound} routes from ${stats.journeyPatterns} patterns.\n`;
+        message += `STOP POINTS: Found coordinates for ${stats.stopPoints} unique stops out of ${stopPointsProcessed} processed.\n`;
+
 
         if (routesFound === 0 && stats.journeyPatterns > 0) {
-            message += `\n--- DEBUGGING INFO ---\n`;
-            message += `The system found ${stats.journeyPatterns} journey patterns but failed to construct any routes. This usually means the link between route sections and stop coordinates is broken.\n`;
-            message += `- Stop Points with coordinates found: ${stats.stopPoints}\n`;
-            message += `- Journey Pattern Sections found: ${Object.keys(journeyPatternSectionsById).length}\n`;
-            message += `Please verify that the StopPointRefs in your JourneyPatternSections correspond to AtcoCodes in your StopPoints, and that JourneyPatternSectionRefs in your JourneyPatterns are valid.`;
+            message += `\n--- ANALYSIS ---\n`;
+            if (stats.stopPoints === 0) {
+                 message += `The root cause appears to be that the system could not find coordinates for any stop points. Without stop locations, routes cannot be constructed.\n`;
+                 message += `This is likely due to the XML structure for stop points being different than expected.\n`;
+            } else {
+                 message += `The system found stop coordinates, but failed to construct routes. This usually means the link between route sections and stop coordinates is broken.\n`;
+                 message += `Please verify that the StopPointRefs in your JourneyPatternSections correspond to AtcoCodes in your StopPoints.`;
+            }
         } else if (routesFound > 0) {
             message += `\nUpload successful. You can now select these routes on the map page.`;
-        } else {
+        } else if (filesProcessed > 0) {
             message += `\nNo routes or services were found. The files may be empty or in an unsupported format.`;
         }
 
-        return NextResponse.json({ message }, { status: 200 });
+        const debugSample = (stats.stopPoints === 0 && stopPointsProcessed > 0) ? firstFailingStopPoint : null;
+
+        return NextResponse.json({ message, debug_info: { stop_point_sample: debugSample } }, { status: 200 });
 
     } catch (error: any) {
         console.error('TransXchange upload error:', error);
