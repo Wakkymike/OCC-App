@@ -20,7 +20,7 @@ export default function HomePage() {
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <Link href="/timetable">
+            <Link href="/timetables">
               <Clock className="mr-2 h-5 w-5" />
               View Timetables
             </Link>

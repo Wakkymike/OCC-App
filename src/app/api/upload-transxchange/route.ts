@@ -131,8 +131,9 @@ export async function POST(req: NextRequest) {
             vehicleJourneysList.push(...ensureArray(data.VehicleJourneys?.VehicleJourney));
         }
         
-        // STAGE 2: Process aggregated stop points to build coordinate map
+        // STAGE 2: Process aggregated stop points to build coordinate and name maps
         const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
+        const stopPointsNames: Record<string, string> = {};
         let stopPointsParsedCount = 0;
         let failedStopPointSample: any = null;
 
@@ -149,6 +150,14 @@ export async function POST(req: NextRequest) {
         for (const sp of uniqueStops) {
              const atcoCode = getText(sp.AtcoCode);
              const stopPointRef = getText(sp.StopPointRef);
+             const commonName = getText(sp.Descriptor?.CommonName);
+
+             if (atcoCode && commonName) {
+                 stopPointsNames[atcoCode] = commonName;
+             }
+             if (stopPointRef && commonName && stopPointRef !== atcoCode) {
+                 stopPointsNames[stopPointRef] = commonName;
+             }
              
              const location = sp.Location ?? sp.Place?.Location;
              const latStr = location ? (getText(location.Latitude) ?? getText(location.latitude)) : undefined;
@@ -223,14 +232,23 @@ export async function POST(req: NextRequest) {
         
         // STAGE 4: Process Vehicle Journeys to build timetables
         const timetable: any = {};
+        const journeysForJson: any[] = [];
         for (const vj of vehicleJourneysList) {
             const journeyRef = getText(vj.VehicleJourneyCode);
             const departureTimeStr = getText(vj.DepartureTime);
             const journeyPatternRef = getText(vj.JourneyPatternRef);
 
             if (!journeyRef || !departureTimeStr || !journeyPatternRef || !journeyPatternsById[journeyPatternRef]) continue;
-            
+
             const pattern = journeyPatternsById[journeyPatternRef];
+            journeysForJson.push({
+                journeyRef,
+                journeyPatternRef,
+                departureTime: departureTimeStr,
+                serviceName: pattern.serviceName,
+                destinationDisplay: pattern.DestinationDisplay,
+            });
+            
             const departureTime = dateFnsParse(departureTimeStr, 'HH:mm:ss', new Date(0));
             if (isNaN(departureTime.getTime())) continue;
 
@@ -277,6 +295,8 @@ export async function POST(req: NextRequest) {
         await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'timetable-data.json'), JSON.stringify(timetable, null, 2));
         await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'route-geometry.json'), JSON.stringify(routeGeometry, null, 2));
         await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'route-metadata.json'), JSON.stringify(routeMetadata, null, 2));
+        await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'journeys.json'), JSON.stringify(journeysForJson, null, 2));
+        await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'stop-names.json'), JSON.stringify(stopPointsNames, null, 2));
 
         // STAGE 6: Generate report
         const routesFound = Object.keys(routeMetadata).length;
@@ -293,7 +313,7 @@ export async function POST(req: NextRequest) {
             message += `--- ANALYSIS ---\n`;
             message += `The system successfully built ${routesFound} routes, but could not build all of them. This is likely because coordinate data could not be found for every bus stop.\n`;
         } else {
-             message += `Upload successful. You can now select these routes on the map page.`;
+             message += `Upload successful. You can now select these routes on the map page and view the full timetables.`;
         }
 
         if (failedStopPointSample) {
