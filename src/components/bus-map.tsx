@@ -22,7 +22,6 @@ interface BusMapProps {
   showBusStops: boolean;
   metrolinkData: MetrolinkData | null;
   recordedRoute: LatLng[] | null;
-  showRecordedRoute: boolean;
 }
 
 const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
@@ -41,7 +40,6 @@ export default function BusMap({
   showBusStops,
   metrolinkData,
   recordedRoute,
-  showRecordedRoute,
 }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -394,9 +392,9 @@ export default function BusMap({
         }, 'bus-stops');
     }
     
-    map.setLayoutProperty(layerId, 'visibility', showRecordedRoute && recordedRoute && recordedRoute.length > 1 ? 'visible' : 'none');
+    map.setLayoutProperty(layerId, 'visibility', recordedRoute && recordedRoute.length > 1 ? 'visible' : 'none');
 
-  }, [recordedRoute, showRecordedRoute, styleRevision]);
+  }, [recordedRoute, styleRevision]);
 
   useEffect(() => {
     const map = mapRef.current;

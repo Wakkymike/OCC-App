@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { Layers3, Satellite, Map, Building, Bus, Route } from 'lucide-react';
+import { Layers3, Satellite, Map, Building, Bus } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { LatLng } from '@/lib/types';
 
 interface MapControlsProps {
   mapStyle: string;
@@ -13,9 +15,9 @@ interface MapControlsProps {
   setShow3DBuildings: (show: boolean) => void;
   showBusStops: boolean;
   setShowBusStops: (show: boolean) => void;
-  showRecordedRoute: boolean;
-  setShowRecordedRoute: (show: boolean) => void;
-  isRouteDataAvailable: boolean;
+  savedRoutes: Record<string, { name: string; route: LatLng[] }>;
+  selectedRouteId: string | null;
+  setSelectedRouteId: (id: string | null) => void;
 }
 
 const styleOptions = [
@@ -31,9 +33,9 @@ export default function MapControls({
   setShow3DBuildings,
   showBusStops,
   setShowBusStops,
-  showRecordedRoute,
-  setShowRecordedRoute,
-  isRouteDataAvailable,
+  savedRoutes,
+  selectedRouteId,
+  setSelectedRouteId,
 }: MapControlsProps) {
   const currentStyleId = mapStyle.split('/').pop();
 
@@ -93,18 +95,24 @@ export default function MapControls({
                     onCheckedChange={setShowBusStops}
                 />
            </div>
-           <div className="flex items-center justify-between rounded-lg border p-3">
-                <div className="flex items-center space-x-2">
-                    <Route className="h-5 w-5" />
-                    <Label htmlFor="show-recorded-route" className="cursor-pointer">Recorded Route</Label>
-                </div>
-                <Switch
-                    id="show-recorded-route"
-                    checked={showRecordedRoute}
-                    onCheckedChange={setShowRecordedRoute}
-                    disabled={!isRouteDataAvailable}
-                />
-           </div>
+        </div>
+        <div className="space-y-2">
+            <Label>Recorded Route</Label>
+            <Select 
+                value={selectedRouteId ?? 'none'} 
+                onValueChange={(value) => setSelectedRouteId(value === 'none' ? null : value)}
+                disabled={Object.keys(savedRoutes).length === 0}
+            >
+                <SelectTrigger>
+                    <SelectValue placeholder="Select a route..." />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {Object.entries(savedRoutes).map(([id, { name }]) => (
+                        <SelectItem key={id} value={id}>{name}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
         </div>
       </CardContent>
     </Card>

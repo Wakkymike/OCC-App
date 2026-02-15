@@ -47,7 +47,7 @@ export default function RouteRecorderDialog({
         <DialogHeader>
           <DialogTitle>Route Recorder</DialogTitle>
           <DialogDescription>
-            Record the path of a bus service to visualize and export its route.
+            Record the path of a bus service to visualize its route.
             The recording will begin when a bus on the specified service starts its journey.
           </DialogDescription>
         </DialogHeader>
@@ -75,9 +75,9 @@ export default function RouteRecorderDialog({
           )}
         </div>
         <DialogFooter className="sm:justify-between">
-            <Button variant="outline" onClick={onExport} disabled={isRecording || recordedPointsCount === 0}>
+            <Button variant="outline" onClick={onExport} disabled={isRecording}>
                 <Download className="mr-2 h-4 w-4" />
-                Export GeoJSON ({recordedPointsCount})
+                Export Selected Route
             </Button>
             <div>
                 {isRecording ? (
