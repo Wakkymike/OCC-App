@@ -36,210 +36,6 @@ const ensureArray = (item: any) => {
     return [item];
 };
 
-const processTransXchangeXml = (
-    xmlContent: string, 
-    timetable: any, 
-    routeGeometry: any, 
-    routeMetadata: any, 
-    stats: any,
-    journeyPatternSectionsById: any,
-    stopPointsCoords: Record<string, { lat: number, lng: number }>
-) => {
-    const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '',
-        removeNSPrefix: true,
-        parseNodeValue: true,
-        parseAttributeValue: true,
-        trimValues: true,
-    });
-
-    const data = parser.parse(xmlContent)?.TransXChange;
-    if (!data) return;
-
-    // Aggregate JourneyPatternSections
-    const allSections = ensureArray(data.JourneyPatternSections?.JourneyPatternSection);
-    for (const section of allSections) {
-        if (section.id) {
-            journeyPatternSectionsById[section.id] = section;
-        }
-    }
-
-    // Aggregate StopPoints
-    const stopPoints = ensureArray(data.StopPoints?.StopPoint);
-    for (const sp of stopPoints) {
-        const atcoCode = getText(sp.AtcoCode);
-        const latStr = getText(sp.Place?.Location?.Latitude);
-        const lngStr = getText(sp.Place?.Location?.Longitude);
-        if (atcoCode && latStr && lngStr) {
-             const lat = parseFloat(latStr);
-             const lng = parseFloat(lngStr);
-             if (!isNaN(lat) && !isNaN(lng) && !stopPointsCoords[atcoCode]) { // Avoid overwriting
-                stopPointsCoords[atcoCode] = { lat, lng };
-                stats.stopPoints++;
-             }
-        }
-    }
-
-    // Process Services and VehicleJourneys which depend on the aggregated data
-    const journeyPatterns: any = {};
-    const services = ensureArray(data.Services?.Service);
-    for (const service of services) {
-        const serviceName = getText(service.Lines?.Line?.LineName) ?? 'Unknown';
-        stats.services.add(serviceName);
-
-        const patterns = ensureArray(service.StandardService?.JourneyPattern);
-        for (const pattern of patterns) {
-            if (pattern.id) {
-                journeyPatterns[pattern.id] = pattern;
-            }
-        }
-    }
-
-    const vehicleJourneys = ensureArray(data.VehicleJourneys?.VehicleJourney);
-    stats.vehicleJourneys += vehicleJourneys.length;
-
-    for (const vj of vehicleJourneys) {
-        const journeyRef = getText(vj.VehicleJourneyCode);
-        const departureTimeStr = getText(vj.DepartureTime);
-        const journeyPatternRef = getText(vj.JourneyPatternRef);
-
-        if (!journeyRef || !departureTimeStr || !journeyPatternRef || !journeyPatterns[journeyPatternRef]) {
-            continue;
-        }
-
-        const pattern = journeyPatterns[journeyPatternRef];
-        const departureTime = dateFnsParse(departureTimeStr, 'HH:mm:ss', new Date(0));
-        if (isNaN(departureTime.getTime())) continue;
-
-        let currentTime = departureTime;
-        const stopTimes: { stop: string; time: string }[] = [];
-        
-        let sections: any[] = [];
-         if (pattern.JourneyPatternSectionRefs) {
-            const refs = ensureArray(pattern.JourneyPatternSectionRefs)
-                            .flatMap((ref: any) => ensureArray(ref.JourneyPatternSectionRef))
-                            .map(getText)
-                            .filter(Boolean);
-            sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
-        } else if (pattern.JourneyPatternSection) {
-            sections = ensureArray(pattern.JourneyPatternSection);
-        }
-
-        let isFirstLinkOfJourney = true;
-
-        for (const section of sections) {
-            const timingLinks = ensureArray(section.JourneyPatternTimingLink);
-            for (const link of timingLinks) {
-                const fromStopRef = getText(link.From?.StopPointRef);
-                if (isFirstLinkOfJourney && fromStopRef) {
-                    stopTimes.push({
-                        stop: fromStopRef,
-                        time: currentTime.toTimeString().split(' ')[0],
-                    });
-                    isFirstLinkOfJourney = false;
-                }
-
-                const runTime = parseISO8601Duration(getText(link.RunTime));
-                const arrivalAtTo = add(currentTime, runTime);
-                
-                const toStopRef = getText(link.To?.StopPointRef);
-                if (toStopRef) {
-                    stopTimes.push({
-                        stop: toStopRef,
-                        time: arrivalAtTo.toTimeString().split(' ')[0],
-                    });
-                }
-
-                const waitTime = link.To.WaitTime ? parseISO8601Duration(getText(link.To.WaitTime)) : {};
-                currentTime = add(arrivalAtTo, waitTime);
-            }
-        }
-        timetable[journeyRef] = stopTimes;
-    }
-
-    // This part must run AFTER all files have been processed and stop/section data is aggregated.
-    // So we will call a separate function for this.
-};
-
-const buildRoutesFromAggregatedData = (
-    xmlContent: string,
-    routeGeometry: any,
-    routeMetadata: any,
-    journeyPatternSectionsById: any,
-    stopPointsCoords: Record<string, { lat: number, lng: number }>,
-    stats: any
-) => {
-    const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '',
-        removeNSPrefix: true,
-        parseNodeValue: true,
-        parseAttributeValue: true,
-        trimValues: true,
-    });
-
-    const data = parser.parse(xmlContent)?.TransXChange;
-    if (!data) return;
-
-    const services = ensureArray(data.Services?.Service);
-    for (const service of services) {
-        const serviceName = getText(service.Lines?.Line?.LineName) ?? 'Unknown';
-
-        const patterns = ensureArray(service.StandardService?.JourneyPattern);
-        for (const pattern of patterns) {
-            if (!pattern.id || routeGeometry[pattern.id]) { // if already processed, skip
-                continue;
-            }
-
-            const routePath: {lat: number, lng: number}[] = [];
-            let sections: any[] = [];
-            
-            if (pattern.JourneyPatternSectionRefs) {
-                const refs = ensureArray(pattern.JourneyPatternSectionRefs)
-                                .flatMap((ref: any) => ensureArray(ref.JourneyPatternSectionRef))
-                                .map(getText)
-                                .filter(Boolean);
-                sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
-            } else if (pattern.JourneyPatternSection) {
-                sections = ensureArray(pattern.JourneyPatternSection);
-            }
-
-            if (sections.length === 0) continue; // No sections, no route
-
-            let isFirstLinkOfPattern = true;
-            for (const section of sections) {
-                const timingLinks = ensureArray(section.JourneyPatternTimingLink);
-                for (const link of timingLinks) {
-                    const fromStopRef = getText(link.From?.StopPointRef);
-                    if (isFirstLinkOfPattern && fromStopRef && stopPointsCoords[fromStopRef]) {
-                        routePath.push(stopPointsCoords[fromStopRef]);
-                    }
-                    isFirstLinkOfPattern = false;
-                    
-                    const toStopRef = getText(link.To?.StopPointRef);
-                    if (toStopRef && stopPointsCoords[toStopRef]) {
-                        routePath.push(stopPointsCoords[toStopRef]);
-                    }
-                }
-            }
-
-            if (routePath.length > 1) {
-                routeGeometry[pattern.id] = routePath;
-                routeMetadata[pattern.id] = {
-                    name: `Service ${serviceName}: ${pattern.DestinationDisplay}`,
-                    service: serviceName,
-                    destination: pattern.DestinationDisplay,
-                    direction: pattern.Direction,
-                    id: pattern.id,
-                };
-                stats.journeyPatterns++;
-            }
-        }
-    }
-};
-
-
 export async function POST(req: NextRequest) {
     try {
         const formData = await req.formData();
@@ -252,20 +48,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Invalid file type. Please upload a ZIP or XML file.' }, { status: 400 });
         }
         
-        const timetable: any = {};
-        const routeGeometry: any = {};
-        const routeMetadata: any = {};
-        const journeyPatternSectionsById: any = {};
-        const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
-        
         let filesProcessed = 0;
-        const stats = {
-            stopPoints: 0,
-            services: new Set<string>(),
-            journeyPatterns: 0,
-            vehicleJourneys: 0
-        };
-
         const xmlContents: string[] = [];
 
         if (file.name.toLowerCase().endsWith('.zip')) {
@@ -291,16 +74,183 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'No valid TransXchange XML files found in the upload.' }, { status: 400 });
         }
 
-        // First pass: aggregate all data into shared objects
+        const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '',
+            removeNSPrefix: true,
+            parseNodeValue: true,
+            parseAttributeValue: true,
+            trimValues: true,
+        });
+        
+        // Aggregated data stores
+        const timetable: any = {};
+        const routeGeometry: any = {};
+        const routeMetadata: any = {};
+        const journeyPatternsById: any = {};
+        const journeyPatternSectionsById: any = {};
+        const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
+        const vehicleJourneysList: any[] = [];
+        
+        const stats = {
+            stopPoints: 0,
+            services: new Set<string>(),
+            journeyPatterns: 0,
+            vehicleJourneys: 0
+        };
+
+        // STAGE 1: Aggregate all data from all files into memory
         for (const xmlContent of xmlContents) {
-            processTransXchangeXml(xmlContent, timetable, routeGeometry, routeMetadata, stats, journeyPatternSectionsById, stopPointsCoords);
+            const data = parser.parse(xmlContent)?.TransXChange;
+            if (!data) continue;
+
+            // Aggregate StopPoints
+            const stopPoints = ensureArray(data.StopPoints?.StopPoint);
+            for (const sp of stopPoints) {
+                const atcoCode = getText(sp.AtcoCode);
+                const latStr = getText(sp.Place?.Location?.Latitude);
+                const lngStr = getText(sp.Place?.Location?.Longitude);
+                if (atcoCode && latStr && lngStr) {
+                    const lat = parseFloat(latStr);
+                    const lng = parseFloat(lngStr);
+                    if (!isNaN(lat) && !isNaN(lng) && !stopPointsCoords[atcoCode]) {
+                        stopPointsCoords[atcoCode] = { lat, lng };
+                    }
+                }
+            }
+
+            // Aggregate JourneyPatternSections
+            const sections = ensureArray(data.JourneyPatternSections?.JourneyPatternSection);
+            for (const section of sections) {
+                if (section.id && !journeyPatternSectionsById[section.id]) {
+                    journeyPatternSectionsById[section.id] = section;
+                }
+            }
+            
+            // Aggregate Services and JourneyPatterns
+            const services = ensureArray(data.Services?.Service);
+            for (const service of services) {
+                const serviceName = getText(service.Lines?.Line?.LineName) ?? 'Unknown';
+                stats.services.add(serviceName);
+
+                const patterns = ensureArray(service.StandardService?.JourneyPattern);
+                for (const pattern of patterns) {
+                    if (pattern.id && !journeyPatternsById[pattern.id]) {
+                        pattern.serviceName = serviceName;
+                        journeyPatternsById[pattern.id] = pattern;
+                    }
+                }
+            }
+            
+            // Aggregate VehicleJourneys
+            const vehicleJourneys = ensureArray(data.VehicleJourneys?.VehicleJourney);
+            vehicleJourneysList.push(...vehicleJourneys);
+        }
+        
+        stats.stopPoints = Object.keys(stopPointsCoords).length;
+        stats.vehicleJourneys = vehicleJourneysList.length;
+
+
+        // STAGE 2.1: Process aggregated VehicleJourneys to build Timetable
+        for (const vj of vehicleJourneysList) {
+            const journeyRef = getText(vj.VehicleJourneyCode);
+            const departureTimeStr = getText(vj.DepartureTime);
+            const journeyPatternRef = getText(vj.JourneyPatternRef);
+
+            if (!journeyRef || !departureTimeStr || !journeyPatternRef || !journeyPatternsById[journeyPatternRef]) {
+                continue;
+            }
+
+            const pattern = journeyPatternsById[journeyPatternRef];
+            const departureTime = dateFnsParse(departureTimeStr, 'HH:mm:ss', new Date(0));
+            if (isNaN(departureTime.getTime())) continue;
+
+            let currentTime = departureTime;
+            const stopTimes: { stop: string; time: string }[] = [];
+            
+            let sections: any[] = [];
+            if (pattern.JourneyPatternSectionRefs) {
+                const refs = ensureArray(pattern.JourneyPatternSectionRefs).map(getText).filter(Boolean);
+                sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
+            } else if (pattern.JourneyPatternSection) {
+                sections = ensureArray(pattern.JourneyPatternSection);
+            }
+
+            let isFirstLinkOfJourney = true;
+            for (const section of sections) {
+                const timingLinks = ensureArray(section.JourneyPatternTimingLink);
+                for (const link of timingLinks) {
+                    const fromStopRef = getText(link.From?.StopPointRef);
+                    if (isFirstLinkOfJourney && fromStopRef) {
+                        stopTimes.push({ stop: fromStopRef, time: currentTime.toTimeString().split(' ')[0] });
+                        isFirstLinkOfJourney = false;
+                    }
+
+                    const runTime = parseISO8601Duration(getText(link.RunTime));
+                    const arrivalAtTo = add(currentTime, runTime);
+                    
+                    const toStopRef = getText(link.To?.StopPointRef);
+                    if (toStopRef) {
+                        stopTimes.push({ stop: toStopRef, time: arrivalAtTo.toTimeString().split(' ')[0] });
+                    }
+
+                    const waitTime = link.To?.WaitTime ? parseISO8601Duration(getText(link.To.WaitTime)) : {};
+                    currentTime = add(arrivalAtTo, waitTime);
+                }
+            }
+            timetable[journeyRef] = stopTimes;
         }
 
-        // Second pass: build routes now that all data is aggregated
-        for (const xmlContent of xmlContents) {
-            buildRoutesFromAggregatedData(xmlContent, routeGeometry, routeMetadata, journeyPatternSectionsById, stopPointsCoords, stats);
+
+        // STAGE 2.2: Process aggregated JourneyPatterns to build Routes
+        for (const patternId in journeyPatternsById) {
+            const pattern = journeyPatternsById[patternId];
+            
+            const routePath: {lat: number, lng: number}[] = [];
+            let sections: any[] = [];
+            
+            if (pattern.JourneyPatternSectionRefs) {
+                const refs = ensureArray(pattern.JourneyPatternSectionRefs)
+                    .map(getText)
+                    .filter(Boolean);
+                sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
+            } else if (pattern.JourneyPatternSection) {
+                sections = ensureArray(pattern.JourneyPatternSection);
+            }
+
+            if (sections.length === 0) continue;
+
+            let isFirstLinkOfPattern = true;
+            for (const section of sections) {
+                const timingLinks = ensureArray(section.JourneyPatternTimingLink);
+                for (const link of timingLinks) {
+                    const fromStopRef = getText(link.From?.StopPointRef);
+                    if (isFirstLinkOfPattern && fromStopRef && stopPointsCoords[fromStopRef]) {
+                        routePath.push(stopPointsCoords[fromStopRef]);
+                    }
+                    isFirstLinkOfPattern = false;
+                    
+                    const toStopRef = getText(link.To?.StopPointRef);
+                    if (toStopRef && stopPointsCoords[toStopRef]) {
+                        routePath.push(stopPointsCoords[toStopRef]);
+                    }
+                }
+            }
+
+            if (routePath.length > 1) {
+                routeGeometry[pattern.id] = routePath;
+                routeMetadata[pattern.id] = {
+                    name: `Service ${pattern.serviceName}: ${pattern.DestinationDisplay}`,
+                    service: pattern.serviceName,
+                    destination: pattern.DestinationDisplay,
+                    direction: pattern.Direction,
+                    id: pattern.id,
+                };
+                stats.journeyPatterns++;
+            }
         }
 
+        // STAGE 3: Write processed data to files
         const timetableFilePath = path.join(process.cwd(), 'src', 'lib', 'timetable-data.json');
         await fs.writeFile(timetableFilePath, JSON.stringify(timetable, null, 2));
 
