@@ -36,7 +36,7 @@ const ensureArray = (item: any) => {
     return [item];
 };
 
-const processTransXchangeXml = (xmlContent: string, timetable: any, routeGeometry: any, routeMetadata: any) => {
+const processTransXchangeXml = (xmlContent: string, timetable: any, routeGeometry: any, routeMetadata: any, stats: any) => {
     const parser = new XMLParser({
         ignoreAttributes: false,
         attributeNamePrefix: '',
@@ -71,11 +71,15 @@ const processTransXchangeXml = (xmlContent: string, timetable: any, routeGeometr
              }
         }
     }
+    stats.stopPoints += Object.keys(stopPointsCoords).length;
+
 
     const journeyPatterns: any = {};
     const services = ensureArray(data.Services?.Service);
     for (const service of services) {
         const serviceName = getText(service.Lines?.Line?.LineName) ?? 'Unknown';
+        stats.services.add(serviceName);
+
         const patterns = ensureArray(service.StandardService?.JourneyPattern);
         for (const pattern of patterns) {
             if (pattern.id) {
@@ -126,8 +130,12 @@ const processTransXchangeXml = (xmlContent: string, timetable: any, routeGeometr
             }
         }
     }
+    stats.journeyPatterns += Object.keys(journeyPatterns).length;
+
 
     const vehicleJourneys = ensureArray(data.VehicleJourneys?.VehicleJourney);
+    stats.vehicleJourneys += vehicleJourneys.length;
+
     for (const vj of vehicleJourneys) {
         const journeyRef = getText(vj.VehicleJourneyCode);
         const departureTimeStr = getText(vj.DepartureTime);
@@ -154,7 +162,6 @@ const processTransXchangeXml = (xmlContent: string, timetable: any, routeGeometr
         } else if (pattern.JourneyPatternSection) {
             sections = ensureArray(pattern.JourneyPatternSection);
         }
-
 
         let isFirstLinkOfJourney = true;
 
@@ -205,6 +212,14 @@ export async function POST(req: NextRequest) {
         const routeGeometry: any = {};
         const routeMetadata: any = {};
         let filesProcessed = 0;
+        
+        const stats = {
+            stopPoints: 0,
+            services: new Set<string>(),
+            journeyPatterns: 0,
+            vehicleJourneys: 0
+        };
+
 
         if (file.name.toLowerCase().endsWith('.zip')) {
             const fileBuffer = Buffer.from(await file.arrayBuffer());
@@ -216,12 +231,12 @@ export async function POST(req: NextRequest) {
 
             for (const filename of xmlFiles) {
                 const xmlContent = await zip.files[filename].async('string');
-                processTransXchangeXml(xmlContent, timetable, routeGeometry, routeMetadata);
+                processTransXchangeXml(xmlContent, timetable, routeGeometry, routeMetadata, stats);
                 filesProcessed++;
             }
         } else { // It's an XML file
             const xmlContent = await file.text();
-            processTransXchangeXml(xmlContent, timetable, routeGeometry, routeMetadata);
+            processTransXchangeXml(xmlContent, timetable, routeGeometry, routeMetadata, stats);
             filesProcessed = 1;
         }
 
@@ -239,8 +254,10 @@ export async function POST(req: NextRequest) {
         const routeMetadataFilePath = path.join(process.cwd(), 'src', 'lib', 'route-metadata.json');
         await fs.writeFile(routeMetadataFilePath, JSON.stringify(routeMetadata, null, 2));
 
-        const serviceNames = new Set(Object.values(routeMetadata).map((m: any) => m.service));
-        const message = `Processed ${filesProcessed} file(s). Found ${Object.keys(routeMetadata).length} routes across ${serviceNames.size} services. Please refresh the map page.`;
+        const routesFound = Object.keys(routeMetadata).length;
+        const serviceNames = Array.from(stats.services).slice(0, 5).join(', '); // Show first 5 services
+
+        const message = `Processed ${filesProcessed} file(s). Found: ${stats.services.size} services (${serviceNames}...); ${stats.stopPoints} stop points; ${stats.journeyPatterns} journey patterns; ${stats.vehicleJourneys} vehicle journeys. Successfully constructed ${routesFound} routes.`;
         return NextResponse.json({ message }, { status: 200 });
 
     } catch (error: any) {
