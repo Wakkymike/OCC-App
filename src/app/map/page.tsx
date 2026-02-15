@@ -14,6 +14,7 @@ import MapControls from '@/components/map-controls';
 import { useToast } from '@/hooks/use-toast';
 import RouteRecorderDialog from '@/components/route-recorder';
 import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 
 export default function Page() {
   const { buses, error } = useBusTracker();
@@ -34,7 +35,6 @@ export default function Page() {
   // New state for map layers
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/streets-v12');
   const [show3DBuildings, setShow3DBuildings] = useState(true);
-  const [controlsVisible, setControlsVisible] = useState(false);
   const [showBusStops, setShowBusStops] = useState(true);
   const { toast } = useToast();
 
@@ -329,28 +329,27 @@ export default function Page() {
           {error}
         </p>
       )}
-      <div
-        className="absolute bottom-4 right-4 z-10"
-        onMouseEnter={() => setControlsVisible(true)}
-        onMouseLeave={() => setControlsVisible(false)}
-      >
-        {controlsVisible ? (
-          <MapControls
-            mapStyle={mapStyle}
-            setMapStyle={setMapStyle}
-            show3DBuildings={show3DBuildings}
-            setShow3DBuildings={setShow3DBuildings}
-            showBusStops={showBusStops}
-            setShowBusStops={setShowBusStops}
-            savedRoutes={savedRoutes}
-            selectedRouteId={selectedRouteId}
-            setSelectedRouteId={setSelectedRouteId}
-          />
-        ) : (
-          <Button variant="outline" size="icon" aria-label="Map Layers">
-            <Layers3 className="h-5 w-5" />
-          </Button>
-        )}
+      <div className="absolute bottom-4 right-4 z-10">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="icon" aria-label="Map Layers">
+              <Layers3 className="h-5 w-5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent side="top" align="end" className="w-auto p-0">
+            <MapControls
+              mapStyle={mapStyle}
+              setMapStyle={setMapStyle}
+              show3DBuildings={show3DBuildings}
+              setShow3DBuildings={setShow3DBuildings}
+              showBusStops={showBusStops}
+              setShowBusStops={setShowBusStops}
+              savedRoutes={savedRoutes}
+              selectedRouteId={selectedRouteId}
+              setSelectedRouteId={setSelectedRouteId}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
       <BusMap
         buses={displayBuses}
