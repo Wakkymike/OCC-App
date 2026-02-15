@@ -471,20 +471,27 @@ export default function BusMap({
       else if (bus.direction.toLowerCase() === 'outbound') directionLabel = ` <span style="color:blue">[O]</span>`;
       
       let statusHtml = '';
-      if (bus.status && bus.status !== 'Unknown') {
-        let color = '#333'; // Default text color
-        const lowerCaseStatus = bus.status.toLowerCase();
-
-        if (lowerCaseStatus.includes('late')) {
-          color = '#a94442'; // red
-        } else if (lowerCaseStatus.includes('early')) {
-          color = '#31708f'; // blue
-        } else if (lowerCaseStatus.includes('on time')) {
-          color = '#3c763d'; // green
-        } else if (lowerCaseStatus.includes('cancelled')) {
-          color = '#a94442';
-        }
-        statusHtml = ` | <span style="color:${color}; font-weight: bold;">${bus.status}</span>`;
+      // Prioritize precise delay number
+      if (bus.delay !== undefined && bus.delay !== null) {
+          const delay = Math.round(bus.delay);
+          if (delay > 1) {
+              statusHtml = ` | <span style="color:#a94442; font-weight: bold;">${delay} min late</span>`;
+          } else if (delay < -1) {
+              statusHtml = ` | <span style="color:#31708f; font-weight: bold;">${Math.abs(delay)} min early</span>`;
+          } else {
+              statusHtml = ` | <span style="color:#3c763d; font-weight: bold;">On Time</span>`;
+          }
+      } 
+      // Fallback to general status text if delay number isn't available
+      else if (bus.status && bus.status !== 'Unknown' && bus.status !== 'Normal') {
+          let color = '#333';
+          const lowerCaseStatus = bus.status.toLowerCase();
+          if (lowerCaseStatus.includes('late')) color = '#a94442';
+          else if (lowerCaseStatus.includes('early')) color = '#31708f';
+          else if (lowerCaseStatus.includes('on time')) color = '#3c763d';
+          else if (lowerCaseStatus.includes('cancelled')) color = '#a94442';
+          
+          statusHtml = ` | <span style="color:${color}; font-weight: bold;">${bus.status}</span>`;
       }
 
 
