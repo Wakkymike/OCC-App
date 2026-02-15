@@ -266,10 +266,11 @@ export async function GET() {
           
           // --- Status String Generation ---
           if (delayInMinutes !== undefined) {
-              if (delayInMinutes > 2) {
-                status = `${delayInMinutes} min late`;
-              } else if (delayInMinutes < -2) {
-                status = `${Math.abs(delayInMinutes)} min early`;
+              const delay = Math.round(delayInMinutes);
+              if (delay > 1) {
+                status = `${delay} min late`;
+              } else if (delay < -1) {
+                status = `${Math.abs(delay)} min early`;
               } else {
                 status = 'On Time';
               }
@@ -281,6 +282,8 @@ export async function GET() {
                   status = 'Late';
               } else if (progressStatusText.includes('early')) {
                   status = 'Early';
+              } else if (progressStatusText) {
+                  status = progressStatusText.charAt(0).toUpperCase() + progressStatusText.slice(1);
               }
           }
 

@@ -426,9 +426,6 @@ export default function BusMap({
       const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
       currentMarkerIds.delete(markerId);
       
-      const isSchoolService = bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
-      const isNightBus = bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
-
       let marker = markersRef.current[markerId];
       if (!marker) {
         const el = document.createElement('div');
@@ -468,21 +465,20 @@ export default function BusMap({
       }
       const markerElement = marker.getElement();
       const flagElement = markerElement.querySelector('div') as HTMLDivElement;
+      
       let directionLabel = '';
       if (bus.direction.toLowerCase() === 'inbound') directionLabel = ` <span style="color:blue">[I]</span>`;
       else if (bus.direction.toLowerCase() === 'outbound') directionLabel = ` <span style="color:blue">[O]</span>`;
       
-      const schoolLabel = isSchoolService ? ` <span style="color:red">[SCH]</span>` : '';
-      const nightBusLabel = isNightBus ? ` <span style="color:red">[NIGHT BUS]</span>` : '';
-      
-      const isFirstJourney = bus.journeyRef ? firstJourneyRefs.includes(bus.journeyRef) : false;
-      const isLastJourney = bus.journeyRef ? lastJourneyRefs.includes(bus.journeyRef) : false;
-      let runningBoardHtml = `RB: ${bus.runningBoard}`;
-      if (isFirstJourney || isLastJourney) {
-        runningBoardHtml = `<span class="blinking-rb">${runningBoardHtml}</span>`;
+      let statusHtml = '';
+      if (bus.status && bus.status !== 'Unknown') {
+          let color = '#3c763d'; // On Time
+          if (bus.status.includes('late')) color = '#a94442'; // Late
+          if (bus.status.includes('early')) color = '#31708f'; // Early
+          statusHtml = ` | <span style="color:${color}; font-weight: bold;">${bus.status}</span>`;
       }
-      
-      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel}${schoolLabel}${nightBusLabel} | ${bus.destination} | ${runningBoardHtml}`;
+
+      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel} | ${bus.destination}${statusHtml}`;
       
       const svg = markerElement.querySelector('svg');
       if (svg && bus.bearing !== undefined) svg.style.transform = `rotate(${bus.bearing}deg)`;
@@ -492,14 +488,22 @@ export default function BusMap({
       if (busBody && infoFlag) {
         busBody.setAttribute('fill', isSelected ? '#00FFFF' : '#FFC107');
         if (isSelected) {
+          const isSchoolService = bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
+          const isNightBus = bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
+          const isFirstJourney = bus.journeyRef ? firstJourneyRefs.includes(bus.journeyRef) : false;
+          const isLastJourney = bus.journeyRef ? lastJourneyRefs.includes(bus.journeyRef) : false;
+          let runningBoardHtml = `RB: ${bus.runningBoard}`;
+          if (isFirstJourney || isLastJourney) {
+            runningBoardHtml = `<span class="blinking-rb">${runningBoardHtml}</span>`;
+          }
+          
           const schoolInfo = isSchoolService ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[SCHOOL SERVICE]</div>` : '';
           const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
-          
           const journeyInfo = bus.journeyRef ? `<div><div style="font-weight: bold; color: green;">Journey Number</div><div>${bus.journeyRef}</div></div>` : '';
+          const runningBoardInfo = bus.runningBoard ? `<div style="margin-top: 4px;"><div style="font-weight: bold;">Running Board</div><div>${runningBoardHtml}</div></div>` : '';
+          const statusDisplay = bus.status && bus.status !== 'Unknown' ? `<div style="font-weight: bold; margin-bottom: 4px;">${bus.status}</div>` : '';
 
-          const statusDisplay = bus.status && bus.status !== 'Unknown' ? `<div style="margin-top: 4px;">${bus.status}</div>` : '';
-
-          infoFlag.innerHTML = `${schoolInfo}${nightBusInfo}${journeyInfo}${statusDisplay}`;
+          infoFlag.innerHTML = `${statusDisplay}${schoolInfo}${nightBusInfo}${journeyInfo}${runningBoardInfo}`;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';
