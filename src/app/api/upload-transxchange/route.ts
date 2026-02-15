@@ -137,6 +137,7 @@ export async function POST(req: NextRequest) {
                 for (const pattern of patterns) {
                     if (pattern.id && !journeyPatternsById[pattern.id]) {
                         pattern.serviceName = serviceName;
+                        pattern.DestinationDisplay = getText(pattern.DestinationDisplay)
                         journeyPatternsById[pattern.id] = pattern;
                     }
                 }
@@ -171,7 +172,8 @@ export async function POST(req: NextRequest) {
             let sections: any[] = [];
             // Robustly find section references
             if (pattern.JourneyPatternSectionRefs?.JourneyPatternSectionRef) {
-                const refs = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
+                const refsRaw = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
+                const refs = refsRaw.map(r => getText(r)).filter(Boolean) as string[];
                 sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
             } 
             // Fallback for inline sections if no refs are found
@@ -217,7 +219,8 @@ export async function POST(req: NextRequest) {
             
             // Robustly find section references
             if (pattern.JourneyPatternSectionRefs?.JourneyPatternSectionRef) {
-                const refs = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
+                const refsRaw = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
+                const refs = refsRaw.map(r => getText(r)).filter(Boolean) as string[];
                 sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
             }
             // Fallback for inline sections
@@ -227,19 +230,25 @@ export async function POST(req: NextRequest) {
 
             if (sections.length === 0) continue;
 
-            let isFirstLinkOfPattern = true;
+            let isFirstLinkInEntirePattern = true;
             for (const section of sections) {
                 const timingLinks = ensureArray(section.JourneyPatternTimingLink);
                 for (const link of timingLinks) {
                     const fromStopRef = getText(link.From?.StopPointRef);
-                    if (isFirstLinkOfPattern && fromStopRef && stopPointsCoords[fromStopRef]) {
-                        routePath.push(stopPointsCoords[fromStopRef]);
-                    }
-                    isFirstLinkOfPattern = false;
-                    
                     const toStopRef = getText(link.To?.StopPointRef);
-                    if (toStopRef && stopPointsCoords[toStopRef]) {
-                        routePath.push(stopPointsCoords[toStopRef]);
+                    const fromCoords = fromStopRef ? stopPointsCoords[fromStopRef] : undefined;
+                    const toCoords = toStopRef ? stopPointsCoords[toStopRef] : undefined;
+
+                    if (isFirstLinkInEntirePattern && fromCoords) {
+                        routePath.push(fromCoords);
+                        isFirstLinkInEntirePattern = false;
+                    }
+
+                    if (toCoords) {
+                        const lastPoint = routePath.length > 0 ? routePath[routePath.length - 1] : null;
+                        if (!lastPoint || lastPoint.lat !== toCoords.lat || lastPoint.lng !== toCoords.lng) {
+                           routePath.push(toCoords);
+                        }
                     }
                 }
             }
@@ -250,7 +259,7 @@ export async function POST(req: NextRequest) {
                     name: `Service ${pattern.serviceName}: ${pattern.DestinationDisplay}`,
                     service: pattern.serviceName,
                     destination: pattern.DestinationDisplay,
-                    direction: pattern.Direction,
+                    direction: getText(pattern.Direction),
                     id: pattern.id,
                 };
             }
