@@ -341,8 +341,10 @@ export async function POST(req: NextRequest) {
                 analysis: "Stop points were found, but route construction failed. This is likely because the structure of the `JourneyPatternSection` and its `StopPointRef` is not what the system expects.",
                 sample_journey_pattern: patternSample,
             };
-        } else if (stats.stopPoints === 0 && stopPointsProcessed > 0) {
-            debugSample = { stop_point_sample: firstFailingStopPoint };
+        } else if (firstFailingStopPoint) {
+             if (!message.includes('--- ANALYSIS ---')) message += `\n--- ANALYSIS ---\n`;
+             message += `The system failed to parse all stop points, which may be why some routes are missing.\n`;
+             debugSample = { ...debugSample, stop_point_sample: firstFailingStopPoint };
         } else if (stats.stopPoints === 0 && stopPointsSampleForDebug) {
              debugSample = { raw_stop_points_structure: stopPointsSampleForDebug };
         } else if (routesFound > 0) {
