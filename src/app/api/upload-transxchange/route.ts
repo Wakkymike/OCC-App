@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
         
         let firstFailingStopPoint: any = null;
         let stopPointsProcessed = 0;
+        let stopPointsSampleForDebug: any = null;
 
         const stats = {
             stopPoints: 0,
@@ -107,7 +108,11 @@ export async function POST(req: NextRequest) {
             const data = parser.parse(xmlContent)?.TransXChange;
             if (!data) continue;
 
-            // Aggregate StopPoints - Check for both &lt;StopPoints&gt; and &lt;Stops&gt;
+            if (!stopPointsSampleForDebug && (data.StopPoints || data.Stops)) {
+                stopPointsSampleForDebug = data.StopPoints || data.Stops;
+            }
+
+            // Aggregate StopPoints - Check for both <StopPoints> and <Stops>
             const stopPointsRaw = data.StopPoints?.StopPoint ?? data.Stops?.StopPoint;
             const stopPoints = ensureArray(stopPointsRaw);
             for (const sp of stopPoints) {
@@ -315,9 +320,16 @@ export async function POST(req: NextRequest) {
             message += `\nNo routes or services were found. The files may be empty or in an unsupported format.`;
         }
 
-        const debugSample = (stats.stopPoints === 0 && stopPointsProcessed > 0) ? firstFailingStopPoint : null;
+        let debugSample: any = null;
+        if (stats.stopPoints === 0 && stopPointsProcessed > 0) {
+            debugSample = { stop_point_sample: firstFailingStopPoint };
+        } else if (stats.stopPoints === 0 && stopPointsSampleForDebug) {
+            debugSample = {
+                raw_stop_points_structure: stopPointsSampleForDebug
+            };
+        }
 
-        return NextResponse.json({ message, debug_info: { stop_point_sample: debugSample } }, { status: 200 });
+        return NextResponse.json({ message, debug_info: debugSample }, { status: 200 });
 
     } catch (error: any) {
         console.error('TransXchange upload error:', error);

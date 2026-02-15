@@ -65,7 +65,12 @@ export default function AdminPage() {
           reportContent += `\n\n--- DEBUG INFO ---\n`;
           reportContent += `This is a sample of the first StopPoint object that could not be parsed:\n\n`;
           reportContent += JSON.stringify(result.debug_info.stop_point_sample, null, 2);
+      } else if (result.debug_info?.raw_stop_points_structure) {
+          reportContent += `\n\n--- DEBUG INFO ---\n`;
+          reportContent += `The system found a <StopPoints> or <Stops> block, but failed to extract individual stops from it. This is likely the root cause. Here is a sample of that raw data structure:\n\n`;
+          reportContent += JSON.stringify(result.debug_info.raw_stop_points_structure, null, 2);
       }
+
 
       const description = (
           <div className="mt-4 w-full text-left">
