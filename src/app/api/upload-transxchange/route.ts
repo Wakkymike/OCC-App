@@ -5,8 +5,21 @@ import fs from 'fs/promises';
 import path from 'path';
 import { add, parse as dateFnsParse, Duration } from 'date-fns';
 
+// Helper to safely extract a text value from a field which might be a string or an object with a #text property.
+const getText = (field: any): string | undefined => {
+    if (field === undefined || field === null) return undefined;
+    if (typeof field === 'object' && '#text' in field) {
+        return field['#text'];
+    }
+    if (typeof field === 'string' || typeof field === 'number' || typeof field === 'boolean') {
+        return String(field);
+    }
+    return undefined;
+};
+
+
 // Helper to parse ISO 8601 duration strings (e.g., "PT1M30S")
-const parseISO8601Duration = (duration: string): Duration => {
+const parseISO8601Duration = (duration: string | undefined): Duration => {
     if (!duration || !duration.startsWith('PT')) return {};
     const matches = duration.match(/(\d+H)?(\d+M)?(\d+S)?/);
     if (!matches) return {};
@@ -69,30 +82,37 @@ export async function POST(req: NextRequest) {
                 const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
                 const stopPoints = ensureArray(data.StopPoints?.StopPoint);
                 for (const sp of stopPoints) {
-                    if (sp.AtcoCode && sp.Place?.Location?.Latitude && sp.Place?.Location?.Longitude) {
-                        stopPointsCoords[sp.AtcoCode] = {
-                            lat: parseFloat(sp.Place.Location.Latitude),
-                            lng: parseFloat(sp.Place.Location.Longitude),
-                        };
+                    const atcoCode = getText(sp.AtcoCode);
+                    const latStr = getText(sp.Place?.Location?.Latitude);
+                    const lngStr = getText(sp.Place?.Location?.Longitude);
+                    if (atcoCode && latStr && lngStr) {
+                         const lat = parseFloat(latStr);
+                         const lng = parseFloat(lngStr);
+                         if (!isNaN(lat) && !isNaN(lng)) {
+                            stopPointsCoords[atcoCode] = { lat, lng };
+                         }
                     }
                 }
 
                 const journeyPatterns: any = {};
                 const services = ensureArray(data.Services?.Service);
                 for (const service of services) {
-                    const serviceName = service.Lines?.Line?.LineName ?? 'Unknown';
+                    const serviceName = getText(service.Lines?.Line?.LineName) ?? 'Unknown';
                     const patterns = ensureArray(service.StandardService?.JourneyPattern);
                     for (const pattern of patterns) {
                         if (pattern.id) {
                             journeyPatterns[pattern.id] = pattern;
                             
                             const routePath: {lat: number, lng: number}[] = [];
-
+                            
                             const sectionRefs = ensureArray(pattern.JourneyPatternSectionRefs);
                             let sections = ensureArray(pattern.JourneyPatternSection);
 
                             if (sectionRefs.length > 0) {
-                                sections = sectionRefs.map((ref: any) => journeyPatternSectionsById[ref]).filter(Boolean);
+                                sections = sectionRefs.map((ref: any) => {
+                                    const refId = getText(ref);
+                                    return journeyPatternSectionsById[refId as string];
+                                }).filter(Boolean);
                             }
                             
                             let isFirstLinkOfPattern = true;
@@ -100,13 +120,13 @@ export async function POST(req: NextRequest) {
                             for (const section of sections) {
                                 const timingLinks = ensureArray(section.JourneyPatternTimingLink);
                                 for (const link of timingLinks) {
-                                    const fromStopRef = link.From?.StopPointRef;
+                                    const fromStopRef = getText(link.From?.StopPointRef);
                                     if (isFirstLinkOfPattern && fromStopRef && stopPointsCoords[fromStopRef]) {
                                         routePath.push(stopPointsCoords[fromStopRef]);
                                     }
                                     isFirstLinkOfPattern = false;
                                     
-                                    const toStopRef = link.To?.StopPointRef;
+                                    const toStopRef = getText(link.To?.StopPointRef);
                                     if (toStopRef && stopPointsCoords[toStopRef]) {
                                         routePath.push(stopPointsCoords[toStopRef]);
                                     }
@@ -128,9 +148,9 @@ export async function POST(req: NextRequest) {
 
                 const vehicleJourneys = ensureArray(data.VehicleJourneys?.VehicleJourney);
                 for (const vj of vehicleJourneys) {
-                    const journeyRef = vj.VehicleJourneyCode;
-                    const departureTimeStr = vj.DepartureTime;
-                    const journeyPatternRef = vj.JourneyPatternRef;
+                    const journeyRef = getText(vj.VehicleJourneyCode);
+                    const departureTimeStr = getText(vj.DepartureTime);
+                    const journeyPatternRef = getText(vj.JourneyPatternRef);
 
                     if (!journeyRef || !departureTimeStr || !journeyPatternRef || !journeyPatterns[journeyPatternRef]) {
                         continue;
@@ -147,7 +167,10 @@ export async function POST(req: NextRequest) {
                     let sections = ensureArray(pattern.JourneyPatternSection);
 
                     if (sectionRefs.length > 0) {
-                        sections = sectionRefs.map((ref: any) => journeyPatternSectionsById[ref]).filter(Boolean);
+                         sections = sectionRefs.map((ref: any) => {
+                            const refId = getText(ref);
+                            return journeyPatternSectionsById[refId as string];
+                        }).filter(Boolean);
                     }
 
                     let isFirstLinkOfJourney = true;
@@ -155,22 +178,27 @@ export async function POST(req: NextRequest) {
                     for (const section of sections) {
                         const timingLinks = ensureArray(section.JourneyPatternTimingLink);
                         for (const link of timingLinks) {
-                            if (isFirstLinkOfJourney) {
+                            const fromStopRef = getText(link.From?.StopPointRef);
+                            if (isFirstLinkOfJourney && fromStopRef) {
                                 stopTimes.push({
-                                    stop: link.From.StopPointRef,
+                                    stop: fromStopRef,
                                     time: currentTime.toTimeString().split(' ')[0],
                                 });
                                 isFirstLinkOfJourney = false;
                             }
 
-                            const runTime = parseISO8601Duration(link.RunTime);
+                            const runTime = parseISO8601Duration(getText(link.RunTime));
                             const arrivalAtTo = add(currentTime, runTime);
-                            stopTimes.push({
-                                stop: link.To.StopPointRef,
-                                time: arrivalAtTo.toTimeString().split(' ')[0],
-                            });
+                            
+                            const toStopRef = getText(link.To?.StopPointRef);
+                            if (toStopRef) {
+                                stopTimes.push({
+                                    stop: toStopRef,
+                                    time: arrivalAtTo.toTimeString().split(' ')[0],
+                                });
+                            }
 
-                            const waitTime = link.To.WaitTime ? parseISO8601Duration(link.To.WaitTime) : {};
+                            const waitTime = link.To.WaitTime ? parseISO8601Duration(getText(link.To.WaitTime)) : {};
                             currentTime = add(arrivalAtTo, waitTime);
                         }
                     }
