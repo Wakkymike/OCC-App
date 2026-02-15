@@ -118,7 +118,7 @@ export default function TimetablesPage() {
                                     <AccordionContent>
                                     <Accordion type="single" collapsible className="w-full pl-4">
                                         {service.journeys.map((journey) => (
-                                        <AccordionItem value={journey.journeyRef} key={journey.journeyRef}>
+                                        <AccordionItem value={`${journey.journeyRef}-${journey.departureTime}`} key={`${journey.journeyRef}-${journey.departureTime}`}>
                                             <AccordionTrigger>
                                             {journey.departureTime.slice(0, 5)} to {journey.destination}
                                             </AccordionTrigger>
