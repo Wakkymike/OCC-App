@@ -26,13 +26,11 @@ export async function GET(request: NextRequest) {
     try {
         const metadataPath = path.join(process.cwd(), 'src', 'lib', 'route-metadata.json');
         const geometryPath = path.join(process.cwd(), 'src', 'lib', 'route-geometry.json');
-        const preRecordedPath = path.join(process.cwd(), 'src', 'lib', 'pre-recorded-routes.json');
 
         // Fetch all data in parallel
-        const [metadata, geometry, preRecordedRoutes] = await Promise.all([
+        const [metadata, geometry] = await Promise.all([
             readJsonFile(metadataPath),
             readJsonFile(geometryPath),
-            readJsonFile(preRecordedPath),
         ]);
         
         const txcRoutes: Record<string, { name: string; route: any[]; busId: string | null }> = {};
@@ -47,15 +45,8 @@ export async function GET(request: NextRequest) {
                 };
             }
         }
-
-        // Combine pre-recorded routes with TXC routes
-        // Pre-recorded routes will be overwritten by TXC routes if they share an ID.
-        const combinedRoutes = {
-            ...preRecordedRoutes,
-            ...txcRoutes,
-        };
         
-        return NextResponse.json({ txcRoutes: combinedRoutes });
+        return NextResponse.json({ txcRoutes: txcRoutes });
 
     } catch (error) {
         console.error('Error in /api/routes:', error);
