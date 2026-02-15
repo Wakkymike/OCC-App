@@ -279,7 +279,23 @@ export async function POST(req: NextRequest) {
         const timetablesFound = Object.keys(timetable).length;
         const serviceNames = Array.from(stats.services).slice(0, 5).join(', ');
 
-        const message = `Processed ${filesProcessed} file(s). Found ${stats.services.size} services (${serviceNames}...). Constructed ${routesFound} routes from ${stats.journeyPatterns} patterns. Timetable created for ${timetablesFound} journeys.`;
+        let message = `Processed ${filesProcessed} file(s).\n\n`;
+        message += `SERVICES: Found ${stats.services.size} services (e.g., ${serviceNames}...).\n`;
+        message += `TIMETABLES: Created timetable data for ${timetablesFound} unique journeys.\n`;
+        message += `ROUTES: Successfully constructed ${routesFound} routes from ${stats.journeyPatterns} patterns.\n`;
+
+        if (routesFound === 0 && stats.journeyPatterns > 0) {
+            message += `\n--- DEBUGGING INFO ---\n`;
+            message += `The system found ${stats.journeyPatterns} journey patterns but failed to construct any routes. This usually means the link between route sections and stop coordinates is broken.\n`;
+            message += `- Stop Points with coordinates found: ${stats.stopPoints}\n`;
+            message += `- Journey Pattern Sections found: ${Object.keys(journeyPatternSectionsById).length}\n`;
+            message += `Please verify that the StopPointRefs in your JourneyPatternSections correspond to AtcoCodes in your StopPoints, and that JourneyPatternSectionRefs in your JourneyPatterns are valid.`;
+        } else if (routesFound > 0) {
+            message += `\nUpload successful. You can now select these routes on the map page.`;
+        } else {
+            message += `\nNo routes or services were found. The files may be empty or in an unsupported format.`;
+        }
+
         return NextResponse.json({ message }, { status: 200 });
 
     } catch (error: any) {

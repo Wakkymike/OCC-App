@@ -61,8 +61,13 @@ export default function AdminPage() {
       }
 
       toast({
-        title: 'Upload Successful',
-        description: `${result.message}`,
+        title: 'Upload Report',
+        description: (
+            <pre className="mt-2 w-full rounded-md bg-slate-950 p-4 text-white text-xs whitespace-pre-wrap">
+                {result.message}
+            </pre>
+        ),
+        duration: 30000, // Give user more time to read
       });
     } catch (error: any) {
       toast({
