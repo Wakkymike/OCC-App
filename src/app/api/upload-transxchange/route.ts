@@ -50,6 +50,14 @@ export async function POST(req: NextRequest) {
                 const data = parser.parse(xmlContent)?.TransXChange;
                 if (!data) continue;
                 filesProcessed++;
+                
+                const journeyPatternSectionsById: any = {};
+                const allSections = ensureArray(data.JourneyPatternSections?.JourneyPatternSection);
+                for (const section of allSections) {
+                    if (section.id) {
+                        journeyPatternSectionsById[section.id] = section;
+                    }
+                }
 
                 const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
                 const stopPoints = ensureArray(data.StopPoints?.StopPoint);
@@ -72,7 +80,14 @@ export async function POST(req: NextRequest) {
                             journeyPatterns[pattern.id] = pattern;
                             
                             const routePath: {lat: number, lng: number}[] = [];
-                            const sections = ensureArray(pattern.JourneyPatternSection);
+
+                            const sectionRefs = ensureArray(pattern.JourneyPatternSectionRefs);
+                            let sections = ensureArray(pattern.JourneyPatternSection);
+
+                            if (sectionRefs.length > 0) {
+                                sections = sectionRefs.map((ref: any) => journeyPatternSectionsById[ref]).filter(Boolean);
+                            }
+                            
                             let isFirstLinkOfPattern = true;
 
                             for (const section of sections) {
@@ -120,7 +135,13 @@ export async function POST(req: NextRequest) {
 
                     let currentTime = departureTime;
                     const stopTimes: { stop: string; time: string }[] = [];
-                    const sections = ensureArray(pattern.JourneyPatternSection);
+                    
+                    const sectionRefs = ensureArray(pattern.JourneyPatternSectionRefs);
+                    let sections = ensureArray(pattern.JourneyPatternSection);
+
+                    if (sectionRefs.length > 0) {
+                        sections = sectionRefs.map((ref: any) => journeyPatternSectionsById[ref]).filter(Boolean);
+                    }
 
                     let isFirstLinkOfJourney = true;
 
