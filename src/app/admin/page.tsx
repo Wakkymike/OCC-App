@@ -60,28 +60,31 @@ export default function AdminPage() {
         throw new Error(result.error || 'An unknown error occurred.');
       }
 
+      let reportContent = result.message;
+      if (result.debug_info?.stop_point_sample) {
+          reportContent += `\n\n--- DEBUG INFO ---\n`;
+          reportContent += `This is a sample of the first StopPoint object that could not be parsed:\n\n`;
+          reportContent += JSON.stringify(result.debug_info.stop_point_sample, null, 2);
+      }
+
       const description = (
-          <div className="text-left">
-              <pre className="mt-2 w-full rounded-md bg-slate-950 p-4 text-white text-xs whitespace-pre-wrap">
-                  {result.message}
-              </pre>
-              {result.debug_info?.stop_point_sample && (
-                  <div className="mt-4">
-                      <p className="font-semibold text-amber-500">
-                          To help debug, here is the first StopPoint object the system failed to parse:
-                      </p>
-                      <pre className="mt-2 w-full rounded-md bg-slate-800 p-4 text-white text-xs whitespace-pre-wrap">
-                          {JSON.stringify(result.debug_info.stop_point_sample, null, 2)}
-                      </pre>
-                  </div>
-              )}
+          <div className="mt-4 w-full text-left">
+              <Label htmlFor="upload-report">Full Report (click to select all)</Label>
+              <textarea
+                  id="upload-report"
+                  readOnly
+                  rows={20}
+                  className="mt-1 w-full rounded-md border border-input bg-slate-950 p-3 font-mono text-xs text-white"
+                  value={reportContent}
+                  onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+              />
           </div>
       );
 
       toast({
           title: 'Upload Report',
           description: description,
-          duration: 60000,
+          duration: 300000, // 5 minutes
       });
     } catch (error: any) {
       toast({
