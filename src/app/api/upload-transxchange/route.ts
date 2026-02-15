@@ -105,18 +105,17 @@ export async function POST(req: NextRequest) {
                             
                             const routePath: {lat: number, lng: number}[] = [];
                             
-                            const sectionRefsNode = pattern.JourneyPatternSectionRefs;
-                            const sectionRefs = sectionRefsNode?.JourneyPatternSectionRef ? ensureArray(sectionRefsNode.JourneyPatternSectionRef) : ensureArray(sectionRefsNode);
-
                             let sections = ensureArray(pattern.JourneyPatternSection);
 
-                            if (sectionRefs.length > 0) {
+                            // If no inline sections, try resolving from references
+                            if (sections.length === 0 && pattern.JourneyPatternSectionRefs) {
+                                const sectionRefs = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
                                 sections = sectionRefs.map((ref: any) => {
                                     const refId = getText(ref);
                                     return journeyPatternSectionsById[refId as string];
                                 }).filter(Boolean);
                             }
-                            
+
                             let isFirstLinkOfPattern = true;
 
                             for (const section of sections) {
@@ -165,12 +164,11 @@ export async function POST(req: NextRequest) {
                     let currentTime = departureTime;
                     const stopTimes: { stop: string; time: string }[] = [];
                     
-                    const sectionRefsNode = pattern.JourneyPatternSectionRefs;
-                    const sectionRefs = sectionRefsNode?.JourneyPatternSectionRef ? ensureArray(sectionRefsNode.JourneyPatternSectionRef) : ensureArray(sectionRefsNode);
-                    
                     let sections = ensureArray(pattern.JourneyPatternSection);
 
-                    if (sectionRefs.length > 0) {
+                    // If no inline sections, try resolving from references
+                    if (sections.length === 0 && pattern.JourneyPatternSectionRefs) {
+                         const sectionRefs = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
                          sections = sectionRefs.map((ref: any) => {
                             const refId = getText(ref);
                             return journeyPatternSectionsById[refId as string];
