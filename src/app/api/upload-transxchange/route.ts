@@ -36,6 +36,159 @@ const ensureArray = (item: any) => {
     return [item];
 };
 
+const processTransXchangeXml = (xmlContent: string, timetable: any, routeGeometry: any, routeMetadata: any) => {
+    const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '',
+        removeNSPrefix: true,
+        parseNodeValue: true,
+        parseAttributeValue: true,
+        trimValues: true,
+    });
+
+    const data = parser.parse(xmlContent)?.TransXChange;
+    if (!data) return;
+
+    const journeyPatternSectionsById: any = {};
+    const allSections = ensureArray(data.JourneyPatternSections?.JourneyPatternSection);
+    for (const section of allSections) {
+        if (section.id) {
+            journeyPatternSectionsById[section.id] = section;
+        }
+    }
+
+    const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
+    const stopPoints = ensureArray(data.StopPoints?.StopPoint);
+    for (const sp of stopPoints) {
+        const atcoCode = getText(sp.AtcoCode);
+        const latStr = getText(sp.Place?.Location?.Latitude);
+        const lngStr = getText(sp.Place?.Location?.Longitude);
+        if (atcoCode && latStr && lngStr) {
+             const lat = parseFloat(latStr);
+             const lng = parseFloat(lngStr);
+             if (!isNaN(lat) && !isNaN(lng)) {
+                stopPointsCoords[atcoCode] = { lat, lng };
+             }
+        }
+    }
+
+    const journeyPatterns: any = {};
+    const services = ensureArray(data.Services?.Service);
+    for (const service of services) {
+        const serviceName = getText(service.Lines?.Line?.LineName) ?? 'Unknown';
+        const patterns = ensureArray(service.StandardService?.JourneyPattern);
+        for (const pattern of patterns) {
+            if (pattern.id) {
+                journeyPatterns[pattern.id] = pattern;
+                
+                const routePath: {lat: number, lng: number}[] = [];
+                
+                let sections: any[] = [];
+                
+                if (pattern.JourneyPatternSectionRefs) {
+                    const refs = ensureArray(pattern.JourneyPatternSectionRefs)
+                                    .flatMap((ref: any) => ensureArray(ref.JourneyPatternSectionRef))
+                                    .map(getText)
+                                    .filter(Boolean);
+                    sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
+                } else if (pattern.JourneyPatternSection) {
+                    sections = ensureArray(pattern.JourneyPatternSection);
+                }
+
+
+                let isFirstLinkOfPattern = true;
+
+                for (const section of sections) {
+                    const timingLinks = ensureArray(section.JourneyPatternTimingLink);
+                    for (const link of timingLinks) {
+                        const fromStopRef = getText(link.From?.StopPointRef);
+                        if (isFirstLinkOfPattern && fromStopRef && stopPointsCoords[fromStopRef]) {
+                            routePath.push(stopPointsCoords[fromStopRef]);
+                        }
+                        isFirstLinkOfPattern = false;
+                        
+                        const toStopRef = getText(link.To?.StopPointRef);
+                        if (toStopRef && stopPointsCoords[toStopRef]) {
+                            routePath.push(stopPointsCoords[toStopRef]);
+                        }
+                    }
+                }
+                if (routePath.length > 1) {
+                    routeGeometry[pattern.id] = routePath;
+                    routeMetadata[pattern.id] = {
+                        name: `Service ${serviceName}: ${pattern.DestinationDisplay}`,
+                        service: serviceName,
+                        destination: pattern.DestinationDisplay,
+                        direction: pattern.Direction,
+                        id: pattern.id,
+                    };
+                }
+            }
+        }
+    }
+
+    const vehicleJourneys = ensureArray(data.VehicleJourneys?.VehicleJourney);
+    for (const vj of vehicleJourneys) {
+        const journeyRef = getText(vj.VehicleJourneyCode);
+        const departureTimeStr = getText(vj.DepartureTime);
+        const journeyPatternRef = getText(vj.JourneyPatternRef);
+
+        if (!journeyRef || !departureTimeStr || !journeyPatternRef || !journeyPatterns[journeyPatternRef]) {
+            continue;
+        }
+
+        const pattern = journeyPatterns[journeyPatternRef];
+        const departureTime = dateFnsParse(departureTimeStr, 'HH:mm:ss', new Date(0));
+        if (isNaN(departureTime.getTime())) continue;
+
+        let currentTime = departureTime;
+        const stopTimes: { stop: string; time: string }[] = [];
+        
+        let sections: any[] = [];
+         if (pattern.JourneyPatternSectionRefs) {
+            const refs = ensureArray(pattern.JourneyPatternSectionRefs)
+                            .flatMap((ref: any) => ensureArray(ref.JourneyPatternSectionRef))
+                            .map(getText)
+                            .filter(Boolean);
+            sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
+        } else if (pattern.JourneyPatternSection) {
+            sections = ensureArray(pattern.JourneyPatternSection);
+        }
+
+
+        let isFirstLinkOfJourney = true;
+
+        for (const section of sections) {
+            const timingLinks = ensureArray(section.JourneyPatternTimingLink);
+            for (const link of timingLinks) {
+                const fromStopRef = getText(link.From?.StopPointRef);
+                if (isFirstLinkOfJourney && fromStopRef) {
+                    stopTimes.push({
+                        stop: fromStopRef,
+                        time: currentTime.toTimeString().split(' ')[0],
+                    });
+                    isFirstLinkOfJourney = false;
+                }
+
+                const runTime = parseISO8601Duration(getText(link.RunTime));
+                const arrivalAtTo = add(currentTime, runTime);
+                
+                const toStopRef = getText(link.To?.StopPointRef);
+                if (toStopRef) {
+                    stopTimes.push({
+                        stop: toStopRef,
+                        time: arrivalAtTo.toTimeString().split(' ')[0],
+                    });
+                }
+
+                const waitTime = link.To.WaitTime ? parseISO8601Duration(getText(link.To.WaitTime)) : {};
+                currentTime = add(arrivalAtTo, waitTime);
+            }
+        }
+        timetable[journeyRef] = stopTimes;
+    }
+};
+
 export async function POST(req: NextRequest) {
     try {
         const formData = await req.formData();
@@ -44,191 +197,37 @@ export async function POST(req: NextRequest) {
         if (!file) {
             return NextResponse.json({ error: 'No file uploaded.' }, { status: 400 });
         }
-        if (!file.name.endsWith('.zip')) {
-            return NextResponse.json({ error: 'Invalid file type. Please upload a ZIP file.' }, { status: 400 });
+        if (!file.name.toLowerCase().endsWith('.zip') && !file.name.toLowerCase().endsWith('.xml')) {
+            return NextResponse.json({ error: 'Invalid file type. Please upload a ZIP or XML file.' }, { status: 400 });
         }
-
-        const fileBuffer = Buffer.from(await file.arrayBuffer());
-        const zip = await jszip.loadAsync(fileBuffer);
-        const parser = new XMLParser({ 
-            ignoreAttributes: false, 
-            attributeNamePrefix: '', 
-            removeNSPrefix: true,
-            parseNodeValue: true, 
-            parseAttributeValue: true,
-            trimValues: true,
-        });
 
         const timetable: any = {};
         const routeGeometry: any = {};
         const routeMetadata: any = {};
         let filesProcessed = 0;
 
-        for (const filename in zip.files) {
-            if (filename.toLowerCase().endsWith('.xml')) {
+        if (file.name.toLowerCase().endsWith('.zip')) {
+            const fileBuffer = Buffer.from(await file.arrayBuffer());
+            const zip = await jszip.loadAsync(fileBuffer);
+            
+            const xmlFiles = Object.keys(zip.files).filter(filename => 
+                filename.toLowerCase().endsWith('.xml') && !zip.files[filename].dir
+            );
+
+            for (const filename of xmlFiles) {
                 const xmlContent = await zip.files[filename].async('string');
-                const data = parser.parse(xmlContent)?.TransXChange;
-                if (!data) continue;
+                processTransXchangeXml(xmlContent, timetable, routeGeometry, routeMetadata);
                 filesProcessed++;
-                
-                const journeyPatternSectionsById: any = {};
-                const allSections = ensureArray(data.JourneyPatternSections?.JourneyPatternSection);
-                for (const section of allSections) {
-                    if (section.id) {
-                        journeyPatternSectionsById[section.id] = section;
-                    }
-                }
-
-                const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
-                const stopPoints = ensureArray(data.StopPoints?.StopPoint);
-                for (const sp of stopPoints) {
-                    const atcoCode = getText(sp.AtcoCode);
-                    const latStr = getText(sp.Place?.Location?.Latitude);
-                    const lngStr = getText(sp.Place?.Location?.Longitude);
-                    if (atcoCode && latStr && lngStr) {
-                         const lat = parseFloat(latStr);
-                         const lng = parseFloat(lngStr);
-                         if (!isNaN(lat) && !isNaN(lng)) {
-                            stopPointsCoords[atcoCode] = { lat, lng };
-                         }
-                    }
-                }
-
-                const journeyPatterns: any = {};
-                const services = ensureArray(data.Services?.Service);
-                for (const service of services) {
-                    const serviceName = getText(service.Lines?.Line?.LineName) ?? 'Unknown';
-                    const patterns = ensureArray(service.StandardService?.JourneyPattern);
-                    for (const pattern of patterns) {
-                        if (pattern.id) {
-                            journeyPatterns[pattern.id] = pattern;
-                            
-                            const routePath: {lat: number, lng: number}[] = [];
-                            
-                            let sections: any[] = [];
-
-                            // Per schema, a JourneyPattern contains a choice between inline sections or references.
-                            if (pattern.JourneyPatternSection) {
-                                sections = ensureArray(pattern.JourneyPatternSection);
-                            } else if (pattern.JourneyPatternSectionRefs) {
-                                // This block handles resolving routes from references, which is a common pattern.
-                                const refsContainerArray = ensureArray(pattern.JourneyPatternSectionRefs);
-                                const allSectionRefs = refsContainerArray.flatMap(container => 
-                                    container.JourneyPatternSectionRef ? ensureArray(container.JourneyPatternSectionRef) : []
-                                );
-
-                                sections = allSectionRefs
-                                    .map((ref: any) => {
-                                        const refId = getText(ref);
-                                        if (!refId) return null;
-                                        return journeyPatternSectionsById[refId];
-                                    })
-                                    .filter(Boolean); // Filter out any nulls from unresolved refs
-                            }
-
-
-                            let isFirstLinkOfPattern = true;
-
-                            for (const section of sections) {
-                                const timingLinks = ensureArray(section.JourneyPatternTimingLink);
-                                for (const link of timingLinks) {
-                                    const fromStopRef = getText(link.From?.StopPointRef);
-                                    if (isFirstLinkOfPattern && fromStopRef && stopPointsCoords[fromStopRef]) {
-                                        routePath.push(stopPointsCoords[fromStopRef]);
-                                    }
-                                    isFirstLinkOfPattern = false;
-                                    
-                                    const toStopRef = getText(link.To?.StopPointRef);
-                                    if (toStopRef && stopPointsCoords[toStopRef]) {
-                                        routePath.push(stopPointsCoords[toStopRef]);
-                                    }
-                                }
-                            }
-                            if (routePath.length > 1) {
-                                routeGeometry[pattern.id] = routePath;
-                                routeMetadata[pattern.id] = {
-                                    name: `Service ${serviceName}: ${pattern.DestinationDisplay}`,
-                                    service: serviceName,
-                                    destination: pattern.DestinationDisplay,
-                                    direction: pattern.Direction,
-                                    id: pattern.id,
-                                };
-                            }
-                        }
-                    }
-                }
-
-                const vehicleJourneys = ensureArray(data.VehicleJourneys?.VehicleJourney);
-                for (const vj of vehicleJourneys) {
-                    const journeyRef = getText(vj.VehicleJourneyCode);
-                    const departureTimeStr = getText(vj.DepartureTime);
-                    const journeyPatternRef = getText(vj.JourneyPatternRef);
-
-                    if (!journeyRef || !departureTimeStr || !journeyPatternRef || !journeyPatterns[journeyPatternRef]) {
-                        continue;
-                    }
-
-                    const pattern = journeyPatterns[journeyPatternRef];
-                    const departureTime = dateFnsParse(departureTimeStr, 'HH:mm:ss', new Date(0));
-                    if (isNaN(departureTime.getTime())) continue;
-
-                    let currentTime = departureTime;
-                    const stopTimes: { stop: string; time: string }[] = [];
-                    
-                    let sections: any[] = [];
-                     if (pattern.JourneyPatternSection) {
-                        sections = ensureArray(pattern.JourneyPatternSection);
-                    } else if (pattern.JourneyPatternSectionRefs) {
-                        const refsContainerArray = ensureArray(pattern.JourneyPatternSectionRefs);
-                        const allSectionRefs = refsContainerArray.flatMap(container => 
-                            container.JourneyPatternSectionRef ? ensureArray(container.JourneyPatternSectionRef) : []
-                        );
-                        sections = allSectionRefs
-                            .map((ref: any) => {
-                                const refId = getText(ref);
-                                if (!refId) return null;
-                                return journeyPatternSectionsById[refId];
-                            })
-                            .filter(Boolean);
-                    }
-
-
-                    let isFirstLinkOfJourney = true;
-
-                    for (const section of sections) {
-                        const timingLinks = ensureArray(section.JourneyPatternTimingLink);
-                        for (const link of timingLinks) {
-                            const fromStopRef = getText(link.From?.StopPointRef);
-                            if (isFirstLinkOfJourney && fromStopRef) {
-                                stopTimes.push({
-                                    stop: fromStopRef,
-                                    time: currentTime.toTimeString().split(' ')[0],
-                                });
-                                isFirstLinkOfJourney = false;
-                            }
-
-                            const runTime = parseISO8601Duration(getText(link.RunTime));
-                            const arrivalAtTo = add(currentTime, runTime);
-                            
-                            const toStopRef = getText(link.To?.StopPointRef);
-                            if (toStopRef) {
-                                stopTimes.push({
-                                    stop: toStopRef,
-                                    time: arrivalAtTo.toTimeString().split(' ')[0],
-                                });
-                            }
-
-                            const waitTime = link.To.WaitTime ? parseISO8601Duration(getText(link.To.WaitTime)) : {};
-                            currentTime = add(arrivalAtTo, waitTime);
-                        }
-                    }
-                    timetable[journeyRef] = stopTimes;
-                }
             }
+        } else { // It's an XML file
+            const xmlContent = await file.text();
+            processTransXchangeXml(xmlContent, timetable, routeGeometry, routeMetadata);
+            filesProcessed = 1;
         }
 
+
         if (filesProcessed === 0) {
-            return NextResponse.json({ error: 'No valid Transxchange XML files found in the ZIP.' }, { status: 400 });
+            return NextResponse.json({ error: 'No valid TransXchange XML files found in the upload.' }, { status: 400 });
         }
 
         const timetableFilePath = path.join(process.cwd(), 'src', 'lib', 'timetable-data.json');

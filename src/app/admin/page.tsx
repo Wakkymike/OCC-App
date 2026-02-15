@@ -39,7 +39,7 @@ export default function AdminPage() {
       toast({
         variant: 'destructive',
         title: 'No file selected',
-        description: 'Please select a TransXchange zip file to upload.',
+        description: 'Please select a TransXchange ZIP or XML file to upload.',
       });
       return;
     }
@@ -153,11 +153,11 @@ export default function AdminPage() {
           <CardContent>
             <form onSubmit={handleTxcSubmit} className="space-y-4">
               <div className="grid w-full items-center gap-1.5">
-                <Label htmlFor="txc-file-upload">TransXchange ZIP File</Label>
+                <Label htmlFor="txc-file-upload">TransXchange ZIP/XML File</Label>
                 <Input
                   id="txc-file-upload"
                   type="file"
-                  accept=".zip"
+                  accept=".zip,.xml"
                   onChange={handleTxcFileChange}
                   disabled={isUploadingTxc}
                 />
