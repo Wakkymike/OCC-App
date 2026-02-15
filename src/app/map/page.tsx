@@ -13,6 +13,7 @@ import Link from 'next/link';
 import MapControls from '@/components/map-controls';
 import { useToast } from '@/hooks/use-toast';
 import RouteRecorderDialog from '@/components/route-recorder';
+import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
 
 export default function Page() {
   const { buses, error } = useBusTracker();
@@ -45,7 +46,7 @@ export default function Page() {
   const [recordingBusId, setRecordingBusId] = useState<string | null>(null);
   const [recordingService, setRecordingService] = useState<string | null>(null);
 
-  const [savedRoutes, setSavedRoutes] = useState<Record<string, { name: string; route: LatLng[]; busId: string | null }>>({});
+  const [savedRoutes, setSavedRoutes] = useState<Record<string, { name: string; route: LatLng[]; busId: string | null }>>(preRecordedRoutes);
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
 
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
