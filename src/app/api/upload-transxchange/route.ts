@@ -121,8 +121,14 @@ export async function POST(req: NextRequest) {
             }
 
             // Aggregate StopPoints
-            const stopPointsRaw = stopPointsContainer?.AnnotatedStopPointRef ?? stopPointsContainer?.StopPoint;
-            const stopPoints = ensureArray(stopPointsRaw);
+            const stopPoints = [];
+            if (stopPointsContainer) {
+                const annotatedStopPoints = ensureArray(stopPointsContainer.AnnotatedStopPointRef);
+                const plainStopPoints = ensureArray(stopPointsContainer.StopPoint);
+                if(annotatedStopPoints.length > 0) stopPoints.push(...annotatedStopPoints);
+                if(plainStopPoints.length > 0) stopPoints.push(...plainStopPoints);
+            }
+
             for (const sp of stopPoints) {
                 stopPointsProcessed++;
                 const atcoCode = getText(sp.StopPointRef) ?? getText(sp.AtcoCode);
