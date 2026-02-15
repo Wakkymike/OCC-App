@@ -104,7 +104,6 @@ export async function POST(req: NextRequest) {
 
             const stopPointsContainer = data.StopPoints || data.Stops;
             if (stopPointsContainer) {
-                allStopPoints.push(...ensureArray(stopPointsContainer.AnnotatedStopPointRef));
                 allStopPoints.push(...ensureArray(stopPointsContainer.StopPoint));
             }
 
@@ -135,7 +134,19 @@ export async function POST(req: NextRequest) {
         // STAGE 2: Process aggregated stop points to build coordinate map
         const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
         let stopPointsParsedCount = 0;
+        let failedStopPointSample: any = null;
+
+        const stopMap = new Map<string, any>();
         for (const sp of allStopPoints) {
+            const atcoCode = getText(sp.AtcoCode);
+            if (atcoCode && !stopMap.has(atcoCode)) {
+                stopMap.set(atcoCode, sp);
+            }
+        }
+        const uniqueStops = Array.from(stopMap.values());
+
+
+        for (const sp of uniqueStops) {
              const atcoCode = getText(sp.AtcoCode);
              const stopPointRef = getText(sp.StopPointRef);
              
@@ -147,19 +158,14 @@ export async function POST(req: NextRequest) {
                 const lat = parseFloat(latStr);
                 const lng = parseFloat(lngStr);
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    let keyed = false;
-                    if (atcoCode && !stopPointsCoords[atcoCode]) {
-                        stopPointsCoords[atcoCode] = { lat, lng };
-                        keyed = true;
-                    }
-                    if (stopPointRef && !stopPointsCoords[stopPointRef]) {
-                        stopPointsCoords[stopPointRef] = { lat, lng };
-                        keyed = true;
-                    }
-                    if (keyed) {
-                        stopPointsParsedCount++;
-                    }
+                    if (atcoCode) stopPointsCoords[atcoCode] = { lat, lng };
+                    if (stopPointRef && stopPointRef !== atcoCode) stopPointsCoords[stopPointRef] = { lat, lng };
+                    stopPointsParsedCount++;
+                } else {
+                     if (!failedStopPointSample) failedStopPointSample = sp;
                 }
+            } else {
+                if (!failedStopPointSample) failedStopPointSample = sp;
             }
         }
         
@@ -281,8 +287,18 @@ export async function POST(req: NextRequest) {
         message += `SERVICES: Found ${serviceNames.size} services (e.g., ${serviceNameSample}...).\n`;
         message += `TIMETABLES: Created timetable data for ${timetablesFound} unique journeys.\n`;
         message += `ROUTES: Successfully constructed ${routesFound} routes from ${Object.keys(journeyPatternsById).length} patterns.\n`;
-        message += `STOP POINTS: Found coordinates for ${stopPointsParsedCount} unique stops out of ${allStopPoints.length} processed.\n\n`;
-        message += `Upload successful. You can now select these routes on the map page.`;
+        message += `STOP POINTS: Found coordinates for ${stopPointsParsedCount} unique stops out of ${uniqueStops.length} processed.\n\n`;
+        
+        if (routesFound < Object.keys(journeyPatternsById).length || stopPointsParsedCount < uniqueStops.length) {
+            message += `--- ANALYSIS ---\n`;
+            message += `The system successfully built ${routesFound} routes, but could not build all of them. This is likely because coordinate data could not be found for every bus stop.\n`;
+        } else {
+             message += `Upload successful. You can now select these routes on the map page.`;
+        }
+
+        if (failedStopPointSample) {
+            return NextResponse.json({ message, debug_info: { stop_point_sample: failedStopPointSample } }, { status: 200 });
+        }
 
         return NextResponse.json({ message }, { status: 200 });
 
