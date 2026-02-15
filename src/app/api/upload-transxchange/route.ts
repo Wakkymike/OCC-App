@@ -136,21 +136,33 @@ export async function POST(req: NextRequest) {
         const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
         let stopPointsParsedCount = 0;
         for (const sp of allStopPoints) {
-             const atcoCode = getText(sp.AtcoCode) ?? getText(sp.StopPointRef);
+             const atcoCode = getText(sp.AtcoCode);
+             const stopPointRef = getText(sp.StopPointRef);
+             
              const location = sp.Location ?? sp.Place?.Location;
              const latStr = location ? (getText(location.Latitude) ?? getText(location.latitude)) : undefined;
              const lngStr = location ? (getText(location.Longitude) ?? getText(location.longitude)) : undefined;
 
-             if (atcoCode && latStr && lngStr) {
+             if (latStr && lngStr) {
                 const lat = parseFloat(latStr);
                 const lng = parseFloat(lngStr);
-                if (!isNaN(lat) && !isNaN(lng) && !stopPointsCoords[atcoCode]) {
-                    stopPointsCoords[atcoCode] = { lat, lng };
-                    stopPointsParsedCount++;
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    let keyed = false;
+                    if (atcoCode && !stopPointsCoords[atcoCode]) {
+                        stopPointsCoords[atcoCode] = { lat, lng };
+                        keyed = true;
+                    }
+                    if (stopPointRef && !stopPointsCoords[stopPointRef]) {
+                        stopPointsCoords[stopPointRef] = { lat, lng };
+                        keyed = true;
+                    }
+                    if (keyed) {
+                        stopPointsParsedCount++;
+                    }
                 }
             }
         }
-
+        
         // STAGE 3: Process Journey Patterns to build routes
         const routeGeometry: any = {};
         const routeMetadata: any = {};
