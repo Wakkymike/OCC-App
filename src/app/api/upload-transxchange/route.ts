@@ -105,16 +105,27 @@ export async function POST(req: NextRequest) {
                             
                             const routePath: {lat: number, lng: number}[] = [];
                             
-                            let sections = ensureArray(pattern.JourneyPatternSection);
+                            let sections: any[] = [];
 
-                            // If no inline sections, try resolving from references
-                            if (sections.length === 0 && pattern.JourneyPatternSectionRefs) {
-                                const sectionRefs = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
-                                sections = sectionRefs.map((ref: any) => {
-                                    const refId = getText(ref);
-                                    return journeyPatternSectionsById[refId as string];
-                                }).filter(Boolean);
+                            // Per schema, a JourneyPattern contains a choice between inline sections or references.
+                            if (pattern.JourneyPatternSection) {
+                                sections = ensureArray(pattern.JourneyPatternSection);
+                            } else if (pattern.JourneyPatternSectionRefs) {
+                                // This block handles resolving routes from references, which is a common pattern.
+                                const refsContainerArray = ensureArray(pattern.JourneyPatternSectionRefs);
+                                const allSectionRefs = refsContainerArray.flatMap(container => 
+                                    container.JourneyPatternSectionRef ? ensureArray(container.JourneyPatternSectionRef) : []
+                                );
+
+                                sections = allSectionRefs
+                                    .map((ref: any) => {
+                                        const refId = getText(ref);
+                                        if (!refId) return null;
+                                        return journeyPatternSectionsById[refId];
+                                    })
+                                    .filter(Boolean); // Filter out any nulls from unresolved refs
                             }
+
 
                             let isFirstLinkOfPattern = true;
 
@@ -164,16 +175,23 @@ export async function POST(req: NextRequest) {
                     let currentTime = departureTime;
                     const stopTimes: { stop: string; time: string }[] = [];
                     
-                    let sections = ensureArray(pattern.JourneyPatternSection);
-
-                    // If no inline sections, try resolving from references
-                    if (sections.length === 0 && pattern.JourneyPatternSectionRefs) {
-                         const sectionRefs = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
-                         sections = sectionRefs.map((ref: any) => {
-                            const refId = getText(ref);
-                            return journeyPatternSectionsById[refId as string];
-                        }).filter(Boolean);
+                    let sections: any[] = [];
+                     if (pattern.JourneyPatternSection) {
+                        sections = ensureArray(pattern.JourneyPatternSection);
+                    } else if (pattern.JourneyPatternSectionRefs) {
+                        const refsContainerArray = ensureArray(pattern.JourneyPatternSectionRefs);
+                        const allSectionRefs = refsContainerArray.flatMap(container => 
+                            container.JourneyPatternSectionRef ? ensureArray(container.JourneyPatternSectionRef) : []
+                        );
+                        sections = allSectionRefs
+                            .map((ref: any) => {
+                                const refId = getText(ref);
+                                if (!refId) return null;
+                                return journeyPatternSectionsById[refId];
+                            })
+                            .filter(Boolean);
                     }
+
 
                     let isFirstLinkOfJourney = true;
 
@@ -222,7 +240,8 @@ export async function POST(req: NextRequest) {
         const routeMetadataFilePath = path.join(process.cwd(), 'src', 'lib', 'route-metadata.json');
         await fs.writeFile(routeMetadataFilePath, JSON.stringify(routeMetadata, null, 2));
 
-        const message = `Processed ${filesProcessed} file(s). Found ${Object.keys(routeMetadata).length} routes. Please refresh the map page.`;
+        const serviceNames = new Set(Object.values(routeMetadata).map((m: any) => m.service));
+        const message = `Processed ${filesProcessed} file(s). Found ${Object.keys(routeMetadata).length} routes across ${serviceNames.size} services. Please refresh the map page.`;
         return NextResponse.json({ message }, { status: 200 });
 
     } catch (error: any) {
