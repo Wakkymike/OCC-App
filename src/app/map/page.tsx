@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -13,7 +14,6 @@ import Link from 'next/link';
 import MapControls from '@/components/map-controls';
 import { useToast } from '@/hooks/use-toast';
 import RouteRecorderDialog from '@/components/route-recorder';
-import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 
 export default function Page() {
@@ -52,7 +52,6 @@ export default function Page() {
 
   const allAvailableRoutes = useMemo(() => {
     return {
-        ...preRecordedRoutes,
         ...txcRoutes,
         ...userSavedRoutes,
     };
