@@ -471,12 +471,24 @@ export default function BusMap({
       else if (bus.direction.toLowerCase() === 'outbound') directionLabel = ` <span style="color:blue">[O]</span>`;
       
       let statusHtml = '';
-      if (bus.status && bus.status !== 'Unknown') {
-          let color = '#3c763d'; // On Time
-          if (bus.status.includes('late')) color = '#a94442'; // Late
-          if (bus.status.includes('early')) color = '#31708f'; // Early
-          statusHtml = ` | <span style="color:${color}; font-weight: bold;">${bus.status}</span>`;
+      let statusTextForPopup = bus.status;
+      if (bus.delay !== undefined) {
+          const delay = Math.round(bus.delay);
+          let color = '#3c763d';
+          let statusText = 'On Time';
+          if (delay > 1) {
+              color = '#a94442';
+              statusText = `${delay} min late`;
+          } else if (delay < -1) {
+              color = '#31708f';
+              statusText = `${Math.abs(delay)} min early`;
+          }
+          statusHtml = ` | <span style="color:${color}; font-weight: bold;">${statusText}</span>`;
+          statusTextForPopup = statusText;
+      } else if (bus.status && bus.status !== 'Unknown' && bus.status !== 'On Time') {
+          statusHtml = ` | <span style="font-weight: bold;">${bus.status}</span>`;
       }
+
 
       flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel} | ${bus.destination}${statusHtml}`;
       
@@ -501,7 +513,7 @@ export default function BusMap({
           const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
           const journeyInfo = bus.journeyRef ? `<div><div style="font-weight: bold; color: green;">Journey Number</div><div>${bus.journeyRef}</div></div>` : '';
           const runningBoardInfo = bus.runningBoard ? `<div style="margin-top: 4px;"><div style="font-weight: bold;">Running Board</div><div>${runningBoardHtml}</div></div>` : '';
-          const statusDisplay = bus.status && bus.status !== 'Unknown' ? `<div style="font-weight: bold; margin-bottom: 4px;">${bus.status}</div>` : '';
+          const statusDisplay = statusTextForPopup && statusTextForPopup !== 'Unknown' ? `<div style="font-weight: bold; margin-bottom: 4px;">${statusTextForPopup}</div>` : '';
 
           infoFlag.innerHTML = `${statusDisplay}${schoolInfo}${nightBusInfo}${journeyInfo}${runningBoardInfo}`;
           infoFlag.style.display = 'block';
