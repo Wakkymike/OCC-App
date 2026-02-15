@@ -269,13 +269,14 @@ export default function BusMap({
 
     const lineLayerId = 'metrolink-lines-layer';
     if (!map.getLayer(lineLayerId)) {
+        const beforeId = map.getLayer('recorded-route-layer') ? 'recorded-route-layer' : 'bus-stops';
         map.addLayer({
             id: lineLayerId,
             type: 'line',
             source: lineSourceId,
             layout: { 'line-join': 'round', 'line-cap': 'round' },
             paint: { 'line-color': ['get', 'color'], 'line-width': 4, 'line-opacity': 0.8 }
-        }, 'bus-stops'); // Draw lines below bus stops
+        }, beforeId);
     }
     
     const stopFeatures = metrolinkData.stops.map(stop => ({
@@ -390,7 +391,7 @@ export default function BusMap({
                 'line-width': 5,
                 'line-opacity': 0.8
             }
-        }, 'metrolink-lines-layer'); // Draw it above metrolink but below buses/stops
+        }, 'bus-stops');
     }
     
     map.setLayoutProperty(layerId, 'visibility', showRecordedRoute && recordedRoute && recordedRoute.length > 1 ? 'visible' : 'none');
