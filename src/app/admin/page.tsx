@@ -61,7 +61,11 @@ export default function AdminPage() {
       }
 
       let reportContent = result.message;
-      if (result.debug_info?.stop_point_sample) {
+      if (result.debug_info?.sample_journey_pattern) {
+          reportContent += `\n\n--- DEBUG INFO ---\n`;
+          reportContent += `The system failed to build routes. This is likely due to an unexpected structure in the JourneyPattern data. Here is a sample of a raw JourneyPattern it could not process:\n\n`;
+          reportContent += JSON.stringify(result.debug_info.sample_journey_pattern, null, 2);
+      } else if (result.debug_info?.stop_point_sample) {
           reportContent += `\n\n--- DEBUG INFO ---\n`;
           reportContent += `This is a sample of the first StopPoint object that could not be parsed:\n\n`;
           reportContent += JSON.stringify(result.debug_info.stop_point_sample, null, 2);
