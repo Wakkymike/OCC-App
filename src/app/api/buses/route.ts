@@ -174,96 +174,86 @@ export async function GET() {
           const monitoredCall = journey.MonitoredCall;
           const onwardCallsRaw = journey.OnwardCalls?.OnwardCall;
           const onwardCalls = onwardCallsRaw ? ensureArray(onwardCallsRaw) : [];
+          
+          // --- PRIMARY DELAY CALCULATION (FROM LIVE FEED AIMED/EXPECTED) ---
+          // This is more robust as it relies directly on the feed's data.
+          let callToUse;
+          // Prioritize onward calls that have both aimed and expected arrival times
+          callToUse = onwardCalls.find(c => getText(c.AimedArrivalTime) && getText(c.ExpectedArrivalTime));
+          if (callToUse) {
+              delayInMinutes = calculateDelayFromTimes(getText(callToUse.AimedArrivalTime), getText(callToUse.ExpectedArrivalTime));
+          }
 
-          // --- TIMETABLE-BASED DELAY CALCULATION (PRIMARY) ---
-          const calculateDelayWithTimetable = (
-            expectedTimeStr: string | undefined, 
-            scheduledStopTime: { time: string } | undefined
-          ): number | undefined => {
-            if (!expectedTimeStr || !scheduledStopTime?.time) return undefined;
-            
-            try {
-              const expectedTime = new Date(expectedTimeStr);
-              const [hours, minutes, seconds] = scheduledStopTime.time.split(':').map(Number);
-              
-              // Create scheduled time on the same date as the expected time
-              const scheduledTime = new Date(expectedTime);
-              scheduledTime.setHours(hours, minutes, seconds, 0);
-
-              let diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
-
-              // Basic midnight crossing handling
-              if (diffMinutes > 12 * 60) { // e.g., expected is 00:05, scheduled is 23:55
-                  scheduledTime.setDate(scheduledTime.getDate() - 1);
-                  diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
-              } else if (diffMinutes < -12 * 60) { // e.g., expected is 23:55, scheduled is 00:05
-                  scheduledTime.setDate(scheduledTime.getDate() + 1);
-                  diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
+          // If still no delay, try with departure times from onward calls
+          if (delayInMinutes === undefined) {
+              callToUse = onwardCalls.find(c => getText(c.AimedDepartureTime) && getText(c.ExpectedDepartureTime));
+              if (callToUse) {
+                  delayInMinutes = calculateDelayFromTimes(getText(callToUse.AimedDepartureTime), getText(callToUse.ExpectedDepartureTime));
               }
-              
-              // Only return a delay if it's within a reasonable range (e.g., less than a day)
-              if (Math.abs(diffMinutes) < 1440) {
-                  return Math.round(diffMinutes);
-              }
-            } catch (e) {
-              return undefined;
-            }
-            return undefined;
-          };
+          }
 
-          const scheduledJourney = journeyRef ? (timetable as Record<string, any>)[journeyRef] : undefined;
-          if (scheduledJourney && Array.isArray(scheduledJourney)) {
-            let delayFound = false;
+          // If still no delay, check the monitored call as a last resort
+          if (delayInMinutes === undefined && monitoredCall) {
+              const aimedTime = getText(monitoredCall.AimedDepartureTime) ?? getText(monitoredCall.AimedArrivalTime);
+              const expectedTime = getText(monitoredCall.ExpectedDepartureTime) ?? getText(monitoredCall.ActualDepartureTime);
+              delayInMinutes = calculateDelayFromTimes(aimedTime, expectedTime);
+          }
 
-            // Method 1: Iterate through upcoming stops (OnwardCalls)
-            for (const call of onwardCalls) {
-              const stopRef = getText(call.StopPointRef);
-              const scheduledStopTime = scheduledJourney.find((s: any) => s.stop === stopRef);
-              const calculatedDelay = calculateDelayWithTimetable(getText(call.ExpectedArrivalTime), scheduledStopTime);
-              
-              if (calculatedDelay !== undefined) {
-                delayInMinutes = calculatedDelay;
-                delayFound = true;
-                break; // Found a valid delay, stop searching
-              }
-            }
 
-            // Method 2: If no delay found, check the last stop visited (MonitoredCall)
-            if (!delayFound && monitoredCall) {
-                const stopRef = getText(monitoredCall.StopPointRef);
-                const scheduledStopTime = scheduledJourney.find((s: any) => s.stop === stopRef);
-                const expectedTimeStr = getText(monitoredCall.ExpectedDepartureTime) ?? getText(monitoredCall.ActualDepartureTime);
-                const calculatedDelay = calculateDelayWithTimetable(expectedTimeStr, scheduledStopTime);
+          // --- FALLBACK DELAY CALCULATION (TIMETABLE-BASED) ---
+          // This is more accurate but more fragile. Only use if the primary method fails.
+          if (delayInMinutes === undefined) {
+            const calculateDelayWithTimetable = (
+                expectedTimeStr: string | undefined, 
+                scheduledStopTime: { time: string } | undefined
+            ): number | undefined => {
+                if (!expectedTimeStr || !scheduledStopTime?.time) return undefined;
+                try {
+                    const expectedTime = new Date(expectedTimeStr);
+                    const [hours, minutes, seconds] = scheduledStopTime.time.split(':').map(Number);
+                    const scheduledTime = new Date(expectedTime);
+                    scheduledTime.setHours(hours, minutes, seconds, 0);
 
-                if (calculatedDelay !== undefined) {
-                    delayInMinutes = calculatedDelay;
+                    let diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
+
+                    if (diffMinutes > 12 * 60) {
+                        scheduledTime.setDate(scheduledTime.getDate() - 1);
+                        diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
+                    } else if (diffMinutes < -12 * 60) {
+                        scheduledTime.setDate(scheduledTime.getDate() + 1);
+                        diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
+                    }
+                    if (Math.abs(diffMinutes) < 1440) return Math.round(diffMinutes);
+                } catch (e) {
+                    return undefined;
+                }
+                return undefined;
+            };
+
+            const scheduledJourney = journeyRef ? (timetable as Record<string, any>)[journeyRef] : undefined;
+            if (scheduledJourney && Array.isArray(scheduledJourney)) {
+                let delayFound = false;
+
+                for (const call of onwardCalls) {
+                    const stopRef = getText(call.StopPointRef);
+                    const scheduledStopTime = scheduledJourney.find((s: any) => s.stop === stopRef);
+                    const calculatedDelay = calculateDelayWithTimetable(getText(call.ExpectedArrivalTime), scheduledStopTime);
+                    if (calculatedDelay !== undefined) {
+                        delayInMinutes = calculatedDelay;
+                        delayFound = true;
+                        break;
+                    }
+                }
+                if (!delayFound && monitoredCall) {
+                    const stopRef = getText(monitoredCall.StopPointRef);
+                    const scheduledStopTime = scheduledJourney.find((s: any) => s.stop === stopRef);
+                    const expectedTimeStr = getText(monitoredCall.ExpectedDepartureTime) ?? getText(monitoredCall.ActualDepartureTime);
+                    const calculatedDelay = calculateDelayWithTimetable(expectedTimeStr, scheduledStopTime);
+                    if (calculatedDelay !== undefined) {
+                        delayInMinutes = calculatedDelay;
+                    }
                 }
             }
-          }
-          
-          // --- FALLBACK DELAY CALCULATION (FROM LIVE FEED AIMED/EXPECTED) ---
-          if (delayInMinutes === undefined) {
-              let callToUse;
-              // Prioritize onward calls that have both aimed and expected arrival times
-              callToUse = onwardCalls.find(c => getText(c.AimedArrivalTime) && getText(c.ExpectedArrivalTime));
-              if (callToUse) {
-                  delayInMinutes = calculateDelayFromTimes(getText(callToUse.AimedArrivalTime), getText(callToUse.ExpectedArrivalTime));
-              }
-
-              // If still no delay, try with departure times from onward calls
-              if (delayInMinutes === undefined) {
-                  callToUse = onwardCalls.find(c => getText(c.AimedDepartureTime) && getText(c.ExpectedDepartureTime));
-                  if (callToUse) {
-                      delayInMinutes = calculateDelayFromTimes(getText(callToUse.AimedDepartureTime), getText(callToUse.ExpectedDepartureTime));
-                  }
-              }
-
-              // If still no delay, check the monitored call as a last resort
-              if (delayInMinutes === undefined && monitoredCall) {
-                  const aimedTime = getText(monitoredCall.AimedDepartureTime) ?? getText(monitoredCall.AimedArrivalTime);
-                  const expectedTime = getText(monitoredCall.ExpectedDepartureTime) ?? getText(monitoredCall.ActualDepartureTime);
-                   delayInMinutes = calculateDelayFromTimes(aimedTime, expectedTime);
-              }
           }
           
           // --- Status String Generation ---
