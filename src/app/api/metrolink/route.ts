@@ -3,6 +3,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import type { MetrolinkData } from '@/lib/types';
 
+// This will make the route dynamic and prevent caching
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const filePath = path.join(process.cwd(), 'src', 'lib', 'metrolink-data.json');

@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 
+// This will make the route dynamic and prevent caching
+export const dynamic = 'force-dynamic';
+
 // Helper function to read a JSON file safely
 async function readJsonFile(filePath: string) {
     try {
