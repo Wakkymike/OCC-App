@@ -105,7 +105,9 @@ export async function POST(req: NextRequest) {
                             
                             const routePath: {lat: number, lng: number}[] = [];
                             
-                            const sectionRefs = ensureArray(pattern.JourneyPatternSectionRefs);
+                            const sectionRefsNode = pattern.JourneyPatternSectionRefs;
+                            const sectionRefs = sectionRefsNode?.JourneyPatternSectionRef ? ensureArray(sectionRefsNode.JourneyPatternSectionRef) : ensureArray(sectionRefsNode);
+
                             let sections = ensureArray(pattern.JourneyPatternSection);
 
                             if (sectionRefs.length > 0) {
@@ -163,7 +165,9 @@ export async function POST(req: NextRequest) {
                     let currentTime = departureTime;
                     const stopTimes: { stop: string; time: string }[] = [];
                     
-                    const sectionRefs = ensureArray(pattern.JourneyPatternSectionRefs);
+                    const sectionRefsNode = pattern.JourneyPatternSectionRefs;
+                    const sectionRefs = sectionRefsNode?.JourneyPatternSectionRef ? ensureArray(sectionRefsNode.JourneyPatternSectionRef) : ensureArray(sectionRefsNode);
+                    
                     let sections = ensureArray(pattern.JourneyPatternSection);
 
                     if (sectionRefs.length > 0) {
