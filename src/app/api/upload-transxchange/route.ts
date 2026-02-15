@@ -169,10 +169,13 @@ export async function POST(req: NextRequest) {
             const stopTimes: { stop: string; time: string }[] = [];
             
             let sections: any[] = [];
-            if (pattern.JourneyPatternSectionRefs) {
-                const refs = ensureArray(pattern.JourneyPatternSectionRefs).map(getText).filter(Boolean);
+            // Robustly find section references
+            if (pattern.JourneyPatternSectionRefs?.JourneyPatternSectionRef) {
+                const refs = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
                 sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
-            } else if (pattern.JourneyPatternSection) {
+            } 
+            // Fallback for inline sections if no refs are found
+            else if (pattern.JourneyPatternSection) {
                 sections = ensureArray(pattern.JourneyPatternSection);
             }
 
@@ -198,23 +201,27 @@ export async function POST(req: NextRequest) {
                     currentTime = add(arrivalAtTo, waitTime);
                 }
             }
-            timetable[journeyRef] = stopTimes;
+            if(stopTimes.length > 0) {
+              timetable[journeyRef] = stopTimes;
+            }
         }
 
 
         // STAGE 2.2: Process aggregated JourneyPatterns to build Routes
         for (const patternId in journeyPatternsById) {
             const pattern = journeyPatternsById[patternId];
+            stats.journeyPatterns++;
             
             const routePath: {lat: number, lng: number}[] = [];
             let sections: any[] = [];
             
-            if (pattern.JourneyPatternSectionRefs) {
-                const refs = ensureArray(pattern.JourneyPatternSectionRefs)
-                    .map(getText)
-                    .filter(Boolean);
+            // Robustly find section references
+            if (pattern.JourneyPatternSectionRefs?.JourneyPatternSectionRef) {
+                const refs = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
                 sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
-            } else if (pattern.JourneyPatternSection) {
+            }
+            // Fallback for inline sections
+            else if (pattern.JourneyPatternSection) {
                 sections = ensureArray(pattern.JourneyPatternSection);
             }
 
@@ -246,7 +253,6 @@ export async function POST(req: NextRequest) {
                     direction: pattern.Direction,
                     id: pattern.id,
                 };
-                stats.journeyPatterns++;
             }
         }
 
@@ -261,9 +267,10 @@ export async function POST(req: NextRequest) {
         await fs.writeFile(routeMetadataFilePath, JSON.stringify(routeMetadata, null, 2));
 
         const routesFound = Object.keys(routeMetadata).length;
+        const timetablesFound = Object.keys(timetable).length;
         const serviceNames = Array.from(stats.services).slice(0, 5).join(', ');
 
-        const message = `Processed ${filesProcessed} file(s). Found: ${stats.services.size} services (${serviceNames}...); ${stats.stopPoints} stop points; ${stats.vehicleJourneys} vehicle journeys. Successfully constructed ${routesFound} routes.`;
+        const message = `Processed ${filesProcessed} file(s). Found ${stats.services.size} services (${serviceNames}...). Constructed ${routesFound} routes from ${stats.journeyPatterns} patterns. Timetable created for ${timetablesFound} journeys.`;
         return NextResponse.json({ message }, { status: 200 });
 
     } catch (error: any) {
