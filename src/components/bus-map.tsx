@@ -471,22 +471,20 @@ export default function BusMap({
       else if (bus.direction.toLowerCase() === 'outbound') directionLabel = ` <span style="color:blue">[O]</span>`;
       
       let statusHtml = '';
-      let statusTextForPopup = bus.status;
-      if (bus.delay !== undefined) {
-          const delay = Math.round(bus.delay);
-          let color = '#3c763d';
-          let statusText = 'On Time';
-          if (delay > 1) {
-              color = '#a94442';
-              statusText = `${delay} min late`;
-          } else if (delay < -1) {
-              color = '#31708f';
-              statusText = `${Math.abs(delay)} min early`;
-          }
-          statusHtml = ` | <span style="color:${color}; font-weight: bold;">${statusText}</span>`;
-          statusTextForPopup = statusText;
-      } else if (bus.status && bus.status !== 'Unknown' && bus.status !== 'On Time') {
-          statusHtml = ` | <span style="font-weight: bold;">${bus.status}</span>`;
+      if (bus.status && bus.status !== 'Unknown') {
+        let color = '#333'; // Default text color
+        const lowerCaseStatus = bus.status.toLowerCase();
+
+        if (lowerCaseStatus.includes('late')) {
+          color = '#a94442'; // red
+        } else if (lowerCaseStatus.includes('early')) {
+          color = '#31708f'; // blue
+        } else if (lowerCaseStatus.includes('on time')) {
+          color = '#3c763d'; // green
+        } else if (lowerCaseStatus.includes('cancelled')) {
+          color = '#a94442';
+        }
+        statusHtml = ` | <span style="color:${color}; font-weight: bold;">${bus.status}</span>`;
       }
 
 
@@ -513,7 +511,17 @@ export default function BusMap({
           const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
           const journeyInfo = bus.journeyRef ? `<div><div style="font-weight: bold; color: green;">Journey Number</div><div>${bus.journeyRef}</div></div>` : '';
           const runningBoardInfo = bus.runningBoard ? `<div style="margin-top: 4px;"><div style="font-weight: bold;">Running Board</div><div>${runningBoardHtml}</div></div>` : '';
-          const statusDisplay = statusTextForPopup && statusTextForPopup !== 'Unknown' ? `<div style="font-weight: bold; margin-bottom: 4px;">${statusTextForPopup}</div>` : '';
+          
+          let statusDisplay = '';
+          if (bus.status && bus.status !== 'Unknown') {
+              let color = 'inherit';
+              const lowerCaseStatus = bus.status.toLowerCase();
+              if (lowerCaseStatus.includes('late')) color = '#a94442';
+              else if (lowerCaseStatus.includes('early')) color = '#31708f';
+              else if (lowerCaseStatus.includes('on time')) color = '#3c763d';
+              else if (lowerCaseStatus.includes('cancelled')) color = '#a94442';
+              statusDisplay = `<div style="color:${color}; font-weight: bold; margin-bottom: 4px;">${bus.status}</div>`;
+          }
 
           infoFlag.innerHTML = `${statusDisplay}${schoolInfo}${nightBusInfo}${journeyInfo}${runningBoardInfo}`;
           infoFlag.style.display = 'block';
