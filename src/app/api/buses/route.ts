@@ -243,24 +243,26 @@ export async function GET() {
           
           // --- FALLBACK DELAY CALCULATION (FROM LIVE FEED AIMED/EXPECTED) ---
           if (delayInMinutes === undefined) {
-              // Check onward calls first
-              for (const call of onwardCalls) {
-                  const aimedTime = getText(call.AimedArrivalTime) ?? getText(call.AimedDepartureTime);
-                  const expectedTime = getText(call.ExpectedArrivalTime) ?? getText(call.ExpectedDepartureTime);
-                  const calculatedDelay = calculateDelayFromTimes(aimedTime, expectedTime);
-                  if (calculatedDelay !== undefined) {
-                      delayInMinutes = calculatedDelay;
-                      break; 
+              let callToUse;
+              // Prioritize onward calls that have both aimed and expected arrival times
+              callToUse = onwardCalls.find(c => getText(c.AimedArrivalTime) && getText(c.ExpectedArrivalTime));
+              if (callToUse) {
+                  delayInMinutes = calculateDelayFromTimes(getText(callToUse.AimedArrivalTime), getText(callToUse.ExpectedArrivalTime));
+              }
+
+              // If still no delay, try with departure times from onward calls
+              if (delayInMinutes === undefined) {
+                  callToUse = onwardCalls.find(c => getText(c.AimedDepartureTime) && getText(c.ExpectedDepartureTime));
+                  if (callToUse) {
+                      delayInMinutes = calculateDelayFromTimes(getText(callToUse.AimedDepartureTime), getText(callToUse.ExpectedDepartureTime));
                   }
               }
-              // If still no delay, check monitored call
+
+              // If still no delay, check the monitored call as a last resort
               if (delayInMinutes === undefined && monitoredCall) {
-                  const aimedTime = getText(monitoredCall.AimedDepartureTime);
-                  const expectedTime = getText(monitoredCall.ExpectedDepartureTime);
-                  const calculatedDelay = calculateDelayFromTimes(aimedTime, expectedTime);
-                  if (calculatedDelay !== undefined) {
-                      delayInMinutes = calculatedDelay;
-                  }
+                  const aimedTime = getText(monitoredCall.AimedDepartureTime) ?? getText(monitoredCall.AimedArrivalTime);
+                  const expectedTime = getText(monitoredCall.ExpectedDepartureTime) ?? getText(monitoredCall.ActualDepartureTime);
+                   delayInMinutes = calculateDelayFromTimes(aimedTime, expectedTime);
               }
           }
           

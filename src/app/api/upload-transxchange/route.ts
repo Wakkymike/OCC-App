@@ -19,15 +19,22 @@ const getText = (field: any): string | undefined => {
 
 
 // Helper to parse ISO 8601 duration strings (e.g., "PT1M30S")
-const parseISO8601Duration = (duration: string | undefined): Duration => {
-    if (!duration || !duration.startsWith('PT')) return {};
-    const matches = duration.match(/(\d+H)?(\d+M)?(\d+S)?/);
-    if (!matches) return {};
-    return {
-        hours: matches[1] ? parseInt(matches[1].replace('H', '')) : 0,
-        minutes: matches[2] ? parseInt(matches[2].replace('M', '')) : 0,
-        seconds: matches[3] ? parseInt(matches[3].replace('S', '')) : 0,
-    };
+const parseISO8601Duration = (durationStr: string | undefined): Duration => {
+    if (!durationStr || !durationStr.startsWith('PT')) return {};
+
+    let remaining = durationStr.substring(2);
+    const hoursMatch = remaining.match(/(\d+)H/);
+    const hours = hoursMatch ? parseInt(hoursMatch[1], 10) : 0;
+    if (hoursMatch) remaining = remaining.replace(hoursMatch[0], '');
+
+    const minutesMatch = remaining.match(/(\d+)M/);
+    const minutes = minutesMatch ? parseInt(minutesMatch[1], 10) : 0;
+    if (minutesMatch) remaining = remaining.replace(minutesMatch[0], '');
+
+    const secondsMatch = remaining.match(/(\d+)S/);
+    const seconds = secondsMatch ? parseInt(secondsMatch[1], 10) : 0;
+
+    return { hours, minutes, seconds };
 };
 
 const ensureArray = (item: any) => {
