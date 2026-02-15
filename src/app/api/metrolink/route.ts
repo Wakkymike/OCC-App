@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import type { MetrolinkData } from '@/lib/types';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const filePath = path.join(process.cwd(), 'src', 'lib', 'metrolink-data.json');
     const fileContent = await fs.readFile(filePath, 'utf-8');

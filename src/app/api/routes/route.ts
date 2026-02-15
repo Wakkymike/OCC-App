@@ -1,5 +1,5 @@
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -19,7 +19,7 @@ async function readJsonFile(filePath: string) {
     }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const metadataPath = path.join(process.cwd(), 'src', 'lib', 'route-metadata.json');
         const geometryPath = path.join(process.cwd(), 'src', 'lib', 'route-geometry.json');
