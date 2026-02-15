@@ -14,6 +14,8 @@ import MapControls from '@/components/map-controls';
 import { useToast } from '@/hooks/use-toast';
 import RouteRecorderDialog from '@/components/route-recorder';
 import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
+import txcRouteMetadata from '@/lib/route-metadata.json';
+import txcRouteGeometry from '@/lib/route-geometry.json';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 
 export default function Page() {
@@ -46,8 +48,30 @@ export default function Page() {
   const [recordingBusId, setRecordingBusId] = useState<string | null>(null);
   const [recordingService, setRecordingService] = useState<string | null>(null);
 
-  const [savedRoutes, setSavedRoutes] = useState<Record<string, { name: string; route: LatLng[]; busId: string | null }>>(preRecordedRoutes);
+  const [userSavedRoutes, setUserSavedRoutes] = useState<Record<string, { name: string; route: LatLng[]; busId: string | null }>>({});
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+
+  const allAvailableRoutes = useMemo(() => {
+    const formattedTxcRoutes: Record<string, { name: string; route: LatLng[]; busId: string | null }> = {};
+    for (const id in txcRouteMetadata) {
+        const key = id as keyof typeof txcRouteMetadata;
+        if (txcRouteGeometry[key]) {
+            const metadata = txcRouteMetadata[key];
+            formattedTxcRoutes[id] = {
+                name: metadata.name,
+                route: txcRouteGeometry[key],
+                busId: null,
+            };
+        }
+    }
+
+    return {
+        ...preRecordedRoutes,
+        ...formattedTxcRoutes,
+        ...userSavedRoutes,
+    };
+  }, [userSavedRoutes]);
+
 
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
 
@@ -58,18 +82,18 @@ export default function Page() {
   }, [activeRecordingRoute]);
   
   const routeToDisplay = useMemo(() => {
-    if (selectedRouteId && savedRoutes[selectedRouteId]) {
-      return savedRoutes[selectedRouteId].route;
+    if (selectedRouteId && allAvailableRoutes[selectedRouteId]) {
+      return allAvailableRoutes[selectedRouteId].route;
     }
     return null;
-  }, [selectedRouteId, savedRoutes]);
+  }, [selectedRouteId, allAvailableRoutes]);
 
 
   const handleStopRecording = useCallback(() => {
     if (isRecording && recordingService && activeRecordingRoute.length > 1) {
       const routeId = `${recordingService}-${Date.now()}`;
       const routeName = `Service ${recordingService} (${new Date().toLocaleTimeString()})`;
-      setSavedRoutes(prev => ({
+      setUserSavedRoutes(prev => ({
         ...prev,
         [routeId]: {
           name: routeName,
@@ -269,19 +293,21 @@ export default function Page() {
   };
 
   const handleExport = () => {
-    if (!selectedRouteId || !savedRoutes[selectedRouteId]) {
-      toast({ variant: 'destructive', title: 'Export Failed', description: 'Please select a recorded route to export.'});
+    if (!selectedRouteId || !allAvailableRoutes[selectedRouteId]) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: 'Please select a route to export.'});
       return;
     };
     
-    const routeToExport = savedRoutes[selectedRouteId];
+    const routeToExport = allAvailableRoutes[selectedRouteId];
+    const metadata = txcRouteMetadata[selectedRouteId as keyof typeof txcRouteMetadata];
     
     const geoJson = {
         type: "Feature",
         properties: {
-            service: routeToExport.name.split(' ')[1],
+            name: routeToExport.name,
+            service: metadata?.service,
             busId: routeToExport.busId,
-            recordedAt: new Date(parseInt(selectedRouteId.split('-')[1])).toISOString(),
+            recordedAt: selectedRouteId.includes('-') ? new Date(parseInt(selectedRouteId.split('-')[1])).toISOString() : new Date().toISOString(),
         },
         geometry: {
             type: "LineString",
@@ -344,7 +370,7 @@ export default function Page() {
               setShow3DBuildings={setShow3DBuildings}
               showBusStops={showBusStops}
               setShowBusStops={setShowBusStops}
-              savedRoutes={savedRoutes}
+              savedRoutes={allAvailableRoutes}
               selectedRouteId={selectedRouteId}
               setSelectedRouteId={setSelectedRouteId}
             />
@@ -361,7 +387,7 @@ export default function Page() {
         show3DBuildings={show3DBuildings}
         showBusStops={showBusStops}
         metrolinkData={metrolinkData}
-        recordedRoute={routeToDisplay}
+        routeToDisplay={routeToDisplay}
       />
       <RouteRecorderDialog
         isOpen={isRecorderOpen}

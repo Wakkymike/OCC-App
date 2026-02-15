@@ -39,8 +39,9 @@ export async function POST(req: NextRequest) {
         const zip = await jszip.loadAsync(fileBuffer);
         const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '', removeNSPrefix: true });
 
-        const journeyPatterns: any = {};
         const timetable: any = {};
+        const routeGeometry: any = {};
+        const routeMetadata: any = {};
         let filesProcessed = 0;
 
         for (const filename in zip.files) {
@@ -50,21 +51,61 @@ export async function POST(req: NextRequest) {
                 if (!data) continue;
                 filesProcessed++;
 
-                // 1. Parse JourneyPatterns
+                const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
+                const stopPoints = ensureArray(data.StopPoints?.StopPoint);
+                for (const sp of stopPoints) {
+                    if (sp.AtcoCode && sp.Place?.Location?.Latitude && sp.Place?.Location?.Longitude) {
+                        stopPointsCoords[sp.AtcoCode] = {
+                            lat: parseFloat(sp.Place.Location.Latitude),
+                            lng: parseFloat(sp.Place.Location.Longitude),
+                        };
+                    }
+                }
+
+                const journeyPatterns: any = {};
                 const services = ensureArray(data.Services?.Service);
                 for (const service of services) {
+                    const serviceName = service.Lines?.Line?.LineName ?? 'Unknown';
                     const patterns = ensureArray(service.StandardService?.JourneyPattern);
                     for (const pattern of patterns) {
                         if (pattern.id) {
                             journeyPatterns[pattern.id] = pattern;
+                            
+                            const routePath: {lat: number, lng: number}[] = [];
+                            const sections = ensureArray(pattern.JourneyPatternSection);
+                            let isFirstLinkOfPattern = true;
+
+                            for (const section of sections) {
+                                const timingLinks = ensureArray(section.JourneyPatternTimingLink);
+                                for (const link of timingLinks) {
+                                    const fromStopRef = link.From?.StopPointRef;
+                                    if (isFirstLinkOfPattern && fromStopRef && stopPointsCoords[fromStopRef]) {
+                                        routePath.push(stopPointsCoords[fromStopRef]);
+                                    }
+                                    isFirstLinkOfPattern = false;
+                                    
+                                    const toStopRef = link.To?.StopPointRef;
+                                    if (toStopRef && stopPointsCoords[toStopRef]) {
+                                        routePath.push(stopPointsCoords[toStopRef]);
+                                    }
+                                }
+                            }
+                            if (routePath.length > 1) {
+                                routeGeometry[pattern.id] = routePath;
+                                routeMetadata[pattern.id] = {
+                                    name: `Service ${serviceName}: ${pattern.DestinationDisplay}`,
+                                    service: serviceName,
+                                    destination: pattern.DestinationDisplay,
+                                    direction: pattern.Direction,
+                                    id: pattern.id,
+                                };
+                            }
                         }
                     }
                 }
 
-                // 2. Parse VehicleJourneys and build timetable
                 const vehicleJourneys = ensureArray(data.VehicleJourneys?.VehicleJourney);
                 for (const vj of vehicleJourneys) {
-                    // FIX: Use the official VehicleJourneyCode, not the internal TicketMachine.JourneyCode
                     const journeyRef = vj.VehicleJourneyCode;
                     const departureTimeStr = vj.DepartureTime;
                     const journeyPatternRef = vj.JourneyPatternRef;
@@ -77,7 +118,7 @@ export async function POST(req: NextRequest) {
                     const departureTime = dateFnsParse(departureTimeStr, 'HH:mm:ss', new Date(0));
                     if (isNaN(departureTime.getTime())) continue;
 
-                    let currentTime = departureTime; // Represents the departure time from the current stop in the loop
+                    let currentTime = departureTime;
                     const stopTimes: { stop: string; time: string }[] = [];
                     const sections = ensureArray(pattern.JourneyPatternSection);
 
@@ -86,7 +127,6 @@ export async function POST(req: NextRequest) {
                     for (const section of sections) {
                         const timingLinks = ensureArray(section.JourneyPatternTimingLink);
                         for (const link of timingLinks) {
-                            // For the very first stop of the journey, its event time is the departure time.
                             if (isFirstLinkOfJourney) {
                                 stopTimes.push({
                                     stop: link.From.StopPointRef,
@@ -95,7 +135,6 @@ export async function POST(req: NextRequest) {
                                 isFirstLinkOfJourney = false;
                             }
 
-                            // Add RunTime to get arrival time at the 'To' stop.
                             const runTime = parseISO8601Duration(link.RunTime);
                             const arrivalAtTo = add(currentTime, runTime);
                             stopTimes.push({
@@ -103,7 +142,6 @@ export async function POST(req: NextRequest) {
                                 time: arrivalAtTo.toTimeString().split(' ')[0],
                             });
 
-                            // The next `currentTime` is the departure from this 'To' stop, which includes wait time.
                             const waitTime = link.To.WaitTime ? parseISO8601Duration(link.To.WaitTime) : {};
                             currentTime = add(arrivalAtTo, waitTime);
                         }
@@ -117,10 +155,16 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'No valid Transxchange XML files found in the ZIP.' }, { status: 400 });
         }
 
-        const filePath = path.join(process.cwd(), 'src', 'lib', 'timetable-data.json');
-        await fs.writeFile(filePath, JSON.stringify(timetable, null, 2));
+        const timetableFilePath = path.join(process.cwd(), 'src', 'lib', 'timetable-data.json');
+        await fs.writeFile(timetableFilePath, JSON.stringify(timetable, null, 2));
 
-        return NextResponse.json({ message: `Successfully processed ${filesProcessed} file(s) and created timetable reference.` }, { status: 200 });
+        const routeGeometryFilePath = path.join(process.cwd(), 'src', 'lib', 'route-geometry.json');
+        await fs.writeFile(routeGeometryFilePath, JSON.stringify(routeGeometry, null, 2));
+        
+        const routeMetadataFilePath = path.join(process.cwd(), 'src', 'lib', 'route-metadata.json');
+        await fs.writeFile(routeMetadataFilePath, JSON.stringify(routeMetadata, null, 2));
+
+        return NextResponse.json({ message: `Successfully processed ${filesProcessed} file(s) and created timetable and route geometry references.` }, { status: 200 });
 
     } catch (error: any) {
         console.error('TransXchange upload error:', error);

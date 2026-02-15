@@ -21,7 +21,7 @@ interface BusMapProps {
   show3DBuildings: boolean;
   showBusStops: boolean;
   metrolinkData: MetrolinkData | null;
-  recordedRoute: LatLng[] | null;
+  routeToDisplay: LatLng[] | null;
 }
 
 const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
@@ -39,7 +39,7 @@ export default function BusMap({
   show3DBuildings,
   showBusStops,
   metrolinkData,
-  recordedRoute,
+  routeToDisplay,
 }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -267,7 +267,7 @@ export default function BusMap({
 
     const lineLayerId = 'metrolink-lines-layer';
     if (!map.getLayer(lineLayerId)) {
-        const beforeId = map.getLayer('recorded-route-layer') ? 'recorded-route-layer' : 'bus-stops';
+        const beforeId = map.getLayer('route-display-layer') ? 'route-display-layer' : 'bus-stops';
         map.addLayer({
             id: lineLayerId,
             type: 'line',
@@ -352,8 +352,8 @@ export default function BusMap({
     const map = mapRef.current;
     if (!map?.isStyleLoaded()) return;
 
-    const sourceId = 'recorded-route-source';
-    const layerId = 'recorded-route-layer';
+    const sourceId = 'route-display-source';
+    const layerId = 'route-display-layer';
 
     const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource;
 
@@ -362,7 +362,7 @@ export default function BusMap({
         properties: {},
         geometry: {
             type: 'LineString',
-            coordinates: recordedRoute ? recordedRoute.map(p => [p.lng, p.lat]) : []
+            coordinates: routeToDisplay ? routeToDisplay.map(p => [p.lng, p.lat]) : []
         }
     };
     
@@ -392,9 +392,9 @@ export default function BusMap({
         }, 'bus-stops');
     }
     
-    map.setLayoutProperty(layerId, 'visibility', recordedRoute && recordedRoute.length > 1 ? 'visible' : 'none');
+    map.setLayoutProperty(layerId, 'visibility', routeToDisplay && routeToDisplay.length > 1 ? 'visible' : 'none');
 
-  }, [recordedRoute, styleRevision]);
+  }, [routeToDisplay, styleRevision]);
 
   useEffect(() => {
     const map = mapRef.current;
