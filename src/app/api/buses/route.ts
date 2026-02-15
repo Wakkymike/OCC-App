@@ -169,7 +169,7 @@ export async function GET() {
           const bearing = bearingText ? parseFloat(bearingText) : undefined;
           
           let delayInMinutes: number | undefined;
-          let status: string = 'Unknown';
+          let status: string;
 
           const monitoredCall = journey.MonitoredCall;
           const onwardCallsRaw = journey.OnwardCalls?.OnwardCall;
@@ -266,26 +266,20 @@ export async function GET() {
           
           // --- Status String Generation ---
           if (delayInMinutes !== undefined) {
-              const delay = Math.round(delayInMinutes);
-              if (delay > 1) {
-                status = `${delay} min late`;
-              } else if (delay < -1) {
-                status = `${Math.abs(delay)} min early`;
-              } else {
-                status = 'On Time';
-              }
+            const delay = Math.round(delayInMinutes);
+            if (delay > 1) {
+              status = `${delay} min late`;
+            } else if (delay < -1) {
+              status = `${Math.abs(delay)} min early`;
+            } else {
+              status = 'On Time';
+            }
+          } else if (progressStatusText) {
+            status = progressStatusText.charAt(0).toUpperCase() + progressStatusText.slice(1);
           } else {
-              // Fallback to text status if no delay could be calculated
-              if (progressStatusText.includes('on time')) {
-                  status = 'On Time';
-              } else if (progressStatusText.includes('late')) {
-                  status = 'Late';
-              } else if (progressStatusText.includes('early')) {
-                  status = 'Early';
-              } else if (progressStatusText) {
-                  status = progressStatusText.charAt(0).toUpperCase() + progressStatusText.slice(1);
-              }
+            status = 'Unknown';
           }
+
 
           return {
             fleetNumber: fleetNumber ?? 'unknown',
