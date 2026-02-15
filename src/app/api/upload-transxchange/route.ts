@@ -220,7 +220,8 @@ export async function POST(req: NextRequest) {
         const routeMetadataFilePath = path.join(process.cwd(), 'src', 'lib', 'route-metadata.json');
         await fs.writeFile(routeMetadataFilePath, JSON.stringify(routeMetadata, null, 2));
 
-        return NextResponse.json({ message: `Successfully processed ${filesProcessed} file(s) and created timetable and route geometry references.` }, { status: 200 });
+        const message = `Processed ${filesProcessed} file(s). Found ${Object.keys(routeMetadata).length} routes. Please refresh the map page.`;
+        return NextResponse.json({ message }, { status: 200 });
 
     } catch (error: any) {
         console.error('TransXchange upload error:', error);
