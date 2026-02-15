@@ -108,12 +108,13 @@ export async function POST(req: NextRequest) {
             const data = parser.parse(xmlContent)?.TransXChange;
             if (!data) continue;
 
-            if (!stopPointsSampleForDebug && (data.StopPoints || data.Stops)) {
-                stopPointsSampleForDebug = data.StopPoints || data.Stops;
+            const stopPointsContainer = data.StopPoints || data.Stops;
+            if (!stopPointsSampleForDebug && stopPointsContainer) {
+                stopPointsSampleForDebug = stopPointsContainer;
             }
 
-            // Aggregate StopPoints - Check for both <StopPoints> and <Stops>, and the correct inner structure
-            const stopPointsRaw = data.StopPoints?.AnnotatedStopPointRef ?? data.Stops?.AnnotatedStopPointRef ?? data.StopPoints?.StopPoint ?? data.Stops?.StopPoint;
+            // Aggregate StopPoints
+            const stopPointsRaw = stopPointsContainer?.AnnotatedStopPointRef ?? stopPointsContainer?.StopPoint;
             const stopPoints = ensureArray(stopPointsRaw);
             for (const sp of stopPoints) {
                 stopPointsProcessed++;
@@ -185,16 +186,21 @@ export async function POST(req: NextRequest) {
             const stopTimes: { stop: string; time: string }[] = [];
             
             let sections: any[] = [];
-            // Robustly find section references
-            if (pattern.JourneyPatternSectionRefs?.JourneyPatternSectionRef) {
-                const refsRaw = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
-                const refs = refsRaw.map(r => getText(r)).filter(Boolean) as string[];
-                sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
-            } 
-            // Fallback for inline sections if no refs are found
-            else if (pattern.JourneyPatternSection) {
+            const jpsRefs = pattern.JourneyPatternSectionRefs;
+            if (jpsRefs) {
+                let refIds: string[] = [];
+                if (typeof jpsRefs === 'string') {
+                    refIds = jpsRefs.split(' ');
+                } else if (jpsRefs.JourneyPatternSectionRef) {
+                    const refsRaw = ensureArray(jpsRefs.JourneyPatternSectionRef);
+                    refIds = refsRaw.map(r => getText(r)).filter(Boolean) as string[];
+                }
+                sections = refIds.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
+            }
+            if (sections.length === 0 && pattern.JourneyPatternSection) {
                 sections = ensureArray(pattern.JourneyPatternSection);
             }
+
 
             let isFirstLinkOfJourney = true;
             for (const section of sections) {
@@ -232,14 +238,18 @@ export async function POST(req: NextRequest) {
             const routePath: {lat: number, lng: number}[] = [];
             let sections: any[] = [];
             
-            // Robustly find section references
-            if (pattern.JourneyPatternSectionRefs?.JourneyPatternSectionRef) {
-                const refsRaw = ensureArray(pattern.JourneyPatternSectionRefs.JourneyPatternSectionRef);
-                const refs = refsRaw.map(r => getText(r)).filter(Boolean) as string[];
-                sections = refs.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
+            const jpsRefs = pattern.JourneyPatternSectionRefs;
+            if (jpsRefs) {
+                let refIds: string[] = [];
+                if (typeof jpsRefs === 'string') {
+                    refIds = jpsRefs.split(' ');
+                } else if (jpsRefs.JourneyPatternSectionRef) {
+                    const refsRaw = ensureArray(jpsRefs.JourneyPatternSectionRef);
+                    refIds = refsRaw.map(r => getText(r)).filter(Boolean) as string[];
+                }
+                sections = refIds.map(refId => journeyPatternSectionsById[refId]).filter(Boolean);
             }
-            // Fallback for inline sections
-            else if (pattern.JourneyPatternSection) {
+            if (sections.length === 0 && pattern.JourneyPatternSection) {
                 sections = ensureArray(pattern.JourneyPatternSection);
             }
 
