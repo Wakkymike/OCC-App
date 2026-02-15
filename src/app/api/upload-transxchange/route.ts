@@ -126,8 +126,16 @@ export async function POST(req: NextRequest) {
             for (const sp of stopPoints) {
                 stopPointsProcessed++;
                 const atcoCode = getText(sp.StopPointRef) ?? getText(sp.AtcoCode);
-                const latStr = getText(sp.Location?.Latitude) ?? getText(sp.Place?.Location?.Latitude);
-                const lngStr = getText(sp.Location?.Longitude) ?? getText(sp.Place?.Location?.Longitude);
+
+                const latStr = getText(sp.Location?.Latitude) ?? 
+                               getText(sp.Place?.Location?.Latitude) ??
+                               getText(sp.Location?.latitude) ??
+                               getText(sp.Place?.Location?.latitude);
+
+                const lngStr = getText(sp.Location?.Longitude) ?? 
+                               getText(sp.Place?.Location?.Longitude) ??
+                               getText(sp.Location?.longitude) ??
+                               getText(sp.Place?.Location?.longitude);
                 
                 if (atcoCode && latStr && lngStr) {
                     const lat = parseFloat(latStr);
