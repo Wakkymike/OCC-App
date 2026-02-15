@@ -120,8 +120,7 @@ export async function POST(req: NextRequest) {
                 const atcoCode = getText(sp.StopPointRef) ?? getText(sp.AtcoCode);
                 const latStr = getText(sp.Location?.Latitude) ?? getText(sp.Place?.Location?.Latitude);
                 const lngStr = getText(sp.Location?.Longitude) ?? getText(sp.Place?.Location?.Longitude);
-                let foundCoords = false;
-
+                
                 if (atcoCode && latStr && lngStr) {
                     const lat = parseFloat(latStr);
                     const lng = parseFloat(lngStr);
@@ -129,11 +128,8 @@ export async function POST(req: NextRequest) {
                         if (!stopPointsCoords[atcoCode]) {
                             stopPointsCoords[atcoCode] = { lat, lng };
                         }
-                        foundCoords = true;
                     }
-                }
-                
-                if (!foundCoords && !firstFailingStopPoint) {
+                } else if (!firstFailingStopPoint) {
                     firstFailingStopPoint = sp;
                 }
             }
@@ -303,7 +299,8 @@ export async function POST(req: NextRequest) {
         message += `TIMETABLES: Created timetable data for ${timetablesFound} unique journeys.\n`;
         message += `ROUTES: Successfully constructed ${routesFound} routes from ${stats.journeyPatterns} patterns.\n`;
         message += `STOP POINTS: Found coordinates for ${stats.stopPoints} unique stops out of ${stopPointsProcessed} processed.\n`;
-
+        
+        let debugSample: any = null;
 
         if (routesFound === 0 && stats.journeyPatterns > 0) {
             message += `\n--- ANALYSIS ---\n`;
@@ -314,19 +311,21 @@ export async function POST(req: NextRequest) {
                  message += `The system found stop coordinates, but failed to construct routes. This usually means the link between route sections and stop coordinates is broken.\n`;
                  message += `Please verify that the StopPointRefs in your JourneyPatternSections correspond to AtcoCodes in your StopPoints.`;
             }
+             // Try to get a sample pattern to debug
+            const firstPatternId = Object.keys(journeyPatternsById)[0];
+            const patternSample = firstPatternId ? journeyPatternsById[firstPatternId] : null;
+            debugSample = {
+                analysis: "Stop points were found, but route construction failed. This is likely because the structure of the `JourneyPatternSection` and its `StopPointRef` is not what the system expects.",
+                sample_journey_pattern: patternSample,
+            };
+        } else if (stats.stopPoints === 0 && stopPointsProcessed > 0) {
+            debugSample = { stop_point_sample: firstFailingStopPoint };
+        } else if (stats.stopPoints === 0 && stopPointsSampleForDebug) {
+             debugSample = { raw_stop_points_structure: stopPointsSampleForDebug };
         } else if (routesFound > 0) {
             message += `\nUpload successful. You can now select these routes on the map page.`;
         } else if (filesProcessed > 0) {
             message += `\nNo routes or services were found. The files may be empty or in an unsupported format.`;
-        }
-
-        let debugSample: any = null;
-        if (stats.stopPoints === 0 && stopPointsProcessed > 0) {
-            debugSample = { stop_point_sample: firstFailingStopPoint };
-        } else if (stats.stopPoints === 0 && stopPointsSampleForDebug) {
-            debugSample = {
-                raw_stop_points_structure: stopPointsSampleForDebug
-            };
         }
 
         return NextResponse.json({ message, debug_info: debugSample }, { status: 200 });
