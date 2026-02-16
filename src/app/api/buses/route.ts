@@ -2,8 +2,6 @@
 import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
 import type { Bus } from '@/lib/types';
-import timetable from '@/lib/timetable-data.json';
-import { add, parse as dateFnsParse, Duration } from 'date-fns';
 
 // Helper to safely extract a text value from a field which might be a string or an object with a #text property.
 const getText = (field: any): string | undefined => {
@@ -198,63 +196,6 @@ export async function GET() {
               const aimedTime = getText(monitoredCall.AimedDepartureTime) ?? getText(monitoredCall.AimedArrivalTime);
               const expectedTime = getText(monitoredCall.ExpectedDepartureTime) ?? getText(monitoredCall.ActualDepartureTime);
               delayInMinutes = calculateDelayFromTimes(aimedTime, expectedTime);
-          }
-
-
-          // --- FALLBACK DELAY CALCULATION (TIMETABLE-BASED) ---
-          // This is more accurate but more fragile. Only use if the primary method fails.
-          if (delayInMinutes === undefined) {
-            const calculateDelayWithTimetable = (
-                expectedTimeStr: string | undefined, 
-                scheduledStopTime: { time: string } | undefined
-            ): number | undefined => {
-                if (!expectedTimeStr || !scheduledStopTime?.time) return undefined;
-                try {
-                    const expectedTime = new Date(expectedTimeStr);
-                    const [hours, minutes, seconds] = scheduledStopTime.time.split(':').map(Number);
-                    const scheduledTime = new Date(expectedTime);
-                    scheduledTime.setHours(hours, minutes, seconds, 0);
-
-                    let diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
-
-                    if (diffMinutes > 12 * 60) {
-                        scheduledTime.setDate(scheduledTime.getDate() - 1);
-                        diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
-                    } else if (diffMinutes < -12 * 60) {
-                        scheduledTime.setDate(scheduledTime.getDate() + 1);
-                        diffMinutes = (expectedTime.getTime() - scheduledTime.getTime()) / (1000 * 60);
-                    }
-                    if (Math.abs(diffMinutes) < 1440) return Math.round(diffMinutes);
-                } catch (e) {
-                    return undefined;
-                }
-                return undefined;
-            };
-
-            const scheduledJourney = journeyRef ? (timetable as Record<string, any>)[journeyRef] : undefined;
-            if (scheduledJourney && Array.isArray(scheduledJourney)) {
-                let delayFound = false;
-
-                for (const call of onwardCalls) {
-                    const stopRef = getText(call.StopPointRef);
-                    const scheduledStopTime = scheduledJourney.find((s: any) => s.stop === stopRef);
-                    const calculatedDelay = calculateDelayWithTimetable(getText(call.ExpectedArrivalTime), scheduledStopTime);
-                    if (calculatedDelay !== undefined) {
-                        delayInMinutes = calculatedDelay;
-                        delayFound = true;
-                        break;
-                    }
-                }
-                if (!delayFound && monitoredCall) {
-                    const stopRef = getText(monitoredCall.StopPointRef);
-                    const scheduledStopTime = scheduledJourney.find((s: any) => s.stop === stopRef);
-                    const expectedTimeStr = getText(monitoredCall.ExpectedDepartureTime) ?? getText(monitoredCall.ActualDepartureTime);
-                    const calculatedDelay = calculateDelayWithTimetable(expectedTimeStr, scheduledStopTime);
-                    if (calculatedDelay !== undefined) {
-                        delayInMinutes = calculatedDelay;
-                    }
-                }
-            }
           }
           
           // --- Status String Generation ---
