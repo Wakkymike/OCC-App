@@ -57,6 +57,7 @@ export default function SignUpPage() {
         displayName: displayName,
         isAdmin: isSuperAdmin,
         isActive: isSuperAdmin, // The super admin is active by default
+        passwordChangeRequired: false, // Always false on initial sign-up
       };
       await setDoc(doc(db, 'userProfiles', user.uid), userProfile);
 

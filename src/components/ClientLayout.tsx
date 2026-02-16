@@ -9,6 +9,7 @@ import { getAuth, signOut } from 'firebase/auth';
 
 const PUBLIC_PAGES = ['/login', '/sign-up', '/pending-activation'];
 const ADMIN_PAGES = ['/admin'];
+const FORCE_PASSWORD_CHANGE_PAGE = '/force-password-change';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
@@ -23,6 +24,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const isPublicPage = PUBLIC_PAGES.includes(pathname);
     const isAdminPage = ADMIN_PAGES.includes(pathname);
     const isPendingPage = pathname === '/pending-activation';
+    const isPasswordChangePage = pathname === FORCE_PASSWORD_CHANGE_PAGE;
+
 
     if (user) {
       // User is authenticated, now check their profile status (active, admin).
@@ -49,21 +52,33 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           return; // Stop further checks if not active.
         }
 
-        // User IS active, proceed with other routing rules.
+        // 2. Check for forced password change (if user is active).
+        if (userProfile.passwordChangeRequired && !isPasswordChangePage) {
+            router.replace(FORCE_PASSWORD_CHANGE_PAGE);
+            return;
+        }
+
+        // 3. If on password change page but it's not required, redirect to home.
+        if (!userProfile.passwordChangeRequired && isPasswordChangePage) {
+            router.replace('/');
+            return;
+        }
+
+        // User IS active and doesn't need a password change, proceed with other routing rules.
         
-        // 2. If on the pending page, but they are now active, redirect to home.
+        // 4. If on the pending page, but they are now active, redirect to home.
         if (isPendingPage && (userProfile.isActive || isSuperAdmin)) {
           router.replace('/');
           return;
         }
 
-        // 3. If on a public page (login/signup) but they are active and logged in, redirect to home.
+        // 5. If on a public page (login/signup) but they are active and logged in, redirect to home.
         if (isPublicPage && !isPendingPage) {
             router.replace('/');
             return;
         }
 
-        // 4. Check for admin access if they are on an admin page.
+        // 6. Check for admin access if they are on an admin page.
         if (isAdminPage) {
           const isDbAdmin = userProfile.isAdmin;
 
@@ -78,7 +93,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       });
     } else {
       // User is not authenticated.
-      // If they are not on a public page, redirect to login.
+      // If they are on a page that isn't public, redirect to login.
       if (!isPublicPage) {
         router.replace('/login');
       }

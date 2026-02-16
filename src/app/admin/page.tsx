@@ -21,6 +21,7 @@ interface UserProfile {
   email: string;
   isAdmin: boolean;
   isActive: boolean;
+  passwordChangeRequired: boolean;
 }
 
 function UserManagement() {
@@ -69,6 +70,16 @@ function UserManagement() {
     });
   };
 
+  const handlePasswordChangeToggle = (user: UserProfile, required: boolean) => {
+    const userDocRef = doc(firestore, 'userProfiles', user.id);
+    updateDocumentNonBlocking(userDocRef, { passwordChangeRequired: required });
+
+    toast({
+        title: 'User Updated',
+        description: `${user.displayName} will ${required ? 'be required to' : 'not be required to'} change their password on next login.`,
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -96,6 +107,7 @@ function UserManagement() {
                 <TableHead>User</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Active</TableHead>
+                <TableHead>Force Password Change</TableHead>
                 <TableHead className="text-right">Administrator</TableHead>
               </TableRow>
             </TableHeader>
@@ -110,6 +122,14 @@ function UserManagement() {
                       onCheckedChange={(isChecked) => handleActiveToggle(user, isChecked)}
                       aria-label={`Toggle activation for ${user.displayName}`}
                       disabled={user.uid === currentUser?.uid || user.email === 'michael.dodsworth@gonorthwest.co.uk'}
+                    />
+                  </TableCell>
+                  <TableCell>
+                     <Switch
+                      checked={user.passwordChangeRequired}
+                      onCheckedChange={(isChecked) => handlePasswordChangeToggle(user, isChecked)}
+                      aria-label={`Toggle force password change for ${user.displayName}`}
+                      disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'}
                     />
                   </TableCell>
                   <TableCell className="text-right">
@@ -277,7 +297,7 @@ export default function AdminPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-background p-8 gap-8">
-       <div className="w-full max-w-2xl space-y-8">
+       <div className="w-full max-w-4xl space-y-8">
         <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold">Admin Panel</h1>
             <Link

@@ -28,9 +28,14 @@
           "type": "boolean",
           "description": "Flag indicating if the user's account has been activated by an admin.",
           "default": false
+        },
+        "passwordChangeRequired": {
+            "type": "boolean",
+            "description": "Flag indicating if the user must change their password on the next login.",
+            "default": false
         }
       },
-      "required": ["uid", "email", "displayName", "isAdmin", "isActive"]
+      "required": ["uid", "email", "displayName", "isAdmin", "isActive", "passwordChangeRequired"]
     }
   },
   "auth": {
