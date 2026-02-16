@@ -4,20 +4,28 @@ import { XMLParser } from 'fast-xml-parser';
 export const dynamic = 'force-dynamic'; // Ensure fresh data on every request
 
 export async function GET() {
-  const TFGM_RSS_URL = 'https://tfgm.com/public-transport/travel-updates/rss';
-  const PROXY_URL = `https://api.allorigins.win/raw?url=${encodeURIComponent(TFGM_RSS_URL)}`;
+  // This is the updated, correct URL for the RSS feed.
+  const TFGM_RSS_URL = 'https://tfgm.com/public-transport-disruptions-rss';
+
+  // We use a proxy to prevent any network or CORS issues.
+  // The /get endpoint returns a JSON object containing the feed content.
+  const PROXY_URL = `https://api.allorigins.win/get?url=${encodeURIComponent(TFGM_RSS_URL)}`;
 
   try {
-    // We fetch via the proxy which should handle CORS and potential blocking.
-    const response = await fetch(PROXY_URL, {
+    const proxyResponse = await fetch(PROXY_URL, {
       cache: 'no-store',
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch RSS feed via proxy: ${response.statusText}`);
+    if (!proxyResponse.ok) {
+      throw new Error(`Failed to fetch from proxy service: ${proxyResponse.statusText}`);
     }
 
-    const xmlText = await response.text();
+    const proxyJson = await proxyResponse.json();
+    const xmlText = proxyJson.contents; // The actual XML content is in this property
+
+    if (!xmlText) {
+      throw new Error("Proxy service did not return any content from the RSS feed.");
+    }
 
     const parser = new XMLParser({
       ignoreAttributes: false,
