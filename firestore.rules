@@ -18,17 +18,20 @@ service cloud.firestore {
     }
 
     match /userProfiles/{userId} {
-      // Users can read and update their own profile.
-      // Admins can read any profile.
-      allow get: if isOwner(userId) || isAdmin();
-      allow update: if isOwner(userId);
+      // Users can read their own profile.
+      // Admins can read any profile and list all profiles.
+      allow get, list: if isOwner(userId) || isAdmin();
+      
+      // A user can update their own profile.
+      // An admin can update any user's profile (to change their admin status).
+      allow update: if isOwner(userId) || isAdmin();
       
       // Only a new user can create their own profile document.
       // The UID in the document must match their auth UID.
       allow create: if isOwner(userId) && request.resource.data.uid == userId;
 
-      // Nobody can list all users or delete profiles from the client.
-      allow list, delete: if false;
+      // Nobody can delete profiles from the client.
+      allow delete: if false;
     }
 
     // Default-deny all other collections/documents

@@ -1,14 +1,108 @@
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState, useMemo } from 'react';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, Home, TramFront } from 'lucide-react';
+import { Loader2, Upload, Home, TramFront, Shield, Users } from 'lucide-react';
 import Link from 'next/link';
-import { buttonVariants } from '@/components/ui/button';
+import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { Switch } from '@/components/ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
+
+interface UserProfile {
+  id: string; // Document ID, which is the user's UID
+  uid: string;
+  displayName: string;
+  email: string;
+  isAdmin: boolean;
+}
+
+function UserManagement() {
+  const firestore = useFirestore();
+  const { user: currentUser } = useUser();
+
+  const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'userProfiles'), [firestore]);
+  const { data: users, isLoading } = useCollection<UserProfile>(usersCollectionRef);
+
+  const handleAdminToggle = (user: UserProfile, isAdmin: boolean) => {
+    if (user.uid === currentUser?.uid) {
+      toast({
+        variant: 'destructive',
+        title: 'Action Forbidden',
+        description: "You cannot change your own admin status.",
+      });
+      return;
+    }
+
+    const userDocRef = doc(firestore, 'userProfiles', user.id);
+    updateDocumentNonBlocking(userDocRef, { isAdmin });
+
+    toast({
+      title: 'User Updated',
+      description: `${user.displayName} has been ${isAdmin ? 'granted' : 'revoked'} admin privileges.`,
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <Users className="h-6 w-6" />
+          <div>
+            <CardTitle className="text-xl">User Management</CardTitle>
+            <CardDescription>
+              Grant or revoke administrator privileges for users.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading && (
+           <div className="flex items-center justify-center py-10 text-muted-foreground">
+             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+             <span>Loading users...</span>
+           </div>
+        )}
+        {users && (
+           <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead className="text-right">Administrator</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">{user.displayName}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell className="text-right">
+                     <Switch
+                      checked={user.isAdmin}
+                      onCheckedChange={(isChecked) => handleAdminToggle(user, isChecked)}
+                      aria-label={`Toggle admin for ${user.displayName}`}
+                      disabled={user.uid === currentUser?.uid}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {!isLoading && (!users || users.length === 0) && (
+            <p className="py-10 text-center text-muted-foreground">No users have signed up yet.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 
 export default function AdminPage() {
   // State for TransXchange upload
@@ -165,6 +259,8 @@ export default function AdminPage() {
               Back to Home
             </Link>
         </div>
+
+        <UserManagement />
 
         <Card>
            <CardHeader>
