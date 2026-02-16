@@ -109,7 +109,7 @@ function UserManagement() {
                       checked={user.isActive}
                       onCheckedChange={(isChecked) => handleActiveToggle(user, isChecked)}
                       aria-label={`Toggle activation for ${user.displayName}`}
-                      disabled={user.uid === currentUser?.uid}
+                      disabled={user.uid === currentUser?.uid || user.email === 'michael.dodsworth@gonorthwest.co.uk'}
                     />
                   </TableCell>
                   <TableCell className="text-right">
@@ -117,7 +117,7 @@ function UserManagement() {
                       checked={user.isAdmin}
                       onCheckedChange={(isChecked) => handleAdminToggle(user, isChecked)}
                       aria-label={`Toggle admin for ${user.displayName}`}
-                      disabled={user.uid === currentUser?.uid}
+                      disabled={user.uid === currentUser?.uid || user.email === 'michael.dodsworth@gonorthwest.co.uk'}
                     />
                   </TableCell>
                 </TableRow>
