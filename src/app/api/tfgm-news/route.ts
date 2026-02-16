@@ -5,17 +5,16 @@ export const dynamic = 'force-dynamic'; // Ensure fresh data on every request
 
 export async function GET() {
   const TFGM_RSS_URL = 'https://tfgm.com/public-transport/travel-updates/rss';
+  const PROXY_URL = `https://api.allorigins.win/raw?url=${encodeURIComponent(TFGM_RSS_URL)}`;
 
   try {
-    const response = await fetch(TFGM_RSS_URL, {
-      cache: 'no-store', // Force a fresh fetch on every request
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
+    // We fetch via the proxy which should handle CORS and potential blocking.
+    const response = await fetch(PROXY_URL, {
+      cache: 'no-store',
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch RSS feed: ${response.statusText}`);
+      throw new Error(`Failed to fetch RSS feed via proxy: ${response.statusText}`);
     }
 
     const xmlText = await response.text();
