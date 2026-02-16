@@ -32,7 +32,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           const userProfileRef = doc(db, 'userProfiles', user.uid);
           const userProfileSnap = await getDoc(userProfileRef);
 
-          if (!userProfileSnap.exists() || !userProfileSnap.data().isAdmin) {
+          const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
+          const isDbAdmin = userProfileSnap.exists() && userProfileSnap.data().isAdmin;
+
+          if (!isSuperAdmin && !isDbAdmin) {
             // Not an admin or profile doesn't exist, redirect away
             console.warn('Admin access denied. Redirecting.');
             router.replace('/');
