@@ -19,8 +19,11 @@ service cloud.firestore {
 
     match /userProfiles/{userId} {
       // Users can read their own profile.
-      // Admins can read any profile and list all profiles.
-      allow get, list: if isOwner(userId) || isAdmin();
+      // Admins can read any profile.
+      allow get: if isOwner(userId) || isAdmin();
+      
+      // Admins can list all profiles. The initial admin is bootstrapped by email.
+      allow list: if isAdmin() || request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk';
       
       // A user can update their own profile.
       // An admin can update any user's profile (to change their admin status).
