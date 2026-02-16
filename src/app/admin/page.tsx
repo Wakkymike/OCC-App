@@ -6,13 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, Home, TramFront, Shield, Users, UserPlus, Send } from 'lucide-react';
+import { Loader2, Upload, Home, TramFront, Users, UserPlus, Send, Clock } from 'lucide-react';
 import Link from 'next/link';
-import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
-import { sendSignInLinkToEmail } from 'firebase/auth';
+import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, addDocumentNonBlocking } from '@/firebase';
+import { collection, doc, Timestamp } from 'firebase/firestore';
+import { sendSignInLinkToEmail, User } from 'firebase/auth';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { format } from 'date-fns';
 
 
 interface UserProfile {
@@ -25,13 +26,15 @@ interface UserProfile {
   passwordChangeRequired: boolean;
 }
 
-function UserManagement() {
-  const firestore = useFirestore();
-  const { user: currentUser } = useUser();
-  const { toast } = useToast();
+interface Invitation {
+    id: string;
+    email: string;
+    invitedAt: Timestamp;
+}
 
-  const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'userProfiles'), [firestore]);
-  const { data: users, isLoading } = useCollection<UserProfile>(usersCollectionRef);
+function UserManagement({ users, isLoading, currentUser }: { users: UserProfile[] | null; isLoading: boolean, currentUser: User | null }) {
+  const firestore = useFirestore();
+  const { toast } = useToast();
 
   const handleAdminToggle = (user: UserProfile, isAdmin: boolean) => {
     if (user.uid === currentUser?.uid) {
@@ -154,6 +157,66 @@ function UserManagement() {
   );
 }
 
+function PendingInvitations({ allUsers, usersLoading }: { allUsers: UserProfile[] | null, usersLoading: boolean }) {
+    const firestore = useFirestore();
+    const invitationsCollectionRef = useMemoFirebase(() => collection(firestore, 'invitations'), [firestore]);
+    const { data: invitations, isLoading: invitationsLoading } = useCollection<Invitation>(invitationsCollectionRef);
+
+    const pendingInvites = useMemo(() => {
+        if (!invitations || !allUsers) return [];
+        const registeredEmails = new Set(allUsers.map(u => u.email));
+        return invitations
+            .filter(inv => !registeredEmails.has(inv.email))
+            .sort((a, b) => b.invitedAt.seconds - a.invitedAt.seconds);
+    }, [invitations, allUsers]);
+
+    const isLoading = usersLoading || invitationsLoading;
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-3">
+                    <Clock className="h-6 w-6" />
+                    <div>
+                        <CardTitle className="text-xl">Pending Invitations</CardTitle>
+                        <CardDescription>
+                            These users have been invited but have not yet created an account.
+                        </CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                {isLoading && (
+                    <div className="flex items-center justify-center py-10 text-muted-foreground">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <span>Loading invitations...</span>
+                    </div>
+                )}
+                {!isLoading && pendingInvites.length === 0 && (
+                    <p className="py-10 text-center text-muted-foreground">No pending invitations.</p>
+                )}
+                {!isLoading && pendingInvites.length > 0 && (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Invited At</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {pendingInvites.map((invite) => (
+                                <TableRow key={invite.id}>
+                                    <TableCell className="font-medium">{invite.email}</TableCell>
+                                    <TableCell>{format(new Date(invite.invitedAt.seconds * 1000), 'PPpp')}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
 
 export default function AdminPage() {
   const [inviteEmail, setInviteEmail] = useState('');
@@ -168,7 +231,12 @@ export default function AdminPage() {
   const [isUploadingMetro, setIsUploadingMetro] = useState(false);
   
   const auth = useAuth();
+  const firestore = useFirestore();
+  const { user: currentUser } = useUser();
   const { toast } = useToast();
+
+  const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'userProfiles'), [firestore]);
+  const { data: users, isLoading: isUsersLoading } = useCollection<UserProfile>(usersCollectionRef);
 
   const handleTxcFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -196,8 +264,15 @@ export default function AdminPage() {
     };
 
     try {
+      // Add a record of the invitation before sending the email.
+      const invitationsColRef = collection(firestore, 'invitations');
+      addDocumentNonBlocking(invitationsColRef, {
+          email: inviteEmail,
+          invitedAt: new Date(),
+      });
+
       await sendSignInLinkToEmail(auth, inviteEmail, actionCodeSettings);
-      // It's good practice to save the email in case the user completes the flow on the same device.
+      
       window.localStorage.setItem('emailForSignIn', inviteEmail);
       toast({
         title: 'Invitation Sent',
@@ -348,7 +423,7 @@ export default function AdminPage() {
             </Link>
         </div>
 
-        <UserManagement />
+        <UserManagement users={users} isLoading={isUsersLoading} currentUser={currentUser} />
         
         <Card>
             <CardHeader>
@@ -392,6 +467,8 @@ export default function AdminPage() {
                 </form>
             </CardContent>
         </Card>
+        
+        <PendingInvitations allUsers={users} usersLoading={isUsersLoading} />
 
 
         <Card>

@@ -44,6 +44,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /invitations/{invitationId} {
+      // Admins can create new invitations and list all of them.
+      allow create, list: if isAdmin();
+      // No one else can read or write individual invitations.
+      allow get, update, delete: if false;
+    }
+
     // Default-deny all other collections/documents
     match /{path=**} {
       allow read, write: if false;
