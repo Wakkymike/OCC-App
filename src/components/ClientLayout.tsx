@@ -37,9 +37,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }
 
         const userProfile = userProfileSnap.data();
+        const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
+
 
         // 1. Check for account activation.
-        if (!userProfile.isActive) {
+        if (!userProfile.isActive && !isSuperAdmin) {
           if (!isPendingPage) {
             // If user is not active, force them to the pending page.
             router.replace('/pending-activation');
@@ -49,8 +51,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
         // User IS active, proceed with other routing rules.
         
-        // 2. If on the pending page, but they are active, redirect to home.
-        if (isPendingPage) {
+        // 2. If on the pending page, but they are now active, redirect to home.
+        if (isPendingPage && (userProfile.isActive || isSuperAdmin)) {
           router.replace('/');
           return;
         }
@@ -63,7 +65,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
         // 4. Check for admin access if they are on an admin page.
         if (isAdminPage) {
-          const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
           const isDbAdmin = userProfile.isAdmin;
 
           if (!isSuperAdmin && !isDbAdmin) {
