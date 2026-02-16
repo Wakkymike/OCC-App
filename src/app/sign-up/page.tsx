@@ -53,7 +53,7 @@ export default function SignUpPage() {
         uid: user.uid,
         email: user.email,
         displayName: displayName,
-        isAdmin: false, // All new users are not admins by default
+        isAdmin: user.email === 'michael.dodsworth@gonorthwest.co.uk',
       };
       await setDoc(doc(db, 'userProfiles', user.uid), userProfile);
 
