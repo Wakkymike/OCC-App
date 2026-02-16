@@ -8,7 +8,7 @@ export async function GET() {
 
   try {
     const response = await fetch(TFGM_RSS_URL, {
-      next: { revalidate: 300 }, // Revalidate every 5 minutes
+      cache: 'no-store', // Force a fresh fetch on every request
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
