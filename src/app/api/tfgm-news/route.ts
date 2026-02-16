@@ -4,12 +4,11 @@ import { XMLParser } from 'fast-xml-parser';
 export const dynamic = 'force-dynamic'; // Ensure fresh data on every request
 
 export async function GET() {
-  // This is the updated, correct URL for the RSS feed.
-  const TFGM_RSS_URL = 'https://tfgm.com/public-transport-disruptions-rss';
+  // Switched to National Highways feed for North West England as requested.
+  const RSS_URL = 'https://nationalhighways.co.uk/travel-updates/rss-feed/?region=north-west';
 
   // We use a proxy to prevent any network or CORS issues.
-  // The /get endpoint returns a JSON object containing the feed content.
-  const PROXY_URL = `https://api.allorigins.win/get?url=${encodeURIComponent(TFGM_RSS_URL)}`;
+  const PROXY_URL = `https://api.allorigins.win/get?url=${encodeURIComponent(RSS_URL)}`;
 
   try {
     const proxyResponse = await fetch(PROXY_URL, {
@@ -45,7 +44,7 @@ export async function GET() {
     return NextResponse.json({ items: newsItems });
 
   } catch (error: any) {
-    console.error('Error fetching or parsing TfGM RSS feed:', error);
+    console.error('Error fetching or parsing travel news RSS feed:', error);
     return NextResponse.json(
       { error: `Failed to retrieve travel news: ${error.message}` },
       { status: 500 }
