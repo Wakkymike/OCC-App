@@ -4,7 +4,7 @@ import { XMLParser } from 'fast-xml-parser';
 export const dynamic = 'force-dynamic'; // Ensure fresh data on every request
 
 export async function GET() {
-  const TFGM_RSS_URL = 'https://tfgm.com/public-transport/rss/travel-updates-rss.xml';
+  const TFGM_RSS_URL = 'https://tfgm.com/travel-updates/rss';
 
   try {
     const response = await fetch(TFGM_RSS_URL, {
