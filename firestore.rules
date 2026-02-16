@@ -15,20 +15,16 @@ service cloud.firestore {
     // An admin is either the "super admin" by email, or a user with the `isAdmin` flag set to true in their profile.
     // This is the single source of truth for admin privileges in security rules.
     function isAdmin() {
-      // Check if the user is signed in before trying to access their auth token.
-      if (!isSignedIn()) {
-        return false;
-      }
-      
-      // Check if the user is the designated super admin by email.
-      let isSuperAdmin = request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk';
-
-      // Check if the user has the isAdmin flag in their profile document.
-      // The `exists()` check prevents errors if the profile document doesn't exist yet.
-      let isDatabaseAdmin = exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
-                            get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true;
-
-      return isSuperAdmin || isDatabaseAdmin;
+      // A user is an admin if they are signed in AND they are either the super admin by email
+      // OR they have the isAdmin flag in their user profile. The `request.auth != null` check
+      // short-circuits and prevents errors when no user is signed in.
+      return request.auth != null && (
+        request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' ||
+        (
+          exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true
+        )
+      );
     }
 
     match /userProfiles/{userId} {
