@@ -36,29 +36,37 @@
         }
       },
       "required": ["uid", "email", "displayName", "isAdmin", "isActive", "passwordChangeRequired"]
+    },
+    "Invitation": {
+        "title": "Invitation",
+        "type": "object",
+        "description": "Represents an invitation for a new user to join the application.",
+        "properties": {
+            "email": {
+                "type": "string",
+                "description": "The email address of the user being invited.",
+                "format": "email"
+            },
+            "invitedAt": {
+                "type": "string",
+                "description": "The timestamp when the invitation was sent.",
+                "format": "date-time"
+            }
+        },
+        "required": ["email", "invitedAt"]
     }
   },
   "auth": {
     "providers": ["password"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/userProfiles/{userId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/entities/UserProfile"
-          },
-          "description": "Stores individual user profiles. The document ID (`userId`) MUST be the user's Firebase Authentication UID.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier (UID) of the user, matching `request.auth.uid`."
-            }
-          ]
-        }
-      }
-    ]
+    "/userProfiles/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores individual user profiles. The document ID (`userId`) MUST be the user's Firebase Authentication UID."
+    },
+    "/invitations/{invitationId}": {
+        "schema": { "$ref": "#/entities/Invitation" },
+        "description": "Stores pending invitations sent to new users. These are deleted upon successful account creation."
+    }
   }
 }

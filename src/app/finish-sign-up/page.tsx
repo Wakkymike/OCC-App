@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '@/firebase';
 import {
   isSignInWithEmailLink,
@@ -8,7 +8,7 @@ import {
   updatePassword,
   updateProfile,
 } from 'firebase/auth';
-import { doc, setDoc, getFirestore } from 'firebase/firestore';
+import { doc, setDoc, getFirestore, getDoc, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -22,10 +22,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function FinishSignUpPage() {
+function FinishSignUpComponent() {
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
@@ -33,33 +33,49 @@ export default function FinishSignUpPage() {
   const [status, setStatus] = useState<'verifying' | 'form' | 'error'>('verifying');
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [invitationId, setInvitationId] = useState<string | null>(null);
   
   const auth = useAuth();
   const db = getFirestore();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (isSignInWithEmailLink(auth, window.location.href)) {
-      let storedEmail = window.localStorage.getItem('emailForSignIn');
-      if (!storedEmail) {
-        // This can happen if the user opens the link on a different device.
-        // We'll prompt them for their email.
-        storedEmail = window.prompt('Please provide your email for confirmation');
-      }
-
-      if (storedEmail) {
-        setEmail(storedEmail);
-        setStatus('form');
-      } else {
-        setErrorMessage('Could not confirm email. Please try the invitation link again or contact an administrator.');
+    const verifyInvitation = async () => {
+      const invId = searchParams.get('invitationId');
+      if (!invId) {
+        setErrorMessage('The invitation link is missing required information.');
         setStatus('error');
+        return;
       }
-    } else {
-      setErrorMessage('This is not a valid sign-up link. Please request a new invitation or sign up normally.');
-      setStatus('error');
-    }
-  }, [auth]);
+      setInvitationId(invId);
+
+      // 1. Check if the invitation document exists in Firestore.
+      const inviteRef = doc(db, 'invitations', invId);
+      const inviteSnap = await getDoc(inviteRef);
+
+      if (!inviteSnap.exists()) {
+        setErrorMessage('This invitation is invalid, has expired, or has been cancelled.');
+        setStatus('error');
+        return;
+      }
+      const inviteEmail = inviteSnap.data().email;
+
+      // 2. Check if the URL is a valid sign-in link from Firebase Auth.
+      if (!isSignInWithEmailLink(auth, window.location.href)) {
+        setErrorMessage('This is not a valid sign-up link. Please request a new invitation.');
+        setStatus('error');
+        return;
+      }
+      
+      // If we've reached here, the invitation is valid. Show the form.
+      setEmail(inviteEmail);
+      setStatus('form');
+    };
+
+    verifyInvitation();
+  }, [auth, searchParams, db]);
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +86,10 @@ export default function FinishSignUpPage() {
     if (password !== confirmPassword) {
       toast({ variant: 'destructive', title: 'Passwords Do Not Match' });
       return;
+    }
+    if (!invitationId) {
+        toast({ variant: 'destructive', title: 'Sign Up Failed', description: 'Missing invitation information.' });
+        return;
     }
     
     setIsLoading(true);
@@ -94,8 +114,8 @@ export default function FinishSignUpPage() {
       };
       await setDoc(doc(db, 'userProfiles', user.uid), userProfile);
       
-      // Clean up local storage
-      window.localStorage.removeItem('emailForSignIn');
+      // Delete the invitation document so it's no longer pending
+      await deleteDoc(doc(db, 'invitations', invitationId));
 
       toast({
         title: 'Account Created',
@@ -201,5 +221,13 @@ export default function FinishSignUpPage() {
         </form>
       </Card>
     </div>
+  );
+}
+
+export default function FinishSignUpPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <FinishSignUpComponent />
+    </Suspense>
   );
 }

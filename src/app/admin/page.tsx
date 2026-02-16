@@ -6,10 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, Home, TramFront, Users, UserPlus, Send, Clock } from 'lucide-react';
+import { Loader2, Upload, Home, TramFront, Users, UserPlus, Send, Clock, XCircle } from 'lucide-react';
 import Link from 'next/link';
-import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, addDocumentNonBlocking } from '@/firebase';
-import { collection, doc, Timestamp } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc, Timestamp, addDoc } from 'firebase/firestore';
 import { sendSignInLinkToEmail, User } from 'firebase/auth';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -159,6 +159,7 @@ function UserManagement({ users, isLoading, currentUser }: { users: UserProfile[
 
 function PendingInvitations({ allUsers, usersLoading }: { allUsers: UserProfile[] | null, usersLoading: boolean }) {
     const firestore = useFirestore();
+    const { toast } = useToast();
     const invitationsCollectionRef = useMemoFirebase(() => collection(firestore, 'invitations'), [firestore]);
     const { data: invitations, isLoading: invitationsLoading } = useCollection<Invitation>(invitationsCollectionRef);
 
@@ -171,6 +172,16 @@ function PendingInvitations({ allUsers, usersLoading }: { allUsers: UserProfile[
     }, [invitations, allUsers]);
 
     const isLoading = usersLoading || invitationsLoading;
+    
+    const handleCancelInvite = (invitationId: string) => {
+        const inviteDocRef = doc(firestore, 'invitations', invitationId);
+        deleteDocumentNonBlocking(inviteDocRef);
+        toast({
+            title: 'Invitation Revoked',
+            description: 'The pending invitation has been cancelled.',
+        });
+    };
+
 
     return (
         <Card>
@@ -201,6 +212,7 @@ function PendingInvitations({ allUsers, usersLoading }: { allUsers: UserProfile[
                             <TableRow>
                                 <TableHead>Email</TableHead>
                                 <TableHead>Invited At</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -208,6 +220,16 @@ function PendingInvitations({ allUsers, usersLoading }: { allUsers: UserProfile[
                                 <TableRow key={invite.id}>
                                     <TableCell className="font-medium">{invite.email}</TableCell>
                                     <TableCell>{format(new Date(invite.invitedAt.seconds * 1000), 'PPpp')}</TableCell>
+                                    <TableCell className="text-right">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => handleCancelInvite(invite.id)}
+                                            aria-label="Cancel invitation"
+                                        >
+                                            <XCircle className="h-5 w-5 text-destructive" />
+                                        </Button>
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -258,22 +280,24 @@ export default function AdminPage() {
     }
     setIsInviting(true);
 
-    const actionCodeSettings = {
-      url: `${window.location.origin}/finish-sign-up`,
-      handleCodeInApp: true,
-    };
-
     try {
-      // Add a record of the invitation before sending the email.
+      // 1. Create a new invitation document to get a unique ID.
       const invitationsColRef = collection(firestore, 'invitations');
-      addDocumentNonBlocking(invitationsColRef, {
+      const newInvitation = {
           email: inviteEmail,
           invitedAt: new Date(),
-      });
+      };
+      const docRef = await addDoc(invitationsColRef, newInvitation);
+      const invitationId = docRef.id;
 
+      // 2. Send the email with a link containing the unique invitation ID.
+      const actionCodeSettings = {
+        url: `${window.location.origin}/finish-sign-up?invitationId=${invitationId}`,
+        handleCodeInApp: true,
+      };
+      
       await sendSignInLinkToEmail(auth, inviteEmail, actionCodeSettings);
       
-      window.localStorage.setItem('emailForSignIn', inviteEmail);
       toast({
         title: 'Invitation Sent',
         description: `An email has been sent to ${inviteEmail} with instructions to create their account.`,

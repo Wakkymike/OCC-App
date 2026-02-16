@@ -15,6 +15,11 @@ service cloud.firestore {
     // An admin is either the "super admin" by email, or a user with the `isAdmin` flag set to true in their profile.
     // This is the single source of truth for admin privileges in security rules.
     function isAdmin() {
+      // Check if the user is signed in before trying to access their auth token.
+      if (!isSignedIn()) {
+        return false;
+      }
+      
       // Check if the user is the designated super admin by email.
       let isSuperAdmin = request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk';
 
@@ -23,7 +28,7 @@ service cloud.firestore {
       let isDatabaseAdmin = exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
                             get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true;
 
-      return isSignedIn() && (isSuperAdmin || isDatabaseAdmin);
+      return isSuperAdmin || isDatabaseAdmin;
     }
 
     match /userProfiles/{userId} {
@@ -45,10 +50,12 @@ service cloud.firestore {
     }
 
     match /invitations/{invitationId} {
-      // Admins can create new invitations and list all of them.
-      allow create, list: if isAdmin();
-      // No one else can read or write individual invitations.
-      allow get, update, delete: if false;
+      // Admins can create, list, and delete invitations.
+      allow create, list, delete: if isAdmin();
+      // An unauthenticated user can read a single invitation to verify it.
+      allow get: if true;
+      // No one can update an invitation.
+      allow update: if false;
     }
 
     // Default-deny all other collections/documents
