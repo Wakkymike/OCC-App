@@ -48,22 +48,26 @@ export default function SignUpPage() {
       // Update Firebase Auth profile
       await updateProfile(user, { displayName });
 
+      const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
+
       // Create user profile in Firestore
       const userProfile = {
         uid: user.uid,
         email: user.email,
         displayName: displayName,
-        isAdmin: user.email === 'michael.dodsworth@gonorthwest.co.uk',
+        isAdmin: isSuperAdmin,
+        isActive: isSuperAdmin, // The super admin is active by default
       };
       await setDoc(doc(db, 'userProfiles', user.uid), userProfile);
 
       toast({
         title: 'Account Created',
-        description: 'You have been successfully signed up.',
+        description: 'Your account is now pending activation by an administrator.',
       });
 
-      // Redirect is handled by ClientLayout
-      router.push('/');
+      // The ClientLayout component will handle redirecting the user
+      // to the appropriate page (/pending-activation or /).
+      // No explicit router.push here is needed.
 
     } catch (error: any) {
       console.error('Sign up error:', error);

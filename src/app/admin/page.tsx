@@ -20,11 +20,13 @@ interface UserProfile {
   displayName: string;
   email: string;
   isAdmin: boolean;
+  isActive: boolean;
 }
 
 function UserManagement() {
   const firestore = useFirestore();
   const { user: currentUser } = useUser();
+  const { toast } = useToast();
 
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'userProfiles'), [firestore]);
   const { data: users, isLoading } = useCollection<UserProfile>(usersCollectionRef);
@@ -48,6 +50,25 @@ function UserManagement() {
     });
   };
 
+  const handleActiveToggle = (user: UserProfile, isActive: boolean) => {
+    if (user.uid === currentUser?.uid) {
+      toast({
+        variant: 'destructive',
+        title: 'Action Forbidden',
+        description: "You cannot change your own activation status.",
+      });
+      return;
+    }
+
+    const userDocRef = doc(firestore, 'userProfiles', user.id);
+    updateDocumentNonBlocking(userDocRef, { isActive });
+
+    toast({
+      title: 'User Updated',
+      description: `${user.displayName}'s account has been ${isActive ? 'activated' : 'deactivated'}.`,
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -56,7 +77,7 @@ function UserManagement() {
           <div>
             <CardTitle className="text-xl">User Management</CardTitle>
             <CardDescription>
-              Grant or revoke administrator privileges for users.
+              Activate, deactivate, and grant admin privileges to users.
             </CardDescription>
           </div>
         </div>
@@ -74,6 +95,7 @@ function UserManagement() {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Active</TableHead>
                 <TableHead className="text-right">Administrator</TableHead>
               </TableRow>
             </TableHeader>
@@ -82,6 +104,14 @@ function UserManagement() {
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.displayName}</TableCell>
                   <TableCell>{user.email}</TableCell>
+                   <TableCell>
+                     <Switch
+                      checked={user.isActive}
+                      onCheckedChange={(isChecked) => handleActiveToggle(user, isChecked)}
+                      aria-label={`Toggle activation for ${user.displayName}`}
+                      disabled={user.uid === currentUser?.uid}
+                    />
+                  </TableCell>
                   <TableCell className="text-right">
                      <Switch
                       checked={user.isAdmin}

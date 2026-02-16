@@ -23,9 +23,14 @@
           "type": "boolean",
           "description": "Flag indicating if the user has administrative privileges.",
           "default": false
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Flag indicating if the user's account has been activated by an admin.",
+          "default": false
         }
       },
-      "required": ["uid", "email", "displayName", "isAdmin"]
+      "required": ["uid", "email", "displayName", "isAdmin", "isActive"]
     }
   },
   "auth": {
