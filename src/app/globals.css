@@ -146,3 +146,34 @@
   border-radius: 3px;
   padding: 0 2px;
 }
+
+/* Ticker Tape Animation */
+.ticker-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ticker-wrapper {
+  display: inline-block;
+}
+
+.ticker-content {
+  display: inline-flex;
+  align-items: center;
+  animation: ticker-scroll 60s linear infinite;
+}
+
+.ticker-container:hover .ticker-content {
+  animation-play-state: paused;
+}
+
+@keyframes ticker-scroll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
