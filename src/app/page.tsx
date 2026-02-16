@@ -1,10 +1,14 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Map, Radio, Shield } from 'lucide-react';
+import UserMenu from '@/components/auth/UserMenu';
 
 export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background p-8">
+      <div className="absolute top-4 right-4">
+        <UserMenu />
+      </div>
       <div className="text-center">
         <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-6xl">
           Go North West Tracker
