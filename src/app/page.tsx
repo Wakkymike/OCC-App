@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Map, Radio, Clock, Shield } from 'lucide-react';
+import { Map, Radio, Shield } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -10,7 +10,7 @@ export default function HomePage() {
           Go North West Tracker
         </h1>
         <p className="mt-6 text-lg leading-8 text-muted-foreground">
-          Your portal for live bus tracking and service timetables.
+          Your portal for live bus tracking and service information.
         </p>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-4">
           <Button asChild size="lg">
@@ -23,12 +23,6 @@ export default function HomePage() {
             <Link href="/timetable">
               <Radio className="mr-2 h-5 w-5" />
               Live Service Board
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link href="/timetables">
-              <Clock className="mr-2 h-5 w-5" />
-              Service Timetables
             </Link>
           </Button>
           <Button asChild size="lg" variant="secondary">
