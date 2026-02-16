@@ -7,7 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
 
-const PUBLIC_PAGES = ['/login', '/sign-up', '/pending-activation'];
+const PUBLIC_PAGES = ['/login', '/sign-up', '/pending-activation', '/finish-sign-up'];
 const ADMIN_PAGES = ['/admin'];
 const FORCE_PASSWORD_CHANGE_PAGE = '/force-password-change';
 
@@ -33,59 +33,64 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       const userProfileRef = doc(db, 'userProfiles', user.uid);
       
       getDoc(userProfileRef).then(userProfileSnap => {
-        // If profile doesn't exist (e.g., still being created), log them out to be safe.
-        if (!userProfileSnap.exists()) {
+        const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
+
+        // If profile doesn't exist yet (e.g., in the middle of sign-up flow),
+        // and we're not on a public page, log them out to be safe.
+        // This can happen with the email link flow if something goes wrong.
+        if (!userProfileSnap.exists() && !isPublicPage) {
           signOut(getAuth());
           return;
         }
-
-        const userProfile = userProfileSnap.data();
-        const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
-
-
-        // 1. Check for account activation.
-        if (!userProfile.isActive && !isSuperAdmin) {
-          if (!isPendingPage) {
-            // If user is not active, force them to the pending page.
-            router.replace('/pending-activation');
-          }
-          return; // Stop further checks if not active.
-        }
-
-        // 2. Check for forced password change (if user is active).
-        if (userProfile.passwordChangeRequired && !isPasswordChangePage) {
-            router.replace(FORCE_PASSWORD_CHANGE_PAGE);
-            return;
-        }
-
-        // 3. If on password change page but it's not required, redirect to home.
-        if (!userProfile.passwordChangeRequired && isPasswordChangePage) {
-            router.replace('/');
-            return;
-        }
-
-        // User IS active and doesn't need a password change, proceed with other routing rules.
         
-        // 4. If on the pending page, but they are now active, redirect to home.
-        if (isPendingPage && (userProfile.isActive || isSuperAdmin)) {
-          router.replace('/');
-          return;
-        }
+        // If profile exists, proceed with checks
+        if (userProfileSnap.exists()) {
+            const userProfile = userProfileSnap.data();
 
-        // 5. If on a public page (login/signup) but they are active and logged in, redirect to home.
-        if (isPublicPage && !isPendingPage) {
-            router.replace('/');
-            return;
-        }
+            // 1. Check for account activation.
+            if (!userProfile.isActive && !isSuperAdmin) {
+              if (!isPendingPage) {
+                // If user is not active, force them to the pending page.
+                router.replace('/pending-activation');
+              }
+              return; // Stop further checks if not active.
+            }
 
-        // 6. Check for admin access if they are on an admin page.
-        if (isAdminPage) {
-          const isDbAdmin = userProfile.isAdmin;
+            // 2. Check for forced password change (if user is active).
+            if (userProfile.passwordChangeRequired && !isPasswordChangePage) {
+                router.replace(FORCE_PASSWORD_CHANGE_PAGE);
+                return;
+            }
 
-          if (!isSuperAdmin && !isDbAdmin) {
-            // Not an admin, redirect to home.
-            router.replace('/');
-          }
+            // 3. If on password change page but it's not required, redirect to home.
+            if (!userProfile.passwordChangeRequired && isPasswordChangePage) {
+                router.replace('/');
+                return;
+            }
+
+            // User IS active and doesn't need a password change, proceed with other routing rules.
+            
+            // 4. If on the pending page, but they are now active, redirect to home.
+            if (isPendingPage && (userProfile.isActive || isSuperAdmin)) {
+              router.replace('/');
+              return;
+            }
+
+            // 5. If on a public page (login/signup) but they are active and logged in, redirect to home.
+            if (isPublicPage && !isPendingPage) {
+                router.replace('/');
+                return;
+            }
+
+            // 6. Check for admin access if they are on an admin page.
+            if (isAdminPage) {
+              const isDbAdmin = userProfile.isAdmin;
+
+              if (!isSuperAdmin && !isDbAdmin) {
+                // Not an admin, redirect to home.
+                router.replace('/');
+              }
+            }
         }
       }).catch(() => {
           // If there's an error fetching the profile, log the user out.

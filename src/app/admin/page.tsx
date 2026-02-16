@@ -6,10 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, Home, TramFront, Shield, Users } from 'lucide-react';
+import { Loader2, Upload, Home, TramFront, Shield, Users, UserPlus, Send } from 'lucide-react';
 import Link from 'next/link';
-import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
+import { sendSignInLinkToEmail } from 'firebase/auth';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -121,7 +122,7 @@ function UserManagement() {
                       checked={user.isActive}
                       onCheckedChange={(isChecked) => handleActiveToggle(user, isChecked)}
                       aria-label={`Toggle activation for ${user.displayName}`}
-                      disabled={user.uid === currentUser?.uid || user.email === 'michael.dodsworth@gonorthwest.co.uk'}
+                      disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'}
                     />
                   </TableCell>
                   <TableCell>
@@ -137,7 +138,7 @@ function UserManagement() {
                       checked={user.isAdmin}
                       onCheckedChange={(isChecked) => handleAdminToggle(user, isChecked)}
                       aria-label={`Toggle admin for ${user.displayName}`}
-                      disabled={user.uid === currentUser?.uid || user.email === 'michael.dodsworth@gonorthwest.co.uk'}
+                      disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'}
                     />
                   </TableCell>
                 </TableRow>
@@ -155,6 +156,9 @@ function UserManagement() {
 
 
 export default function AdminPage() {
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
+  
   // State for TransXchange upload
   const [txcFile, setTxcFile] = useState<File | null>(null);
   const [isUploadingTxc, setIsUploadingTxc] = useState(false);
@@ -162,7 +166,8 @@ export default function AdminPage() {
   // State for Metrolink upload
   const [metroFile, setMetroFile] = useState<File | null>(null);
   const [isUploadingMetro, setIsUploadingMetro] = useState(false);
-
+  
+  const auth = useAuth();
   const { toast } = useToast();
 
   const handleTxcFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,6 +179,39 @@ export default function AdminPage() {
   const handleMetroFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setMetroFile(e.target.files[0]);
+    }
+  };
+
+  const handleInviteSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!inviteEmail) {
+      toast({ variant: 'destructive', title: 'Email required' });
+      return;
+    }
+    setIsInviting(true);
+
+    const actionCodeSettings = {
+      url: `${window.location.origin}/finish-sign-up`,
+      handleCodeInApp: true,
+    };
+
+    try {
+      await sendSignInLinkToEmail(auth, inviteEmail, actionCodeSettings);
+      // It's good practice to save the email in case the user completes the flow on the same device.
+      window.localStorage.setItem('emailForSignIn', inviteEmail);
+      toast({
+        title: 'Invitation Sent',
+        description: `An email has been sent to ${inviteEmail} with instructions to create their account.`,
+      });
+      setInviteEmail('');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Invitation Failed',
+        description: error.message,
+      });
+    } finally {
+      setIsInviting(false);
     }
   };
 
@@ -311,6 +349,50 @@ export default function AdminPage() {
         </div>
 
         <UserManagement />
+        
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-3">
+                    <UserPlus className="h-6 w-6" />
+                    <div>
+                        <CardTitle className="text-xl">Invite New User</CardTitle>
+                        <CardDescription>
+                          Send an email invitation to a new user to create their account.
+                        </CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <form onSubmit={handleInviteSubmit} className="space-y-4">
+                  <div className="grid w-full max-w-sm items-center gap-1.5">
+                    <Label htmlFor="invite-email">User's Email</Label>
+                    <Input
+                      id="invite-email"
+                      type="email"
+                      placeholder="new.user@example.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      disabled={isInviting}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" disabled={isInviting || !inviteEmail}>
+                    {isInviting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Send Invitation
+                      </>
+                    )}
+                  </Button>
+                </form>
+            </CardContent>
+        </Card>
+
 
         <Card>
            <CardHeader>
