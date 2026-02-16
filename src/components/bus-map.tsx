@@ -466,12 +466,26 @@ export default function BusMap({
       const markerElement = marker.getElement();
       const flagElement = markerElement.querySelector('div') as HTMLDivElement;
       
+      const isSchoolService = bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
+      const isNightBus = bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
+      const isFirstJourney = bus.journeyRef ? firstJourneyRefs.includes(bus.journeyRef) : false;
+      const isLastJourney = bus.journeyRef ? lastJourneyRefs.includes(bus.journeyRef) : false;
+
+      let runningBoardHtml = bus.runningBoard;
+      if (isFirstJourney || isLastJourney) {
+        runningBoardHtml = `<span class="blinking-rb">${bus.runningBoard}</span>`;
+      }
+      
+      let indicators = '';
+      if (isSchoolService) indicators += ` <span style="color:red;font-weight:bold;">(S)</span>`;
+      if (isNightBus) indicators += ` <span style="color:purple;font-weight:bold;">(N)</span>`;
+
       let directionLabel = '';
-      if (bus.direction.toLowerCase() === 'inbound') directionLabel = ` <span style="color:blue">[I]</span>`;
-      else if (bus.direction.toLowerCase() === 'outbound') directionLabel = ` <span style="color:blue">[O]</span>`;
+      if (bus.direction.toLowerCase() === 'inbound') directionLabel = ` <span style="color:blue;">[I]</span>`;
+      else if (bus.direction.toLowerCase() === 'outbound') directionLabel = ` <span style="color:green;">[O]</span>`;
       
       let statusHtml = '';
-      let color = '#333'; // Default color for status text
+      let color = '#333';
       const lowerCaseStatus = bus.status.toLowerCase();
 
       if (bus.status && bus.status !== 'Unknown') {
@@ -484,12 +498,11 @@ export default function BusMap({
           } else if (lowerCaseStatus.includes('cancelled')) {
               color = '#a94442'; // red
           }
-          // For other statuses like 'Normal', 'Stopped', it will use the default color
           statusHtml = ` | <span style="color:${color}; font-weight: bold;">${bus.status}</span>`;
       }
 
 
-      flagElement.innerHTML = `${bus.fleetNumber} | ${bus.service}${directionLabel} | ${bus.destination}${statusHtml}`;
+      flagElement.innerHTML = `${bus.fleetNumber} | RB: ${runningBoardHtml} | ${bus.service}${directionLabel}${indicators} | ${bus.destination}${statusHtml}`;
       
       const svg = markerElement.querySelector('svg');
       if (svg && bus.bearing !== undefined) svg.style.transform = `rotate(${bus.bearing}deg)`;
@@ -499,19 +512,15 @@ export default function BusMap({
       if (busBody && infoFlag) {
         busBody.setAttribute('fill', isSelected ? '#00FFFF' : '#FFC107');
         if (isSelected) {
-          const isSchoolService = bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
-          const isNightBus = bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
-          const isFirstJourney = bus.journeyRef ? firstJourneyRefs.includes(bus.journeyRef) : false;
-          const isLastJourney = bus.journeyRef ? lastJourneyRefs.includes(bus.journeyRef) : false;
-          let runningBoardHtml = `RB: ${bus.runningBoard}`;
+          let detailedRunningBoardHtml = `RB: ${bus.runningBoard}`;
           if (isFirstJourney || isLastJourney) {
-            runningBoardHtml = `<span class="blinking-rb">${runningBoardHtml}</span>`;
+            detailedRunningBoardHtml = `<span class="blinking-rb">${detailedRunningBoardHtml}</span>`;
           }
           
           const schoolInfo = isSchoolService ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[SCHOOL SERVICE]</div>` : '';
           const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
           const journeyInfo = bus.journeyRef ? `<div><div style="font-weight: bold; color: green;">Journey Number</div><div>${bus.journeyRef}</div></div>` : '';
-          const runningBoardInfo = bus.runningBoard ? `<div style="margin-top: 4px;"><div style="font-weight: bold;">Running Board</div><div>${runningBoardHtml}</div></div>` : '';
+          const runningBoardInfo = bus.runningBoard ? `<div style="margin-top: 4px;"><div style="font-weight: bold;">Running Board</div><div>${detailedRunningBoardHtml}</div></div>` : '';
           
           let statusDisplay = '';
           if (bus.status && bus.status !== 'Unknown') {
