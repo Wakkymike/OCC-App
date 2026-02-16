@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user's profile within the application, linked to an external authentication system. It stores user-specific information and their assigned roles.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity. This ID is typically provided by the external authentication system."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address, often used as a primary identifier from an external authentication provider.",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "A user-friendly name for the user, intended for display within the application."
+        },
+        "roleIds": {
+          "type": "array",
+          "description": "References to Role entities that define the permissions and access levels for this user. (Relationship: UserProfile N:N Role)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "displayName",
+        "roleIds"
+      ]
+    },
+    "Role": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Role",
+      "type": "object",
+      "description": "Defines a security role within the application, granting specific access rights or permissions to users assigned to it.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Role entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the role (e.g., 'Admin', 'User'). This should be unique."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed explanation of what this role represents and the access it grants."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/userProfiles/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores individual user profiles. The document ID (`userId`) MUST be the user's Firebase Authentication UID. Includes denormalized 'roleIds' for user-facing role display, but authorization relies on separate role collections.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier (UID) of the user, matching `request.auth.uid`."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{adminId}",
+        "definition": {
+          "entityName": "Role",
+          "schema": {
+            "$ref": "#/backend/entities/Role"
+          },
+          "description": "Designates administrators. The *existence* of a document at this path signifies the user specified by `adminId` is an admin. The document ID (`adminId`) MUST be the user's Firebase Authentication UID. This collection is for authorization independence via 'existence over content' for admin checks.",
+          "params": [
+            {
+              "name": "adminId",
+              "description": "The unique identifier (UID) of the user who is designated as an administrator."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles/{roleId}",
+        "definition": {
+          "entityName": "Role",
+          "schema": {
+            "$ref": "#/backend/entities/Role"
+          },
+          "description": "Stores the definitions of different roles (e.g., 'Admin', 'User'). This is reference data and not directly used for per-user authorization checks, which are handled by dedicated role collections (like '/roles_admin/{adminId}').",
+          "params": [
+            {
+              "name": "roleId",
+              "description": "The unique identifier for the role (e.g., 'admin', 'user')."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure is designed to support a secure login system with robust role-based access control, specifically for 'Admin' users, while adhering to the core design principles of Authorization Independence and QAPs. \n\n1.  \"/userProfiles/{userId}\": This top-level collection stores individual user profiles. The document ID, `userId`, is explicitly set to the Firebase Authentication `uid` of the user. This ensures **Path-Based Ownership**, where a user's profile path directly includes their unique ID. This setup guarantees **Authorization Independence** for user profile access because security rules can directly compare `request.auth.uid` with `userId` from the path, eliminating any need for `get()` operations on parent documents. It provides clear intent: `request.auth.uid == userId` for personal profile access, and `exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))` for admin override.\n\n2.  \"/roles_admin/{adminId}\": This dedicated collection implements the **DBAC (No Custom Claims) and Existence over Content** principle for global roles. The *existence* of a document at `/roles_admin/{adminId}` where `adminId` matches a user's `uid` unequivocally designates that user as an administrator. This is crucial for **Authorization Independence** and supporting **QAPs** (Queries as Permissions). Rules can efficiently check `exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))` to grant admin permissions without ever performing `get()` operations on other documents or iterating arrays. For **QAPs**, `list` operations on this collection can be restricted to only authenticated administrators, preventing non-admins from discovering all admin UIDs, as per the mandate that rules are not filters.\n\n3.  \"/roles/{roleId}\": This collection stores the static definitions of roles (e.g., 'Admin', 'User'). It acts as reference data. While `UserProfile` documents store `roleIds` for display purposes or more complex authorization scenarios, this collection itself does not directly participate in real-time user authorization checks to preserve **Authorization Independence**. Access to this collection is generally read-only for authenticated users, making its security posture simple and homogeneous.\n\nThis structure prioritizes security and debuggability by denormalizing authorization context into dedicated, path-based or existence-based collections. It avoids complex `get()` calls in security rules, supports atomic operations, and provides clear, testable authorization logic."
+  }
+}
