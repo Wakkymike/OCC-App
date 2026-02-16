@@ -11,25 +11,32 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Function to check if the user is an admin by reading their profile.
-    // This is secure because reads to userProfiles are restricted.
+    // Function to check if the requesting user is an admin.
+    // An admin is either the "super admin" by email, or a user with the `isAdmin` flag set to true in their profile.
+    // This is the single source of truth for admin privileges in security rules.
     function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true;
+      // Check if the user is the designated super admin by email.
+      let isSuperAdmin = request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk';
+
+      // Check if the user has the isAdmin flag in their profile document.
+      // The `exists()` check prevents errors if the profile document doesn't exist yet.
+      let isDatabaseAdmin = exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
+                            get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true;
+
+      return isSignedIn() && (isSuperAdmin || isDatabaseAdmin);
     }
 
     match /userProfiles/{userId} {
-      // Users can read their own profile.
-      // Admins can read any profile.
+      // Admins can get any profile. Users can only get their own.
       allow get: if isOwner(userId) || isAdmin();
       
-      // Admins can list all profiles. The initial admin is bootstrapped by email.
-      allow list: if isAdmin() || request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk';
+      // Only admins can list all user profiles.
+      allow list: if isAdmin();
       
-      // A user can update their own profile.
-      // An admin can update any user's profile (to change their admin status).
+      // Admins can update any profile. Users can only update their own.
       allow update: if isOwner(userId) || isAdmin();
       
-      // Only a new user can create their own profile document.
+      // A new user can create their own profile document.
       // The UID in the document must match their auth UID.
       allow create: if isOwner(userId) && request.resource.data.uid == userId;
 
