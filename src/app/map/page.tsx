@@ -40,6 +40,7 @@ export default function Page() {
   const [showBusStops, setShowBusStops] = useState(true);
   const [showMetroline, setShowMetroline] = useState(false);
   const [showVisionBus, setShowVisionBus] = useState(false);
+  const [showStagecoach, setShowStagecoach] = useState(false);
   const { toast } = useToast();
 
   const [metrolinkData, setMetrolinkData] = useState<MetrolinkData | null>(null);
@@ -186,7 +187,8 @@ export default function Page() {
     const operatorFilteredBuses = buses.filter(bus => 
         bus.operator === 'GNW' || 
         (bus.operator === 'MET' && showMetroline) ||
-        (bus.operator === 'VB' && showVisionBus)
+        (bus.operator === 'VB' && showVisionBus) ||
+        (bus.operator === 'SC' && showStagecoach)
     );
 
     // 2. Filter by search query if there is one
@@ -282,7 +284,7 @@ export default function Page() {
         setSelectedBusId(null);
       }
     }
-  }, [buses, currentSearch, selectedBusId, isRecording, recordingBusId, recordingService, toast, lastRecordedPosition, handleStopRecording, showMetroline, showVisionBus]);
+  }, [buses, currentSearch, selectedBusId, isRecording, recordingBusId, recordingService, toast, lastRecordedPosition, handleStopRecording, showMetroline, showVisionBus, showStagecoach]);
 
   const handleLocationSearch = async (query: string) => {
     setSelectedBusId(null);
@@ -424,6 +426,8 @@ export default function Page() {
               setShowMetroline={setShowMetroline}
               showVisionBus={showVisionBus}
               setShowVisionBus={setShowVisionBus}
+              showStagecoach={showStagecoach}
+              setShowStagecoach={setShowStagecoach}
             />
           </PopoverContent>
         </Popover>

@@ -64,6 +64,7 @@ export async function GET() {
     { operator: 'GNW' as const, feedId: '18880' },
     { operator: 'MET' as const, feedId: '16387' },
     { operator: 'VB' as const, feedId: '20422' },
+    { operator: 'SC' as const, feedId: '14336' },
   ];
 
   const fetchPromises = feeds.map(feed => {

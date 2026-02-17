@@ -582,6 +582,8 @@ export default function BusMap({
         operatorLabel = ` <span style="color:#2563eb;font-weight:bold;">[MET]</span>`;
       } else if (bus.operator === 'VB') {
         operatorLabel = ` <span style="color:#16a34a;font-weight:bold;">[VB]</span>`;
+      } else if (bus.operator === 'SC') {
+        operatorLabel = ` <span style="color:#ef4444;font-weight:bold;">[SC]</span>`;
       }
       
       flagElement.innerHTML = `${bus.fleetNumber} | RB: ${runningBoardHtml} | ${bus.service}${operatorLabel}${directionLabel}${indicators} | ${bus.destination}${statusHtml}`;
@@ -596,7 +598,9 @@ export default function BusMap({
           ? '#FFC107' // Yellow for GNW
           : bus.operator === 'MET'
           ? '#60a5fa' // Blue for Metroline
-          : '#4ade80'; // Green for VisionBus
+          : bus.operator === 'VB'
+          ? '#4ade80' // Green for VisionBus
+          : '#ef4444'; // Red for Stagecoach
           
       if (busBody) {
           busBody.setAttribute('fill', isSelected ? '#00FFFF' : defaultColor);
