@@ -84,8 +84,8 @@ export default function TickerTape() {
         <div className="ticker-wrapper">
             <div className="ticker-content">
                 {content}
-                {/* Duplicate content for seamless looping only if there are items */}
-                {items.length > 0 && <div className="ticker-content">{content}</div>}
+                {/* Duplicate content for seamless looping */}
+                {items.length > 0 && content}
             </div>
         </div>
       ) : (
