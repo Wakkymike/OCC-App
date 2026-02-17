@@ -133,7 +133,7 @@ export default function MapControls({
            </div>
            <div className="flex items-center justify-between rounded-lg border p-3">
                 <div className="flex items-center space-x-2">
-                    <TramFront className="h-5 w-5" />
+                    <Bus className="h-5 w-5" />
                     <Label htmlFor="show-metroline" className="cursor-pointer">Show Metroline</Label>
                 </div>
                 <Switch
