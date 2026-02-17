@@ -1,3 +1,5 @@
+'use client';
+
 import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
 import type { Roadwork } from '@/lib/types';
@@ -47,12 +49,6 @@ export async function GET() {
         
         const title = item.title || '';
         
-        // Filter for items that are likely roadworks from the title
-        const isRoadwork = ['roadwork', 'closure', 'lane closed', 'maintenance'].some(keyword => title.toLowerCase().includes(keyword));
-        if (!isRoadwork) {
-          return null;
-        }
-
         const point = item.point;
         if (!point || typeof point !== 'string') {
           return null;
