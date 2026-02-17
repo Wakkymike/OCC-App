@@ -69,11 +69,23 @@ function UserManagement({ users, isLoading, currentUser }: { users: UserProfile[
         return;
     }
     const userDocRef = doc(firestore, 'userProfiles', user.id);
-    updateDocumentNonBlocking(userDocRef, { isContentCreator });
+
+    // If we are granting content creator permissions, also ensure the user is active.
+    const updateData: { isContentCreator: boolean, isActive?: boolean } = { isContentCreator };
+    if (isContentCreator) {
+        updateData.isActive = true;
+    }
+    
+    updateDocumentNonBlocking(userDocRef, updateData);
+
+    let toastDescription = `${user.displayName} has been ${isContentCreator ? 'granted' : 'revoked'} content creator privileges.`;
+    if (isContentCreator && !user.isActive) {
+        toastDescription += ' Their account has also been activated.';
+    }
 
     toast({
         title: 'User Updated',
-        description: `${user.displayName} has been ${isContentCreator ? 'granted' : 'revoked'} content creator privileges.`,
+        description: toastDescription,
     });
   };
 
