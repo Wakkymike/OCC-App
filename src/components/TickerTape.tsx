@@ -15,10 +15,10 @@ export default function TickerTape() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchNews() {
+    const fetchNews = async () => {
+      // Note: We don't set loading to true on subsequent polls
+      // to avoid a flicker in the UI.
       try {
-        setIsLoading(true);
-        setError(null);
         const response = await fetch('/api/tfgm-news');
         const data = await response.json();
 
@@ -32,17 +32,24 @@ export default function TickerTape() {
             description: item.description.replace(/<[^>]*>?/gm, '')
         }));
         setItems(cleanedItems);
+        setError(null); // Clear any previous error on success
       } catch (err: any) {
         console.error(err);
         setError(err.message || 'An unknown error occurred while loading travel news.');
-        setItems([]);
+        // We don't clear old items, so the last good data can still be shown if a fetch fails
       } finally {
-        setIsLoading(false);
+        // This will only run once to remove the initial "Loading..." message
+        if (isLoading) {
+          setIsLoading(false);
+        }
       }
     }
 
-    fetchNews();
-  }, []);
+    fetchNews(); // Fetch immediately on mount
+    const intervalId = setInterval(fetchNews, 60000); // And then every minute
+
+    return () => clearInterval(intervalId); // Cleanup on unmount
+  }, [isLoading]);
 
   const hasContent = !isLoading && (items.length > 0 || error);
 
