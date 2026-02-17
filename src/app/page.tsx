@@ -4,6 +4,7 @@ import { Map, Radio, Shield, Route } from 'lucide-react';
 import UserMenu from '@/components/auth/UserMenu';
 import TickerTape from '@/components/TickerTape';
 import BreakingNewsTicker from '@/components/BreakingNewsTicker';
+import NetworkUpdatesBox from '@/components/NetworkUpdatesBox';
 
 export default function HomePage() {
   return (
@@ -48,6 +49,8 @@ export default function HomePage() {
                     </Button>
                     </div>
                 </div>
+
+                <NetworkUpdatesBox />
 
             </main>
         </div>

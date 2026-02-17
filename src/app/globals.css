@@ -84,6 +84,18 @@
   }
 }
 
+@layer utilities {
+    @keyframes scroll-up {
+        0% { transform: translateY(100%); opacity: 0; }
+        10% { transform: translateY(0); opacity: 1; }
+        90% { transform: translateY(0); opacity: 1; }
+        100% { transform: translateY(-100%); opacity: 0; }
+    }
+    .animate-scroll-up {
+        animation: scroll-up 60s ease-in-out forwards;
+    }
+}
+
 .bus-marker {
   display:flex;
   flex-direction:column;

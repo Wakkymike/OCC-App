@@ -54,6 +54,37 @@
             }
         },
         "required": ["email", "invitedAt"]
+    },
+    "NetworkUpdate": {
+        "title": "Network Update",
+        "type": "object",
+        "description": "Represents a network status update to be displayed on the homepage.",
+        "properties": {
+            "title": {
+                "type": "string",
+                "description": "The title of the update."
+            },
+            "details": {
+                "type": "string",
+                "description": "The full text content of the update."
+            },
+            "priority": {
+                "type": "number",
+                "description": "A number to control the order of updates. Lower numbers are shown first.",
+                "default": 0
+            },
+            "isVisible": {
+                "type": "boolean",
+                "description": "Whether the update is currently visible on the homepage.",
+                "default": true
+            },
+            "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "The timestamp when the update was created."
+            }
+        },
+        "required": ["title", "details", "priority", "isVisible", "createdAt"]
     }
   },
   "auth": {
@@ -67,6 +98,10 @@
     "/invitations/{invitationId}": {
         "schema": { "$ref": "#/entities/Invitation" },
         "description": "Stores pending invitations sent to new users. These are deleted upon successful account creation."
+    },
+    "/networkUpdates/{updateId}": {
+        "schema": { "$ref": "#/entities/NetworkUpdate" },
+        "description": "Stores network-wide updates and announcements for display on the homepage."
     }
   }
 }

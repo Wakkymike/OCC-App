@@ -6,14 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, Home, TramFront, Users, UserPlus, Send, Clock, XCircle } from 'lucide-react';
+import { Loader2, Upload, Home, TramFront, Users, UserPlus, Send, Clock, XCircle, Rss, PlusCircle, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc, Timestamp, addDoc } from 'firebase/firestore';
+import { collection, query, orderBy, Timestamp, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { sendSignInLinkToEmail, User } from 'firebase/auth';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
+import type { NetworkUpdate } from '@/lib/types';
+import { Textarea } from '@/components/ui/textarea';
 
 
 interface UserProfile {
@@ -235,6 +237,137 @@ function PendingInvitations({ allUsers, usersLoading }: { allUsers: UserProfile[
                         </TableBody>
                     </Table>
                 )}
+            </CardContent>
+        </Card>
+    );
+}
+
+function NetworkUpdateManagement() {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [newUpdateTitle, setNewUpdateTitle] = useState('');
+    const [newUpdateDetails, setNewUpdateDetails] = useState('');
+    const [newUpdatePriority, setNewUpdatePriority] = useState(0);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const updatesQuery = useMemoFirebase(() => query(collection(firestore, 'networkUpdates'), orderBy('priority', 'asc'), orderBy('createdAt', 'desc')), [firestore]);
+    const { data: updates, isLoading } = useCollection<NetworkUpdate>(updatesQuery);
+
+    const handleAddUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        try {
+            await addDoc(collection(firestore, 'networkUpdates'), {
+                title: newUpdateTitle,
+                details: newUpdateDetails,
+                priority: Number(newUpdatePriority),
+                isVisible: true,
+                createdAt: serverTimestamp(),
+            });
+            toast({ title: 'Update Added', description: 'The new network update has been added.' });
+            setNewUpdateTitle('');
+            setNewUpdateDetails('');
+            setNewUpdatePriority(0);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error Adding Update', description: error.message });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleVisibilityToggle = (update: NetworkUpdate, isVisible: boolean) => {
+        const updateRef = doc(firestore, 'networkUpdates', update.id);
+        updateDocumentNonBlocking(updateRef, { isVisible });
+        toast({ title: 'Update Changed', description: `Update is now ${isVisible ? 'visible' : 'hidden'}.` });
+    };
+
+    const handlePriorityChange = (updateId: string, priority: string) => {
+        const numericPriority = Number(priority);
+        if (!isNaN(numericPriority)) {
+            const updateRef = doc(firestore, 'networkUpdates', updateId);
+            // Debounce or onBlur would be better, but for simplicity, immediate update is fine.
+            updateDocumentNonBlocking(updateRef, { priority: numericPriority });
+        }
+    };
+
+    const handleDeleteUpdate = (updateId: string) => {
+        const updateRef = doc(firestore, 'networkUpdates', updateId);
+        deleteDocumentNonBlocking(updateRef);
+        toast({ title: 'Update Deleted', description: 'The network update has been removed.' });
+    };
+    
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-3">
+                    <Rss className="h-6 w-6" />
+                    <div>
+                        <CardTitle className="text-xl">Network Update Management</CardTitle>
+                        <CardDescription>
+                            Add, remove, and manage homepage network updates.
+                        </CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <form onSubmit={handleAddUpdate} className="space-y-4 p-4 border rounded-lg">
+                    <h3 className="font-semibold flex items-center gap-2"><PlusCircle className="h-5 w-5" /> Add New Update</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         <div className="space-y-2 md:col-span-2">
+                             <Label htmlFor="update-title">Title</Label>
+                             <Input id="update-title" value={newUpdateTitle} onChange={(e) => setNewUpdateTitle(e.target.value)} placeholder="e.g., Service 582 Diversion" required disabled={isSubmitting} />
+                         </div>
+                         <div className="space-y-2">
+                             <Label htmlFor="update-priority">Priority</Label>
+                             <Input id="update-priority" type="number" value={newUpdatePriority} onChange={(e) => setNewUpdatePriority(Number(e.target.value))} required disabled={isSubmitting} />
+                         </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="update-details">Details</Label>
+                        <Textarea id="update-details" value={newUpdateDetails} onChange={(e) => setNewUpdateDetails(e.target.value)} placeholder="Full details of the update..." required disabled={isSubmitting} />
+                    </div>
+                    <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding...</> : 'Add Update'}
+                    </Button>
+                </form>
+
+                <div>
+                   <h3 className="font-semibold mb-4">Current Updates</h3>
+                    {isLoading && (
+                        <div className="flex items-center justify-center py-10 text-muted-foreground">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <span>Loading updates...</span>
+                        </div>
+                    )}
+                    {!isLoading && (!updates || updates.length === 0) && (
+                        <p className="py-10 text-center text-muted-foreground">No network updates have been added yet.</p>
+                    )}
+                    {updates && updates.length > 0 && (
+                        <div className="space-y-4">
+                           {updates.map(update => (
+                               <div key={update.id} className="flex items-start gap-4 p-3 border rounded-lg">
+                                   <div className="flex-grow space-y-2">
+                                        <p className="font-bold">{update.title}</p>
+                                        <p className="text-sm text-muted-foreground">{update.details}</p>
+                                   </div>
+                                   <div className="flex flex-col items-end gap-3 w-40">
+                                      <div className="flex items-center space-x-2">
+                                          <Label htmlFor={`visible-${update.id}`} className="text-xs">Visible</Label>
+                                           <Switch id={`visible-${update.id}`} checked={update.isVisible} onCheckedChange={(isChecked) => handleVisibilityToggle(update, isChecked)} />
+                                      </div>
+                                       <div className="flex items-center space-x-2">
+                                          <Label htmlFor={`priority-${update.id}`} className="text-xs">Priority</Label>
+                                          <Input id={`priority-${update.id}`} type="number" defaultValue={update.priority} onChange={(e) => handlePriorityChange(update.id, e.target.value)} className="h-8 w-16" />
+                                       </div>
+                                   </div>
+                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteUpdate(update.id)} aria-label="Delete update">
+                                        <Trash2 className="h-5 w-5 text-destructive" />
+                                    </Button>
+                               </div>
+                           ))}
+                        </div>
+                    )}
+                </div>
             </CardContent>
         </Card>
     );
@@ -494,6 +627,7 @@ export default function AdminPage() {
         
         <PendingInvitations allUsers={users} usersLoading={isUsersLoading} />
 
+        <NetworkUpdateManagement />
 
         <Card>
            <CardHeader>

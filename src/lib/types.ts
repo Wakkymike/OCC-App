@@ -1,3 +1,5 @@
+import { Timestamp } from 'firebase/firestore';
+
 export interface LatLng {
   lat: number;
   lng: number;
@@ -54,4 +56,13 @@ export interface Roadwork {
   severity: 'low' | 'moderate' | 'high';
   link: string;
   pubDate: string;
+}
+
+export interface NetworkUpdate {
+  id: string;
+  title: string;
+  details: string;
+  priority: number;
+  isVisible: boolean;
+  createdAt: Timestamp;
 }
