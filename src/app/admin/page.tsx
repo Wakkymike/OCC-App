@@ -285,8 +285,8 @@ function NetworkUpdateManagement() {
         const numericPriority = Number(priority);
         if (!isNaN(numericPriority)) {
             const updateRef = doc(firestore, 'networkUpdates', updateId);
-            // Debounce or onBlur would be better, but for simplicity, immediate update is fine.
             updateDocumentNonBlocking(updateRef, { priority: numericPriority });
+            toast({ title: 'Priority Updated', description: 'The update priority has been changed.' });
         }
     };
 
@@ -357,7 +357,7 @@ function NetworkUpdateManagement() {
                                       </div>
                                        <div className="flex items-center space-x-2">
                                           <Label htmlFor={`priority-${update.id}`} className="text-xs">Priority</Label>
-                                          <Input id={`priority-${update.id}`} type="number" defaultValue={update.priority} onChange={(e) => handlePriorityChange(update.id, e.target.value)} className="h-8 w-16" />
+                                          <Input id={`priority-${update.id}`} type="number" defaultValue={update.priority} onBlur={(e) => handlePriorityChange(update.id, e.target.value)} className="h-8 w-16" />
                                        </div>
                                    </div>
                                     <Button variant="ghost" size="icon" onClick={() => handleDeleteUpdate(update.id)} aria-label="Delete update">
