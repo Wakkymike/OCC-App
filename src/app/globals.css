@@ -92,7 +92,7 @@
         100% { transform: translateY(-100%); opacity: 0; }
     }
     .animate-scroll-up {
-        animation: scroll-up 60s ease-in-out forwards;
+        animation: scroll-up 25s ease-in-out forwards;
     }
 }
 

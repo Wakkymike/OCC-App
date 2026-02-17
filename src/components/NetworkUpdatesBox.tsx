@@ -44,7 +44,7 @@ export default function NetworkUpdatesBox() {
       const timer = setInterval(() => {
         // Cycle to the next update. The modulo operator handles wrapping around.
         setCurrentIndex((prevIndex) => (prevIndex + 1) % updates.length);
-      }, 60000); // 1 minute
+      }, 25000); // 25 seconds
       return () => clearInterval(timer); // Clean up the interval on unmount or when updates change.
     }
   }, [updates]);
