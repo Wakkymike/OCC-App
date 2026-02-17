@@ -49,7 +49,6 @@ export async function GET() {
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '',
-      removeNSPrefix: true, // Correctly configure the parser to remove namespace prefixes
     });
     const parsedData = parser.parse(xmlText);
 
@@ -60,8 +59,7 @@ export async function GET() {
         
         const title = item.title || '';
         
-        // Access the location data using the tag without the namespace prefix
-        const pointStr = getText(item.point);
+        const pointStr = getText(item['georss:point']);
         if (!pointStr) {
           return null;
         }
