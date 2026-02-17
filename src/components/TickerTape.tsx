@@ -16,7 +16,7 @@ export default function TickerTape() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchNews = useCallback(async () => {
-    setIsLoading(true);
+    // Don't set loading to true here to prevent flicker on refresh
     try {
       const response = await fetch('/api/tfgm-news');
       const data = await response.json();
@@ -25,7 +25,7 @@ export default function TickerTape() {
       }
       const cleanedItems = data.items.map((item: any) => ({
         title: item.title,
-        description: String(item.description).replace(/<[^>]*>?/gm, ''),
+        description: String(item.description).replace(/<[^>]*>?/gm, ''), // Basic HTML stripping
         pubDate: item.pubDate,
       }));
       setItems(cleanedItems);
@@ -44,27 +44,18 @@ export default function TickerTape() {
     return () => clearInterval(intervalId);
   }, [fetchNews]);
 
-  const renderScrollingContent = () => {
+  const allNewsString = items.map(item => `${item.title}: ${item.description}`).join(' • ');
+  const hasContentToScroll = !isLoading && !error && items.length > 0;
+
+  const renderStaticContent = () => {
     if (isLoading) {
-      return <span className="px-4">Loading latest travel news...</span>;
+      return 'Loading latest travel news...';
     }
     if (error) {
-      return <span className="px-4 font-semibold text-destructive">Error: {error}</span>;
+      return <span className="font-semibold text-destructive">Error: {error}</span>;
     }
-    if (items.length > 0) {
-      const allNewsString = items.map(item => `${item.title}: ${item.description}`).join(' • ');
-      // Render the content twice for a seamless loop
-      return (
-        <>
-          <span className="mx-4">{allNewsString}</span>
-          <span className="mx-4">{allNewsString}</span>
-        </>
-      );
-    }
-    return <span className="px-4">No travel news to display.</span>;
-  };
-  
-  const hasContentToScroll = !isLoading && !error && items.length > 0;
+    return 'No travel news to display.';
+  }
 
   return (
     <div className="w-full bg-secondary text-secondary-foreground h-12 flex items-center overflow-hidden">
@@ -73,11 +64,17 @@ export default function TickerTape() {
       </div>
       <div className="flex-grow min-w-0 whitespace-nowrap">
         <div className={cn(
-            "inline-block", 
-            // Only apply animation if there is content to prevent an empty ticker from scrolling
-            hasContentToScroll && "animate-marquee"
+            "inline-block",
+            hasContentToScroll && "ticker-animation"
         )}>
-            {renderScrollingContent()}
+          {hasContentToScroll ? (
+            <>
+              <span className="mx-4">{allNewsString}</span>
+              <span className="mx-4">{allNewsString}</span>
+            </>
+          ) : (
+            <span className="px-4">{renderStaticContent()}</span>
+          )}
         </div>
       </div>
     </div>

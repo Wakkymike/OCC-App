@@ -146,3 +146,16 @@
   border-radius: 3px;
   padding: 0 2px;
 }
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker-animation {
+  animation: marquee 900s linear infinite;
+}
