@@ -648,7 +648,8 @@ export default function AdminPage() {
   }
 
   const isSuperAdmin = currentUser?.email === 'michael.dodsworth@gonorthwest.co.uk';
-  const isFullAdmin = currentUserProfile?.isAdmin || isSuperAdmin;
+  const isFullAdmin = !!currentUserProfile?.isAdmin || isSuperAdmin;
+  const isContentCreator = !!currentUserProfile?.isContentCreator;
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-background p-8 gap-8">
@@ -798,8 +799,15 @@ export default function AdminPage() {
                   </CardContent>
                 </Card>
             </>
-        ) : (
+        ) : isContentCreator ? (
              <NetworkUpdateManagement />
+        ) : (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Permission Denied</CardTitle>
+                    <CardDescription>You do not have permission to view this page.</CardDescription>
+                </CardHeader>
+            </Card>
         )}
       </div>
     </main>
