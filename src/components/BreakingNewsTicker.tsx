@@ -56,7 +56,7 @@ export default function BreakingNewsTicker() {
     const scrollWidth = contentElement.scrollWidth / 2;
     if (scrollWidth === 0) return;
 
-    const speed = 20; // pixels per second
+    const speed = 50; // pixels per second
     let position = 0;
     let lastTimestamp: number | null = null;
 
