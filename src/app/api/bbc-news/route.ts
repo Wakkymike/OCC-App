@@ -4,7 +4,7 @@ import { XMLParser } from 'fast-xml-parser';
 export const dynamic = 'force-dynamic'; // Ensure fresh data on every request
 
 export async function GET() {
-  const RSS_URL = 'http://feeds.bbci.co.uk/news/uk/rss.xml';
+  const RSS_URL = 'https://feeds.bbci.co.uk/news/uk/rss.xml';
 
   try {
     const response = await fetch(RSS_URL, {
