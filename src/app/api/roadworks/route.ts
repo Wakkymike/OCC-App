@@ -1,5 +1,3 @@
-'use client';
-
 import { NextResponse } from 'next/server';
 import { XMLParser } from 'fast-xml-parser';
 import type { Roadwork } from '@/lib/types';
