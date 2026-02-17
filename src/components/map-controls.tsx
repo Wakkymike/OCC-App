@@ -26,6 +26,8 @@ interface MapControlsProps {
   setShowStagecoach: (show: boolean) => void;
   showFirstBus: boolean;
   setShowFirstBus: (show: boolean) => void;
+  showDiamondBus: boolean;
+  setShowDiamondBus: (show: boolean) => void;
 }
 
 const styleOptions = [
@@ -52,6 +54,8 @@ export default function MapControls({
   setShowStagecoach,
   showFirstBus,
   setShowFirstBus,
+  showDiamondBus,
+  setShowDiamondBus,
 }: MapControlsProps) {
   const currentStyleId = mapStyle.split('/').pop();
 
@@ -153,6 +157,17 @@ export default function MapControls({
                     id="show-firstbus"
                     checked={showFirstBus}
                     onCheckedChange={setShowFirstBus}
+                />
+           </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center space-x-2">
+                    <Bus className="h-5 w-5" />
+                    <Label htmlFor="show-diamondbus" className="cursor-pointer">Show Diamond</Label>
+                </div>
+                <Switch
+                    id="show-diamondbus"
+                    checked={showDiamondBus}
+                    onCheckedChange={setShowDiamondBus}
                 />
            </div>
         </div>

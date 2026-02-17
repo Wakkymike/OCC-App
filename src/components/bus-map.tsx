@@ -586,6 +586,8 @@ export default function BusMap({
         operatorLabel = ` <span style="color:#ef4444;font-weight:bold;">[SC]</span>`;
       } else if (bus.operator === 'FB') {
         operatorLabel = ` <span style="color:#a855f7;font-weight:bold;">[FB]</span>`;
+      } else if (bus.operator === 'DB') {
+        operatorLabel = ` <span style="color:#f97316;font-weight:bold;">[DB]</span>`;
       }
       
       flagElement.innerHTML = `${bus.fleetNumber} | RB: ${runningBoardHtml} | ${bus.service}${operatorLabel}${directionLabel}${indicators} | ${bus.destination}${statusHtml}`;
@@ -606,6 +608,8 @@ export default function BusMap({
           ? '#ef4444' // Red for Stagecoach
           : bus.operator === 'FB'
           ? '#a855f7' // Purple for First Bus
+          : bus.operator === 'DB'
+          ? '#f97316' // Orange for Diamond
           : '#ef4444'; 
           
       if (busBody) {
