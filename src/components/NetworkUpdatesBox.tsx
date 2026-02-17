@@ -2,32 +2,50 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 import type { NetworkUpdate } from '@/lib/types';
 import { Rss, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function NetworkUpdatesBox() {
   const firestore = useFirestore();
+  
+  // Simplified query to fetch all documents. Filtering and sorting will be done client-side.
   const updatesQuery = useMemoFirebase(
-    () =>
-      query(
-        collection(firestore, 'networkUpdates'),
-        where('isVisible', '==', true),
-        orderBy('priority', 'asc'),
-        orderBy('createdAt', 'desc')
-      ),
+    () => collection(firestore, 'networkUpdates'),
     [firestore]
   );
-  const { data: updates, isLoading } = useCollection<NetworkUpdate>(updatesQuery);
+  const { data: allUpdates, isLoading } = useCollection<NetworkUpdate>(updatesQuery);
+
+  // Memoized client-side filtering and sorting.
+  const updates = useMemo(() => {
+    if (!allUpdates) return null;
+    return allUpdates
+      .filter(update => update.isVisible)
+      .sort((a, b) => {
+        if (a.priority !== b.priority) {
+          return a.priority - b.priority;
+        }
+        if (a.createdAt && b.createdAt) {
+          return b.createdAt.seconds - a.createdAt.seconds;
+        }
+        return 0;
+      });
+  }, [allUpdates]);
+
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // This effect manages the cycling of updates.
   useEffect(() => {
+    // When the list of updates changes, reset the ticker to show the first item.
+    setCurrentIndex(0);
+
     if (updates && updates.length > 1) {
       const timer = setInterval(() => {
+        // Cycle to the next update. The modulo operator handles wrapping around.
         setCurrentIndex((prevIndex) => (prevIndex + 1) % updates.length);
       }, 60000); // 1 minute
-      return () => clearInterval(timer);
+      return () => clearInterval(timer); // Clean up the interval on unmount or when updates change.
     }
   }, [updates]);
   
