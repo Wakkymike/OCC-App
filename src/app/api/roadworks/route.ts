@@ -49,8 +49,6 @@ export async function GET() {
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '',
-      removeNSPrefix: true, // Easier to handle georss:point as 'point'
-      parseNodeValue: true, // Important for text extraction
     });
     const parsedData = parser.parse(xmlText);
 
@@ -61,7 +59,8 @@ export async function GET() {
         
         const title = item.title || '';
         
-        const pointStr = getText(item.point); // Use the helper
+        // Correctly access the geo-namespaced point data.
+        const pointStr = getText(item['georss:point']);
         if (!pointStr) {
           return null;
         }
