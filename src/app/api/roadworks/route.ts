@@ -10,19 +10,6 @@ const getSeverity = (text: string): 'low' | 'moderate' | 'high' => {
     return 'low';
 }
 
-// Helper to safely extract a text value
-const getText = (field: any): string | undefined => {
-    if (field === undefined || field === null) return undefined;
-    if (typeof field === 'object' && '#text' in field) {
-        return field['#text'];
-    }
-    if (typeof field === 'string' || typeof field === 'number' || typeof field === 'boolean') {
-        return String(field);
-    }
-    return undefined;
-};
-
-
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
@@ -46,9 +33,12 @@ export async function GET() {
       throw new Error("The RSS feed returned empty content.");
     }
 
+    // A simple parser configuration is more reliable here.
     const parser = new XMLParser({
       ignoreAttributes: false,
       attributeNamePrefix: '',
+      parseNodeValue: true,
+      trimValues: true,
     });
     const parsedData = parser.parse(xmlText);
 
@@ -57,21 +47,24 @@ export async function GET() {
     const roadworks: Roadwork[] = items
       .map((item: any, index: number): Roadwork | null => {
         
-        const title = item.title || '';
+        // Directly access the 'georss:point' key and validate it's a string.
+        // This is the most robust way to handle this specific feed.
+        const pointStr = item['georss:point'];
         
-        const pointStr = getText(item['georss:point']);
-        if (!pointStr) {
-          return null;
+        if (!pointStr || typeof pointStr !== 'string') {
+          return null; // Skip item if location is missing or not in the expected format.
         }
 
         const [latStr, lngStr] = pointStr.split(' ');
         const lat = parseFloat(latStr);
         const lng = parseFloat(lngStr);
 
+        // Skip if coordinates are not valid numbers.
         if (isNaN(lat) || isNaN(lng)) {
           return null;
         }
 
+        const title = item.title || '';
         const description = item.description || '';
         const severity = getSeverity(title + ' ' + description);
 
