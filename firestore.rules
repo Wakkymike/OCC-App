@@ -12,12 +12,11 @@ service cloud.firestore {
     }
 
     // Function to check if the requesting user is an admin.
-    // An admin is either the "super admin" by email, or a user with the `isAdmin` flag set to true in their profile.
-    // This is the single source of truth for admin privileges in security rules.
+    // An admin is a user with the `isAdmin` flag set to true in their profile.
+    // The super admin email check provides a permanent admin user.
     function isAdmin() {
-      // A user is an admin if they are signed in AND they are either the super admin by email
-      // OR they have the isAdmin flag in their user profile. The `request.auth != null` check
-      // short-circuits and prevents errors when no user is signed in.
+      // The `exists()` check is crucial to prevent errors if the profile document
+      // hasn't been created yet. This is a non-recursive check.
       return request.auth != null && (
         request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' ||
         (
@@ -28,17 +27,15 @@ service cloud.firestore {
     }
 
     match /userProfiles/{userId} {
-      // Admins can get any profile. Users can only get their own.
-      allow get: if isOwner(userId) || isAdmin();
+      // A user can always get and update their own profile.
+      // This rule is critical for breaking the recursion in the isAdmin() function.
+      allow get, update: if isOwner(userId);
       
-      // Only admins can list all user profiles.
-      allow list: if isAdmin();
-      
-      // Admins can update any profile. Users can only update their own.
-      allow update: if isOwner(userId) || isAdmin();
+      // Admins get full read (list) and write (update) access to all profiles.
+      // This is additive to the `isOwner` rule above.
+      allow list, update: if isAdmin();
       
       // A new user can create their own profile document.
-      // The UID in the document must match their auth UID.
       allow create: if isOwner(userId) && request.resource.data.uid == userId;
 
       // Nobody can delete profiles from the client.
@@ -56,7 +53,6 @@ service cloud.firestore {
 
     match /networkUpdates/{updateId} {
       // Explicitly allow both get and list for everyone.
-      // This covers the public homepage feed and the admin panel's list of all updates.
       allow get, list: if true;
       
       // Explicitly allow write operations only for admins.
