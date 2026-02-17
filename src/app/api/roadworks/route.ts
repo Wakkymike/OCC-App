@@ -10,6 +10,19 @@ const getSeverity = (text: string): 'low' | 'moderate' | 'high' => {
     return 'low';
 }
 
+// Helper to safely extract a text value
+const getText = (field: any): string | undefined => {
+    if (field === undefined || field === null) return undefined;
+    if (typeof field === 'object' && '#text' in field) {
+        return field['#text'];
+    }
+    if (typeof field === 'string' || typeof field === 'number' || typeof field === 'boolean') {
+        return String(field);
+    }
+    return undefined;
+};
+
+
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
@@ -37,6 +50,7 @@ export async function GET() {
       ignoreAttributes: false,
       attributeNamePrefix: '',
       removeNSPrefix: true, // Easier to handle georss:point as 'point'
+      parseNodeValue: true, // Important for text extraction
     });
     const parsedData = parser.parse(xmlText);
 
@@ -47,12 +61,12 @@ export async function GET() {
         
         const title = item.title || '';
         
-        const point = item.point;
-        if (!point || typeof point !== 'string') {
+        const pointStr = getText(item.point); // Use the helper
+        if (!pointStr) {
           return null;
         }
 
-        const [latStr, lngStr] = point.split(' ');
+        const [latStr, lngStr] = pointStr.split(' ');
         const lat = parseFloat(latStr);
         const lng = parseFloat(lngStr);
 
