@@ -250,8 +250,21 @@ function NetworkUpdateManagement() {
     const [newUpdatePriority, setNewUpdatePriority] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const updatesQuery = useMemoFirebase(() => query(collection(firestore, 'networkUpdates'), orderBy('priority', 'asc'), orderBy('createdAt', 'desc')), [firestore]);
-    const { data: updates, isLoading } = useCollection<NetworkUpdate>(updatesQuery);
+    const updatesCollectionRef = useMemoFirebase(() => collection(firestore, 'networkUpdates'), [firestore]);
+    const { data: allUpdates, isLoading } = useCollection<NetworkUpdate>(updatesCollectionRef);
+
+    const updates = useMemo(() => {
+        if (!allUpdates) return null;
+        return [...allUpdates].sort((a, b) => {
+            if (a.priority !== b.priority) {
+                return a.priority - b.priority;
+            }
+            if (a.createdAt && b.createdAt) {
+                return b.createdAt.seconds - a.createdAt.seconds;
+            }
+            return 0;
+        });
+    }, [allUpdates]);
 
     const handleAddUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
