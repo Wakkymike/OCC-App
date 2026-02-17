@@ -13,12 +13,6 @@ export default function TickerTape() {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false);
-
-  // This effect runs only on the client, after hydration, to avoid server-client mismatch
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   const fetchNews = useCallback(async () => {
     try {
@@ -49,51 +43,31 @@ export default function TickerTape() {
 
   const renderContent = () => {
     if (isLoading) {
-      return <div className="flex items-center"><span className="mx-8">Loading latest travel news...</span></div>;
+      return <span className="mx-4">Loading latest travel news...</span>;
     }
     if (error) {
-      return <div className="flex items-center font-semibold text-destructive"><span className="mx-8">Error: {error}</span></div>;
+      return <span className="mx-4 font-semibold text-destructive">Error: {error}</span>;
     }
     if (items.length > 0) {
+      const firstItem = items[0];
       return (
-        <div className="ticker-content">
-          {/* Render items twice for a seamless loop */}
-          {items.map((item, index) => (
-            <div key={index} className="flex items-center flex-shrink-0">
-              <span className="mx-8 font-semibold">{item.title}:</span>
-              <span className="mx-8">{item.description}</span>
-              {isClient && (
-                  <span className="mx-8 text-muted-foreground text-sm">
-                      ({new Date(item.pubDate).toLocaleTimeString()})
-                  </span>
-              )}
-              <span className="text-muted-foreground mx-4">||</span>
-            </div>
-          ))}
-          {items.map((item, index) => (
-            <div key={`dup-${index}`} className="flex items-center flex-shrink-0" aria-hidden="true">
-              <span className="mx-8 font-semibold">{item.title}:</span>
-              <span className="mx-8">{item.description}</span>
-              {isClient && (
-                  <span className="mx-8 text-muted-foreground text-sm">
-                      ({new Date(item.pubDate).toLocaleTimeString()})
-                  </span>
-              )}
-              <span className="text-muted-foreground mx-4">||</span>
-            </div>
-          ))}
+        <div className="mx-4 flex items-center truncate">
+          <span className="font-semibold mr-2">{firstItem.title}:</span>
+          <span className="truncate">{firstItem.description}</span>
         </div>
       );
     }
-    return <div className="flex items-center"><span className="mx-8">No travel news to display.</span></div>;
+    return <span className="mx-4">No travel news to display.</span>;
   };
 
   return (
-    <div className="w-full bg-secondary text-secondary-foreground overflow-hidden h-12 flex items-center ticker-container">
+    <div className="w-full bg-secondary text-secondary-foreground overflow-hidden h-12 flex items-center">
       <div className="flex items-center bg-accent text-accent-foreground h-full px-4 z-10">
         <Megaphone className="h-6 w-6" />
       </div>
-      {renderContent()}
+      <div className="flex-grow min-w-0">
+        {renderContent()}
+      </div>
     </div>
   );
 }
