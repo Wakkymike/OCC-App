@@ -33,9 +33,14 @@
             "type": "boolean",
             "description": "Flag indicating if the user must change their password on the next login.",
             "default": false
+        },
+        "forceSignOut": {
+            "type": "boolean",
+            "description": "If true, the user will be automatically signed out on their next interaction.",
+            "default": false
         }
       },
-      "required": ["uid", "email", "displayName", "isAdmin", "isActive", "passwordChangeRequired"]
+      "required": ["uid", "email", "displayName", "isAdmin", "isActive", "passwordChangeRequired", "forceSignOut"]
     },
     "Invitation": {
         "title": "Invitation",

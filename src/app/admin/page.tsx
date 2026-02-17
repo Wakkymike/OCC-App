@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, Home, TramFront, Users, UserPlus, Send, Clock, XCircle, Rss, PlusCircle, Trash2 } from 'lucide-react';
+import { Loader2, Upload, Home, TramFront, Users, UserPlus, Send, Clock, XCircle, Rss, PlusCircle, Trash2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, Timestamp, addDoc, serverTimestamp, doc } from 'firebase/firestore';
@@ -26,6 +26,7 @@ interface UserProfile {
   isAdmin: boolean;
   isActive: boolean;
   passwordChangeRequired: boolean;
+  forceSignOut: boolean;
 }
 
 interface Invitation {
@@ -86,6 +87,25 @@ function UserManagement({ users, isLoading, currentUser }: { users: UserProfile[
     });
   };
 
+  const handleForceSignOut = (user: UserProfile) => {
+    if (user.uid === currentUser?.uid) {
+      toast({
+        variant: 'destructive',
+        title: 'Action Forbidden',
+        description: "You cannot force sign out yourself.",
+      });
+      return;
+    }
+
+    const userDocRef = doc(firestore, 'userProfiles', user.id);
+    updateDocumentNonBlocking(userDocRef, { forceSignOut: true });
+
+    toast({
+        title: 'User Session Flagged',
+        description: `${user.displayName} will be signed out on their next page load.`,
+    });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -114,7 +134,8 @@ function UserManagement({ users, isLoading, currentUser }: { users: UserProfile[
                 <TableHead>Email</TableHead>
                 <TableHead>Active</TableHead>
                 <TableHead>Force Password Change</TableHead>
-                <TableHead className="text-right">Administrator</TableHead>
+                <TableHead>Administrator</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -138,13 +159,24 @@ function UserManagement({ users, isLoading, currentUser }: { users: UserProfile[
                       disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'}
                     />
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell>
                      <Switch
                       checked={user.isAdmin}
                       onCheckedChange={(isChecked) => handleAdminToggle(user, isChecked)}
                       aria-label={`Toggle admin for ${user.displayName}`}
                       disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'}
                     />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleForceSignOut(user)}
+                        disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk' || user.uid === currentUser?.uid}
+                        aria-label={`Force sign out for ${user.displayName}`}
+                    >
+                        <LogOut className="h-5 w-5 text-destructive" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

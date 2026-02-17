@@ -1,11 +1,12 @@
 'use client';
 
-import { useUser } from '@/firebase';
+import { useUser, updateDocumentNonBlocking } from '@/firebase';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { getAuth, signOut } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
 
 const PUBLIC_PAGES = ['/login', '/sign-up', '/pending-activation', '/finish-sign-up'];
 const ADMIN_PAGES = ['/admin'];
@@ -15,6 +16,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const { user, isUserLoading } = useUser();
   const pathname = usePathname();
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isUserLoading) {
@@ -46,6 +48,20 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         // If profile exists, proceed with checks
         if (userProfileSnap.exists()) {
             const userProfile = userProfileSnap.data();
+
+            // 0. Check for forced sign out first.
+            if (userProfile.forceSignOut) {
+                // Reset the flag first to prevent a sign-out loop on next login.
+                updateDocumentNonBlocking(userProfileRef, { forceSignOut: false });
+                
+                signOut(getAuth());
+                
+                toast({
+                    title: "Signed Out",
+                    description: "You have been signed out by an administrator."
+                });
+                return; // Stop further processing. The onAuthStateChanged will handle the redirect.
+            }
 
             // 1. Check for account activation.
             if (!userProfile.isActive && !isSuperAdmin) {
@@ -103,7 +119,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         router.replace('/login');
       }
     }
-  }, [user, isUserLoading, pathname, router]);
+  }, [user, isUserLoading, pathname, router, toast]);
 
   // Show a loading screen while authentication is in progress and not on a public page.
   if (isUserLoading && !PUBLIC_PAGES.includes(pathname)) {
