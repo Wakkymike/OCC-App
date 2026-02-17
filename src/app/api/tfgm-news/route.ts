@@ -4,7 +4,7 @@ import { XMLParser } from 'fast-xml-parser';
 export const dynamic = 'force-dynamic'; // Ensure fresh data on every request
 
 export async function GET() {
-  const RSS_URL = 'https://nationalhighways.co.uk/travel-updates/rss-feed/?region=north-west';
+  const RSS_URL = 'https://nationalhighways.co.uk/feed/?regions=north-west';
 
   try {
     // Attempting a direct fetch, which is simpler and more reliable than a public proxy.
