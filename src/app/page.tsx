@@ -4,16 +4,17 @@ import { Map, Radio, Shield } from 'lucide-react';
 import UserMenu from '@/components/auth/UserMenu';
 import TickerTape from '@/components/TickerTape';
 import BreakingNewsTicker from '@/components/BreakingNewsTicker';
+import JourneyPlanner from '@/components/journey-planner';
 
 export default function HomePage() {
   return (
     <div className="flex flex-col h-screen bg-background">
         <BreakingNewsTicker />
-        <div className="relative flex-grow">
+        <div className="relative flex-grow overflow-y-auto">
             <div className="absolute top-4 right-4 z-10">
                 <UserMenu />
             </div>
-            <main className="flex h-full flex-col items-center justify-center p-8">
+            <main className="flex flex-col items-center justify-center p-8 gap-12">
                 <div className="text-center">
                     <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-6xl">
                     Go North West Tracker
@@ -41,6 +42,10 @@ export default function HomePage() {
                         </Link>
                     </Button>
                     </div>
+                </div>
+
+                <div className="w-full max-w-4xl">
+                    <JourneyPlanner />
                 </div>
             </main>
         </div>

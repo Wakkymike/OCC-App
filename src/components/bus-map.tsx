@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import type { Bus, LatLng, MetrolinkData } from '@/lib/types';
+import type { Bus, LatLng, MetrolinkData, JourneyPlan } from '@/lib/types';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
 
@@ -22,6 +22,7 @@ interface BusMapProps {
   showBusStops: boolean;
   metrolinkData: MetrolinkData | null;
   routeToDisplay: LatLng[] | null;
+  journeyPlan: JourneyPlan | null;
 }
 
 const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
@@ -40,11 +41,14 @@ export default function BusMap({
   showBusStops,
   metrolinkData,
   routeToDisplay,
+  journeyPlan,
 }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
   const placeMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const journeyStartMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const journeyEndMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const animationFrameRefs = useRef<Record<string, number>>({});
   const [styleRevision, setStyleRevision] = useState(0);
   const currentStyleRef = useRef(mapStyle);
@@ -395,6 +399,77 @@ export default function BusMap({
     map.setLayoutProperty(layerId, 'visibility', routeToDisplay && routeToDisplay.length > 1 ? 'visible' : 'none');
 
   }, [routeToDisplay, styleRevision]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.isStyleLoaded()) return;
+
+    const sourceId = 'journey-plan-source';
+    const layerId = 'journey-plan-layer';
+
+    // Clear old markers
+    if (journeyStartMarkerRef.current) journeyStartMarkerRef.current.remove();
+    if (journeyEndMarkerRef.current) journeyEndMarkerRef.current.remove();
+    journeyStartMarkerRef.current = null;
+    journeyEndMarkerRef.current = null;
+
+    const lineString: GeoJSON.Feature<GeoJSON.LineString> = {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+            type: 'LineString',
+            coordinates: journeyPlan ? journeyPlan.path.map(p => [p.lng, p.lat]) : []
+        }
+    };
+    
+    const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource;
+    if (source) {
+        source.setData(lineString);
+    } else {
+        map.addSource(sourceId, {
+            type: 'geojson',
+            data: lineString
+        });
+    }
+
+    if (!map.getLayer(layerId)) {
+        map.addLayer({
+            id: layerId,
+            type: 'line',
+            source: sourceId,
+            layout: {
+                'line-join': 'round',
+                'line-cap': 'round'
+            },
+            paint: {
+                'line-color': '#0891b2', // A nice cyan color
+                'line-width': 8,
+                'line-opacity': 0.75,
+                'line-dasharray': [0, 2],
+            }
+        }, 'route-display-layer'); // Draw below recorded routes, but above metrolink
+    }
+    
+    map.setLayoutProperty(layerId, 'visibility', journeyPlan && journeyPlan.path.length > 1 ? 'visible' : 'none');
+
+    // Add markers for start and end
+    if (journeyPlan) {
+        const startEl = document.createElement('div');
+        startEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>`;
+        journeyStartMarkerRef.current = new mapboxgl.Marker(startEl)
+            .setLngLat(journeyPlan.startStop)
+            .setPopup(new mapboxgl.Popup({ offset: 25, className: 'bus-stop-popup' }).setHTML(`<b>Get on:</b> Service ${journeyPlan.service}<br/>To: ${journeyPlan.destination}`))
+            .addTo(map);
+
+        const endEl = document.createElement('div');
+        endEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#ef4444" stroke="white" stroke-width="1.5"><path d="M21 10.5C21 17.5 12 23 12 23C12 23 3 17.5 3 10.5C3 6.35786 7.02944 3 12 3C16.9706 3 21 6.35786 21 10.5Z"/><circle cx="12" cy="10.5" r="3" fill="white"/></svg>`;
+        journeyEndMarkerRef.current = new mapboxgl.Marker(endEl)
+            .setLngLat(journeyPlan.endStop)
+            .setPopup(new mapboxgl.Popup({ offset: 25, className: 'bus-stop-popup' }).setHTML(`<b>Get off here</b>`))
+            .addTo(map);
+    }
+
+  }, [journeyPlan, styleRevision]);
 
   useEffect(() => {
     const map = mapRef.current;

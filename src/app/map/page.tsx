@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import BusMap from '@/components/bus-map';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
-import type { Bus, LatLng, MetrolinkData } from '@/lib/types';
+import type { Bus, LatLng, MetrolinkData, JourneyPlan } from '@/lib/types';
 import SearchBar from '@/components/search-bar';
 import LocationSearchBar from '@/components/location-search-bar';
 import mapboxgl from 'mapbox-gl';
@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import RouteRecorderDialog from '@/components/route-recorder';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
+import { useSearchParams } from 'next/navigation';
 
 export default function Page() {
   const { buses, error } = useBusTracker();
@@ -99,16 +100,44 @@ export default function Page() {
     setActiveRecordingRoute([]);
   }, [isRecording, recordingService, activeRecordingRoute, recordingBusId, toast]);
 
+  const searchParams = useSearchParams();
+  const [journeyPlan, setJourneyPlan] = useState<JourneyPlan | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const busIdFromQuery = params.get('busId');
+    const busIdFromQuery = searchParams.get('busId');
     if (busIdFromQuery) {
       setSelectedBusId(decodeURIComponent(busIdFromQuery));
       // Clean the URL so a refresh doesn't re-select the bus
       const newUrl = window.location.pathname;
       window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
     }
+    
+    const journeyParam = searchParams.get('journey');
+    if (journeyParam) {
+        try {
+            const plan = JSON.parse(journeyParam) as JourneyPlan;
+            setJourneyPlan(plan);
+            
+            const newBounds = new mapboxgl.LngLatBounds();
+            plan.path.forEach(p => newBounds.extend([p.lng, p.lat]));
+            if (!newBounds.isEmpty()) {
+                setMapView({ bounds: newBounds });
+            }
+
+            // Clean the URL
+            const newUrl = window.location.pathname;
+            window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
+
+        } catch (e) {
+            console.error("Failed to parse journey plan from URL", e);
+            toast({
+                variant: 'destructive',
+                title: 'Could not display journey',
+                description: 'There was an error reading the planned journey from the URL.',
+            });
+        }
+    }
+
 
     // Fetch metrolink data
     const fetchMetrolinkData = async () => {
@@ -148,7 +177,7 @@ export default function Page() {
     fetchMetrolinkData();
     fetchTxcRoutes();
 
-  }, [toast]);
+  }, [searchParams, toast]);
 
   useEffect(() => {
     let results = buses;
@@ -397,6 +426,7 @@ export default function Page() {
         showBusStops={showBusStops}
         metrolinkData={metrolinkData}
         routeToDisplay={routeToDisplay}
+        journeyPlan={journeyPlan}
       />
       <RouteRecorderDialog
         isOpen={isRecorderOpen}

@@ -35,3 +35,12 @@ export interface MetrolinkData {
   stops: MetrolinkStop[];
   lines: MetrolinkLine[];
 }
+
+export interface JourneyPlan {
+  service: string;
+  destination: string;
+  routeName: string;
+  startStop: LatLng;
+  endStop: LatLng;
+  path: LatLng[];
+}
