@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { Layers3, Satellite, Map, Building, Bus, Route } from 'lucide-react';
+import { Layers3, Satellite, Map, Building, Bus, Route, TramFront } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { LatLng } from '@/lib/types';
 
@@ -20,6 +20,8 @@ interface MapControlsProps {
   setSelectedRouteId: (id: string | null) => void;
   showMetroline: boolean;
   setShowMetroline: (show: boolean) => void;
+  showVisionBus: boolean;
+  setShowVisionBus: (show: boolean) => void;
 }
 
 const styleOptions = [
@@ -40,6 +42,8 @@ export default function MapControls({
   setSelectedRouteId,
   showMetroline,
   setShowMetroline,
+  showVisionBus,
+  setShowVisionBus,
 }: MapControlsProps) {
   const currentStyleId = mapStyle.split('/').pop();
 
@@ -101,13 +105,24 @@ export default function MapControls({
            </div>
            <div className="flex items-center justify-between rounded-lg border p-3">
                 <div className="flex items-center space-x-2">
-                    <Route className="h-5 w-5" />
+                    <TramFront className="h-5 w-5" />
                     <Label htmlFor="show-metroline" className="cursor-pointer">Show Metroline</Label>
                 </div>
                 <Switch
                     id="show-metroline"
                     checked={showMetroline}
                     onCheckedChange={setShowMetroline}
+                />
+           </div>
+           <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center space-x-2">
+                    <Bus className="h-5 w-5" />
+                    <Label htmlFor="show-visionbus" className="cursor-pointer">Show Vision Bus</Label>
+                </div>
+                <Switch
+                    id="show-visionbus"
+                    checked={showVisionBus}
+                    onCheckedChange={setShowVisionBus}
                 />
            </div>
         </div>

@@ -577,7 +577,13 @@ export default function BusMap({
           statusHtml = ` | <span style="color:${color}; font-weight: bold;">${bus.status}</span>`;
       }
 
-      const operatorLabel = bus.operator === 'MET' ? ` <span style="color:#2563eb;font-weight:bold;">[MET]</span>` : '';
+      let operatorLabel = '';
+      if (bus.operator === 'MET') {
+        operatorLabel = ` <span style="color:#2563eb;font-weight:bold;">[MET]</span>`;
+      } else if (bus.operator === 'VB') {
+        operatorLabel = ` <span style="color:#16a34a;font-weight:bold;">[VB]</span>`;
+      }
+      
       flagElement.innerHTML = `${bus.fleetNumber} | RB: ${runningBoardHtml} | ${bus.service}${operatorLabel}${directionLabel}${indicators} | ${bus.destination}${statusHtml}`;
       
       const svg = markerElement.querySelector('svg');
@@ -586,7 +592,12 @@ export default function BusMap({
       const busBody = markerElement.querySelector('#bus-body');
       const infoFlag = markerElement.querySelector('.bus-info-flag') as HTMLDivElement;
       
-      const defaultColor = bus.operator === 'GNW' ? '#FFC107' : '#60a5fa'; // Yellow for GNW, Blue for Metroline
+      const defaultColor = bus.operator === 'GNW'
+          ? '#FFC107' // Yellow for GNW
+          : bus.operator === 'MET'
+          ? '#60a5fa' // Blue for Metroline
+          : '#4ade80'; // Green for VisionBus
+          
       if (busBody) {
           busBody.setAttribute('fill', isSelected ? '#00FFFF' : defaultColor);
       }
