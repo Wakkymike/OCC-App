@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import BusMap from '@/components/bus-map';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
-import type { Bus, LatLng, MetrolinkData, JourneyPlan } from '@/lib/types';
+import { useRoadworksTracker } from '@/hooks/useRoadworksTracker';
+import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork } from '@/lib/types';
 import SearchBar from '@/components/search-bar';
 import LocationSearchBar from '@/components/location-search-bar';
 import mapboxgl from 'mapbox-gl';
@@ -30,7 +31,8 @@ export default function Page() {
   }, [user, firestore]);
   const { data: userProfile } = useDoc<{ isAdmin: boolean }>(userProfileRef);
   
-  const { buses, error } = useBusTracker();
+  const { buses, error: busError } = useBusTracker();
+  const { roadworks, error: roadworksError } = useRoadworksTracker();
   const [displayBuses, setDisplayBuses] = useState<Bus[]>([]);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const [searchedPlace, setSearchedPlace] = useState<LatLng | null>(null);
@@ -55,6 +57,7 @@ export default function Page() {
   const [showStagecoach, setShowStagecoach] = useState(false);
   const [showFirstBus, setShowFirstBus] = useState(false);
   const [showDiamondBus, setShowDiamondBus] = useState(false);
+  const [showRoadworks, setShowRoadworks] = useState(true);
   const { toast } = useToast();
 
   const [metrolinkData, setMetrolinkData] = useState<MetrolinkData | null>(null);
@@ -417,9 +420,10 @@ export default function Page() {
         <LocationSearchBar onSearch={handleLocationSearch} onClear={handleLocationClear} />
         <SearchBar onSearch={handleBusSearch} onClear={handleBusClear} />
       </div>
-      {error && (
+      {(busError || roadworksError) && (
         <p className="absolute top-24 left-4 z-10 text-destructive bg-card p-2 rounded-lg shadow-md">
-          {error}
+          {busError && <div>{busError}</div>}
+          {roadworksError && <div>{roadworksError}</div>}
         </p>
       )}
       <div className="absolute bottom-4 right-4 z-10">
@@ -452,6 +456,8 @@ export default function Page() {
               setShowFirstBus={setShowFirstBus}
               showDiamondBus={showDiamondBus}
               setShowDiamondBus={setShowDiamondBus}
+              showRoadworks={showRoadworks}
+              setShowRoadworks={setShowRoadworks}
             />
           </PopoverContent>
         </Popover>
@@ -468,6 +474,8 @@ export default function Page() {
         metrolinkData={metrolinkData}
         routeToDisplay={routeToDisplay}
         journeyPlan={journeyPlan}
+        roadworks={roadworks}
+        showRoadworks={showRoadworks}
       />
       <RouteRecorderDialog
         isOpen={isRecorderOpen}

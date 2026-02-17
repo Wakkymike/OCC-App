@@ -9,6 +9,13 @@ import { Layers3, Satellite, Map, Building, Bus, Route, TramFront } from 'lucide
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { LatLng } from '@/lib/types';
 
+const TrafficConeIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2L2 22h20L12 2z" />
+    </svg>
+);
+
+
 interface MapControlsProps {
   mapStyle: string;
   setMapStyle: (style: string) => void;
@@ -31,6 +38,8 @@ interface MapControlsProps {
   setShowFirstBus: (show: boolean) => void;
   showDiamondBus: boolean;
   setShowDiamondBus: (show: boolean) => void;
+  showRoadworks: boolean;
+  setShowRoadworks: (show: boolean) => void;
 }
 
 const styleOptions = [
@@ -61,6 +70,8 @@ export default function MapControls({
   setShowFirstBus,
   showDiamondBus,
   setShowDiamondBus,
+  showRoadworks,
+  setShowRoadworks,
 }: MapControlsProps) {
   const currentStyleId = mapStyle.split('/').pop();
 
@@ -118,6 +129,17 @@ export default function MapControls({
                     id="show-bus-stops"
                     checked={showBusStops}
                     onCheckedChange={setShowBusStops}
+                />
+           </div>
+           <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center space-x-2">
+                    <TrafficConeIcon />
+                    <Label htmlFor="show-roadworks" className="cursor-pointer">Show Roadworks</Label>
+                </div>
+                <Switch
+                    id="show-roadworks"
+                    checked={showRoadworks}
+                    onCheckedChange={setShowRoadworks}
                 />
            </div>
            <div className="flex items-center justify-between rounded-lg border p-3">

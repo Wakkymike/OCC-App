@@ -45,3 +45,13 @@ export interface JourneyPlan {
   endStop: LatLng;
   path: LatLng[];
 }
+
+export interface Roadwork {
+  id: string;
+  title: string;
+  description: string;
+  location: LatLng;
+  severity: 'low' | 'moderate' | 'high';
+  link: string;
+  pubDate: string;
+}

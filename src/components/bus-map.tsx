@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import type { Bus, LatLng, MetrolinkData, JourneyPlan } from '@/lib/types';
+import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork } from '@/lib/types';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
 
@@ -23,6 +23,8 @@ interface BusMapProps {
   metrolinkData: MetrolinkData | null;
   routeToDisplay: LatLng[] | null;
   journeyPlan: JourneyPlan | null;
+  roadworks: Roadwork[] | null;
+  showRoadworks: boolean;
 }
 
 const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
@@ -42,10 +44,13 @@ export default function BusMap({
   metrolinkData,
   routeToDisplay,
   journeyPlan,
+  roadworks,
+  showRoadworks,
 }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
+  const roadworksMarkersRef = useRef<Record<string, mapboxgl.Marker>>({});
   const placeMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const journeyStartMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const journeyEndMarkerRef = useRef<mapboxgl.Marker | null>(null);
@@ -154,6 +159,8 @@ export default function BusMap({
       if (!mapRef.current) return;
       Object.values(markersRef.current).forEach(marker => marker.remove());
       markersRef.current = {};
+      Object.values(roadworksMarkersRef.current).forEach(marker => marker.remove());
+      roadworksMarkersRef.current = {};
       setupOptionalLayers(mapRef.current);
       setStyleRevision(rev => rev + 1);
     };
@@ -677,6 +684,64 @@ export default function BusMap({
       }
     }
   }, [searchedPlace, mapView, styleRevision]);
+
+  // Effect for roadworks
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.isStyleLoaded()) return;
+
+    const currentRoadworkIds = new Set(Object.keys(roadworksMarkersRef.current));
+
+    if (roadworks && showRoadworks) {
+      roadworks.forEach((work) => {
+        const markerId = work.id;
+        currentRoadworkIds.delete(markerId);
+
+        const severityColor = {
+          low: '#22c55e', // green
+          moderate: '#f97316', // orange
+          high: '#ef4444', // red
+        }[work.severity];
+        
+        const el = document.createElement('div');
+        el.style.cursor = 'pointer';
+        el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="${severityColor}" stroke="white" stroke-width="1.5" style="filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));"><path d="M12 2L2 22h20L12 2z" /></svg>`;
+        
+        const popup = new mapboxgl.Popup({ offset: 25, className: 'bus-stop-popup' })
+            .setHTML(`
+                <div class="font-bold">${work.title}</div>
+                <div>${work.description}</div>
+                <div class="text-xs mt-1">Updated: ${new Date(work.pubDate).toLocaleString()}</div>
+            `);
+
+        let marker = roadworksMarkersRef.current[markerId];
+        if (!marker) {
+          marker = new mapboxgl.Marker(el)
+            .setLngLat([work.location.lng, work.location.lat])
+            .setPopup(popup)
+            .addTo(map);
+          roadworksMarkersRef.current[markerId] = marker;
+        } else {
+            marker.setLngLat([work.location.lng, work.location.lat]);
+        }
+      });
+    }
+
+    // Remove old markers
+    currentRoadworkIds.forEach(id => {
+      roadworksMarkersRef.current[id]?.remove();
+      delete roadworksMarkersRef.current[id];
+    });
+
+    // If showRoadworks is false, remove all of them
+    if (!showRoadworks) {
+        Object.keys(roadworksMarkersRef.current).forEach(id => {
+            roadworksMarkersRef.current[id]?.remove();
+            delete roadworksMarkersRef.current[id];
+        });
+    }
+
+  }, [roadworks, showRoadworks, styleRevision]);
 
   return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />;
 }
