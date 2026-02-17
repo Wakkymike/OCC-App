@@ -1,10 +1,9 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Map, Radio, Shield } from 'lucide-react';
+import { Map, Radio, Shield, Route } from 'lucide-react';
 import UserMenu from '@/components/auth/UserMenu';
 import TickerTape from '@/components/TickerTape';
 import BreakingNewsTicker from '@/components/BreakingNewsTicker';
-import JourneyPlanner from '@/components/journey-planner';
 
 export default function HomePage() {
   return (
@@ -29,6 +28,12 @@ export default function HomePage() {
                         Live Bus Map
                         </Link>
                     </Button>
+                    <Button asChild size="lg">
+                        <Link href="/journey-planner">
+                        <Route className="mr-2 h-5 w-5" />
+                        Journey Planner
+                        </Link>
+                    </Button>
                     <Button asChild size="lg" variant="outline">
                         <Link href="/timetable">
                         <Radio className="mr-2 h-5 w-5" />
@@ -44,9 +49,6 @@ export default function HomePage() {
                     </div>
                 </div>
 
-                <div className="w-full max-w-4xl">
-                    <JourneyPlanner />
-                </div>
             </main>
         </div>
         <footer className="w-full flex-shrink-0">
