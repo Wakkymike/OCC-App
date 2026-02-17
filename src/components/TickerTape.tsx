@@ -13,6 +13,12 @@ export default function TickerTape() {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // This effect runs only on the client, after hydration, to avoid server-client mismatch
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const fetchNews = useCallback(async () => {
     try {
@@ -41,19 +47,6 @@ export default function TickerTape() {
     return () => clearInterval(intervalId);
   }, [fetchNews]);
 
-  const TickerItems = ({ isDuplicate }: { isDuplicate: boolean }) => (
-    <>
-      {items.map((item, index) => (
-        <div key={isDuplicate ? `dup-${index}` : index} className="flex items-center flex-shrink-0">
-          <span className="mx-8 font-semibold">{item.title}:</span>
-          <span className="mx-8">{item.description}</span>
-          <span className="mx-8 text-muted-foreground text-sm">({new Date(item.pubDate).toLocaleTimeString()})</span>
-          {index < items.length - 1 && <span className="text-muted-foreground">||</span>}
-        </div>
-      ))}
-    </>
-  );
-
   const renderContent = () => {
     if (isLoading) {
       return <div className="flex items-center"><span className="mx-8">Loading latest travel news...</span></div>;
@@ -65,8 +58,31 @@ export default function TickerTape() {
       return (
         <div className="ticker-wrapper">
           <div className="ticker-content">
-            <TickerItems isDuplicate={false} />
-            <TickerItems isDuplicate={true} />
+            {/* Render items twice for a seamless loop */}
+            {items.map((item, index) => (
+              <div key={index} className="flex items-center flex-shrink-0">
+                <span className="mx-8 font-semibold">{item.title}:</span>
+                <span className="mx-8">{item.description}</span>
+                {isClient && (
+                    <span className="mx-8 text-muted-foreground text-sm">
+                        ({new Date(item.pubDate).toLocaleTimeString()})
+                    </span>
+                )}
+                <span className="text-muted-foreground mx-4">||</span>
+              </div>
+            ))}
+            {items.map((item, index) => (
+              <div key={`dup-${index}`} className="flex items-center flex-shrink-0" aria-hidden="true">
+                <span className="mx-8 font-semibold">{item.title}:</span>
+                <span className="mx-8">{item.description}</span>
+                {isClient && (
+                    <span className="mx-8 text-muted-foreground text-sm">
+                        ({new Date(item.pubDate).toLocaleTimeString()})
+                    </span>
+                )}
+                <span className="text-muted-foreground mx-4">||</span>
+              </div>
+            ))}
           </div>
         </div>
       );
