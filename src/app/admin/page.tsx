@@ -310,7 +310,7 @@ function NetworkUpdateManagement() {
     const [newUpdatePriority, setNewUpdatePriority] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const updatesCollectionRef = useMemoFirebase(() => collection(firestore, 'networkUpdates'), [firestore]);
+    const updatesCollectionRef = useMemoFirebase(() => query(collection(firestore, 'networkUpdates')), [firestore]);
     const { data: allUpdates, isLoading } = useCollection<NetworkUpdate>(updatesCollectionRef);
 
     const updates = useMemo(() => {
@@ -359,7 +359,7 @@ function NetworkUpdateManagement() {
         if (!isNaN(numericPriority)) {
             const updateRef = doc(firestore, 'networkUpdates', updateId);
             updateDocumentNonBlocking(updateRef, { priority: numericPriority });
-            toast({ title: 'Priority Updated', description: 'The update priority has been changed.' });
+             toast({ title: 'Priority Updated', description: 'The update priority has been changed.' });
         }
     };
 
@@ -647,7 +647,8 @@ export default function AdminPage() {
       )
   }
 
-  const isFullAdmin = currentUserProfile?.isAdmin;
+  const isSuperAdmin = currentUser?.email === 'michael.dodsworth@gonorthwest.co.uk';
+  const isFullAdmin = currentUserProfile?.isAdmin || isSuperAdmin;
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-background p-8 gap-8">
