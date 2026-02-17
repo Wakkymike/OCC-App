@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Megaphone } from 'lucide-react';
 
 interface NewsItem {
@@ -13,63 +13,38 @@ export default function TickerTape() {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [animationDuration, setAnimationDuration] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
-    const fetchNews = async () => {
-      try {
-        const response = await fetch('/api/tfgm-news');
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to fetch news');
-        }
-        const cleanedItems = data.items.map((item: NewsItem) => ({
-            ...item,
-            description: item.description.replace(/<[^>]*>?/gm, '')
-        }));
-        setItems(cleanedItems);
-        setError(null);
-      } catch (err: any) {
-        console.error(err);
-        setError(err.message || 'An unknown error occurred while loading travel news.');
-      } finally {
-        setIsLoading(false);
+  const fetchNews = useCallback(async () => {
+    try {
+      const response = await fetch('/api/tfgm-news');
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch news');
       }
+      const cleanedItems = data.items.map((item: NewsItem) => ({
+          ...item,
+          description: item.description.replace(/<[^>]*>?/gm, '')
+      }));
+      setItems(cleanedItems);
+      setError(null);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'An unknown error occurred while loading travel news.');
+    } finally {
+      setIsLoading(false);
     }
-
-    fetchNews();
-    const intervalId = setInterval(fetchNews, 60000);
-    return () => clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
-    // We need a small delay to allow the browser to render the new items and calculate the width
-    const timeoutId = setTimeout(() => {
-      if (contentRef.current) {
-        const contentWidth = contentRef.current.scrollWidth;
-        // Define a constant speed in pixels per second. A smaller number means a slower scroll.
-        const pixelsPerSecond = 50; 
-        // The animation distance is half the total width (because the content is duplicated)
-        const distanceToTravel = contentWidth / 2;
-        
-        if (distanceToTravel > 0) {
-          const duration = distanceToTravel / pixelsPerSecond;
-          setAnimationDuration(`${duration}s`);
-        } else {
-          setAnimationDuration(undefined); // No animation if there's no content
-        }
-      }
-    }, 100); // 100ms delay
-
-    return () => clearTimeout(timeoutId);
-
-  }, [items]); // Recalculate whenever the news items change
+    fetchNews();
+    const intervalId = setInterval(fetchNews, 60000); // Refresh every minute
+    return () => clearInterval(intervalId);
+  }, [fetchNews]);
 
   const TickerItems = ({ isDuplicate }: { isDuplicate: boolean }) => (
     <>
       {items.map((item, index) => (
-        <div key={isDuplicate ? `dup-${index}` : index} className="flex items-center">
+        <div key={isDuplicate ? `dup-${index}` : index} className="flex items-center flex-shrink-0">
           <span className="mx-8 font-semibold">{item.title}:</span>
           <span className="mx-8">{item.description}</span>
           <span className="mx-8 text-muted-foreground text-sm">({new Date(item.pubDate).toLocaleTimeString()})</span>
@@ -89,11 +64,7 @@ export default function TickerTape() {
     if (items.length > 0) {
       return (
         <div className="ticker-wrapper">
-          <div 
-            className="ticker-content" 
-            ref={contentRef}
-            style={animationDuration ? { animationDuration } : {}}
-          >
+          <div className="ticker-content">
             <TickerItems isDuplicate={false} />
             <TickerItems isDuplicate={true} />
           </div>

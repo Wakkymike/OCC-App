@@ -165,6 +165,7 @@
   animation-name: ticker-scroll;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+  animation-duration: 900s; /* A very long duration for a slow scroll */
 }
 
 .ticker-container:hover .ticker-content {
