@@ -56,7 +56,7 @@ export default function BreakingNewsTicker() {
     const scrollWidth = contentElement.scrollWidth / 2;
     if (scrollWidth === 0) return;
 
-    const speed = 40; // pixels per second
+    const speed = 20; // pixels per second
     let position = 0;
     let lastTimestamp: number | null = null;
 
@@ -104,8 +104,9 @@ export default function BreakingNewsTicker() {
 
   return (
     <div className="w-full bg-destructive text-destructive-foreground h-12 flex items-center overflow-hidden">
-      <div className="flex-shrink-0 flex items-center bg-red-700 text-white h-full px-4 z-10">
-        <Radio className="h-6 w-6" />
+      <div className="flex-shrink-0 flex items-center bg-red-700 text-white h-full px-4 z-10 font-bold text-sm tracking-wider">
+        <Radio className="h-6 w-6 mr-2" />
+        <span>BREAKING NEWS</span>
       </div>
       <div className="flex-grow min-w-0 whitespace-nowrap">
         {hasContentToScroll ? (
