@@ -56,34 +56,32 @@ export default function TickerTape() {
     }
     if (items.length > 0) {
       return (
-        <div className="ticker-wrapper">
-          <div className="ticker-content">
-            {/* Render items twice for a seamless loop */}
-            {items.map((item, index) => (
-              <div key={index} className="flex items-center flex-shrink-0">
-                <span className="mx-8 font-semibold">{item.title}:</span>
-                <span className="mx-8">{item.description}</span>
-                {isClient && (
-                    <span className="mx-8 text-muted-foreground text-sm">
-                        ({new Date(item.pubDate).toLocaleTimeString()})
-                    </span>
-                )}
-                <span className="text-muted-foreground mx-4">||</span>
-              </div>
-            ))}
-            {items.map((item, index) => (
-              <div key={`dup-${index}`} className="flex items-center flex-shrink-0" aria-hidden="true">
-                <span className="mx-8 font-semibold">{item.title}:</span>
-                <span className="mx-8">{item.description}</span>
-                {isClient && (
-                    <span className="mx-8 text-muted-foreground text-sm">
-                        ({new Date(item.pubDate).toLocaleTimeString()})
-                    </span>
-                )}
-                <span className="text-muted-foreground mx-4">||</span>
-              </div>
-            ))}
-          </div>
+        <div className="ticker-content">
+          {/* Render items twice for a seamless loop */}
+          {items.map((item, index) => (
+            <div key={index} className="flex items-center flex-shrink-0">
+              <span className="mx-8 font-semibold">{item.title}:</span>
+              <span className="mx-8">{item.description}</span>
+              {isClient && (
+                  <span className="mx-8 text-muted-foreground text-sm">
+                      ({new Date(item.pubDate).toLocaleTimeString()})
+                  </span>
+              )}
+              <span className="text-muted-foreground mx-4">||</span>
+            </div>
+          ))}
+          {items.map((item, index) => (
+            <div key={`dup-${index}`} className="flex items-center flex-shrink-0" aria-hidden="true">
+              <span className="mx-8 font-semibold">{item.title}:</span>
+              <span className="mx-8">{item.description}</span>
+              {isClient && (
+                  <span className="mx-8 text-muted-foreground text-sm">
+                      ({new Date(item.pubDate).toLocaleTimeString()})
+                  </span>
+              )}
+              <span className="text-muted-foreground mx-4">||</span>
+            </div>
+          ))}
         </div>
       );
     }

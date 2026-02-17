@@ -155,17 +155,10 @@
   white-space: nowrap;
 }
 
-.ticker-wrapper {
-  display: inline-block;
-}
-
 .ticker-content {
   display: inline-flex;
   align-items: center;
-  animation-name: ticker-scroll;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-duration: 900s; /* A very long duration for a slow scroll */
+  animation: ticker-scroll 3600s linear infinite;
 }
 
 .ticker-container:hover .ticker-content {
