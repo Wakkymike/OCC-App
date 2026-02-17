@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +19,8 @@ interface MapControlsProps {
   savedRoutes: Record<string, { name: string; route: LatLng[] }>;
   selectedRouteId: string | null;
   setSelectedRouteId: (id: string | null) => void;
+  showGnw: boolean;
+  setShowGnw: (show: boolean) => void;
   showMetroline: boolean;
   setShowMetroline: (show: boolean) => void;
   showVisionBus: boolean;
@@ -46,6 +49,8 @@ export default function MapControls({
   savedRoutes,
   selectedRouteId,
   setSelectedRouteId,
+  showGnw,
+  setShowGnw,
   showMetroline,
   setShowMetroline,
   showVisionBus,
@@ -113,6 +118,17 @@ export default function MapControls({
                     id="show-bus-stops"
                     checked={showBusStops}
                     onCheckedChange={setShowBusStops}
+                />
+           </div>
+           <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center space-x-2">
+                    <Bus className="h-5 w-5" />
+                    <Label htmlFor="show-gnw" className="cursor-pointer">Show Go N. West</Label>
+                </div>
+                <Switch
+                    id="show-gnw"
+                    checked={showGnw}
+                    onCheckedChange={setShowGnw}
                 />
            </div>
            <div className="flex items-center justify-between rounded-lg border p-3">

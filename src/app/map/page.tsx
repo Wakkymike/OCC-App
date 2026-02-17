@@ -38,6 +38,7 @@ export default function Page() {
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/streets-v12');
   const [show3DBuildings, setShow3DBuildings] = useState(true);
   const [showBusStops, setShowBusStops] = useState(true);
+  const [showGnw, setShowGnw] = useState(true);
   const [showMetroline, setShowMetroline] = useState(false);
   const [showVisionBus, setShowVisionBus] = useState(false);
   const [showStagecoach, setShowStagecoach] = useState(false);
@@ -187,7 +188,7 @@ export default function Page() {
   useEffect(() => {
     // 1. Filter buses based on the operator toggles
     const operatorFilteredBuses = buses.filter(bus => 
-        bus.operator === 'GNW' || 
+        (bus.operator === 'GNW' && showGnw) || 
         (bus.operator === 'MET' && showMetroline) ||
         (bus.operator === 'VB' && showVisionBus) ||
         (bus.operator === 'SC' && showStagecoach) ||
@@ -288,7 +289,7 @@ export default function Page() {
         setSelectedBusId(null);
       }
     }
-  }, [buses, currentSearch, selectedBusId, isRecording, recordingBusId, recordingService, toast, lastRecordedPosition, handleStopRecording, showMetroline, showVisionBus, showStagecoach, showFirstBus, showDiamondBus]);
+  }, [buses, currentSearch, selectedBusId, isRecording, recordingBusId, recordingService, toast, lastRecordedPosition, handleStopRecording, showGnw, showMetroline, showVisionBus, showStagecoach, showFirstBus, showDiamondBus]);
 
   const handleLocationSearch = async (query: string) => {
     setSelectedBusId(null);
@@ -426,6 +427,8 @@ export default function Page() {
               savedRoutes={allAvailableRoutes}
               selectedRouteId={selectedRouteId}
               setSelectedRouteId={setSelectedRouteId}
+              showGnw={showGnw}
+              setShowGnw={setShowGnw}
               showMetroline={showMetroline}
               setShowMetroline={setShowMetroline}
               showVisionBus={showVisionBus}
