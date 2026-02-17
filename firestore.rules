@@ -55,11 +55,10 @@ service cloud.firestore {
     }
 
     match /networkUpdates/{updateId} {
-      // Admins can perform any action on network updates.
-      allow create, update, delete: if isAdmin();
-
-      // Anyone can read network updates. This is required for the homepage display.
-      allow get, list: if true;
+      // Anyone can read network updates for the homepage display.
+      allow read: if true;
+      // Admins can create, update, and delete network updates.
+      allow write: if isAdmin();
     }
 
     // Default-deny all other collections/documents
