@@ -51,7 +51,6 @@ const calculateDelayFromTimes = (aimedTimeStr: string | undefined, expectedTimeS
 
 export async function GET() {
   const apiKey = process.env.BODS_API_KEY;
-  const feedId = '18880';
 
   if (!apiKey) {
     console.error('BODS_API_KEY missing');
@@ -61,187 +60,189 @@ export async function GET() {
     );
   }
 
-  const url = `https://data.bus-data.dft.gov.uk/api/v1/datafeed/${feedId}/?api_key=${apiKey}`;
+  const feeds = [
+    { operator: 'GNW' as const, feedId: '18880' },
+    { operator: 'MET' as const, feedId: '16387' },
+  ];
 
+  const fetchPromises = feeds.map(feed => {
+      const url = `https://data.bus-data.dft.gov.uk/api/v1/datafeed/${feed.feedId}/?api_key=${apiKey}`;
+      return fetch(url, { cache: 'no-store' })
+        .then(async (res) => {
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`API error for ${feed.operator} (${feed.feedId}): ${res.status} ${errorText.slice(0, 200)}`);
+            }
+            return res.text();
+        })
+        .then(xmlText => ({ xmlText, operator: feed.operator, feedId: feed.feedId }));
+  });
+  
+  const allBuses: Bus[] = [];
+  
   try {
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`BODS API error: ${response.status}`, errorText.slice(0, 500));
-      return NextResponse.json(
-        { error: `Failed to fetch data from bus API. Status: ${response.status}` },
-        { status: response.status }
-      );
-    }
+      const settledResults = await Promise.allSettled(fetchPromises);
+      
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '',
+        removeNSPrefix: true,
+        parseNodeValue: true, 
+        parseAttributeValue: true,
+        trimValues: true,
+      });
 
-    const xmlText = await response.text();
+      for (const result of settledResults) {
+          if (result.status === 'rejected') {
+              console.error('BODS feed fetch failed:', result.reason);
+              continue;
+          }
+          
+          const { xmlText, operator } = result.value;
+          const data = parser.parse(xmlText);
 
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '',
-      removeNSPrefix: true,
-      parseNodeValue: true, 
-      parseAttributeValue: true,
-      trimValues: true,
-    });
+          const deliveries = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery ?? [];
+          const deliveriesArray = Array.isArray(deliveries) ? deliveries : [deliveries];
 
-    const data = parser.parse(xmlText);
+          let vehicleActivities: any[] = [];
+          for (const delivery of deliveriesArray) {
+            if (delivery.ErrorCondition) {
+              console.warn(`[${operator}] BODS API returned an error condition:`, getText(delivery.ErrorCondition.Description));
+              continue;
+            }
 
-    const deliveries = data?.Siri?.ServiceDelivery?.VehicleMonitoringDelivery ?? [];
-    const deliveriesArray = Array.isArray(deliveries) ? deliveries : [deliveries];
+            let activities = delivery?.VehicleActivity ?? [];
+            if (!activities) continue;
+            if (!Array.isArray(activities)) activities = [activities];
+            vehicleActivities.push(...activities);
+          }
 
-    let vehicleActivities: any[] = [];
-    for (const delivery of deliveriesArray) {
-      if (delivery.ErrorCondition) {
-        console.warn('BODS API returned an error condition:', getText(delivery.ErrorCondition.Description));
-        continue;
+          let skippedCount = 0;
+
+          const buses: Bus[] = vehicleActivities
+            .map((activity): Bus | null => {
+              try {
+                const recordedAtTimeStr = getText(activity.RecordedAtTime);
+                if (!recordedAtTimeStr) return null;
+
+                const recordedAt = new Date(recordedAtTimeStr);
+                if (isNaN(recordedAt.getTime())) return null;
+
+                const ageInMinutes = (new Date().getTime() - recordedAt.getTime()) / (1000 * 60);
+                if (ageInMinutes > 3) return null;
+
+                const journey = activity.MonitoredVehicleJourney;
+                if (!journey) return null;
+
+                const fleetNumber = getText(journey.VehicleRef);
+                const runningBoard = getText(journey.BlockRef);
+                const service = getText(journey.PublishedLineName);
+                const destination = getText(journey.DestinationName)?.replace(/_/g, ' ');
+                const direction = getText(journey.DirectionRef);
+                const journeyRef = getText(journey.FramedVehicleJourneyRef?.DatedVehicleJourneyRef);
+                const progressStatusText = getText(journey.ProgressStatus)?.toLowerCase() ?? '';
+
+                if (progressStatusText.includes('cancelled')) {
+                  return {
+                    fleetNumber: fleetNumber ?? 'unknown',
+                    runningBoard: runningBoard ?? 'unknown',
+                    service: service ?? 'unknown',
+                    destination: destination ?? 'Cancelled',
+                    direction: direction ?? 'unknown',
+                    journeyRef: journeyRef,
+                    status: 'Cancelled',
+                    operator: operator,
+                  };
+                }
+
+                if (!journey.VehicleLocation || !journey.VehicleLocation.Latitude || !journey.VehicleLocation.Longitude) {
+                  skippedCount++;
+                  return null;
+                }
+
+                const lat = parseFloat(journey.VehicleLocation.Latitude);
+                const lng = parseFloat(journey.VehicleLocation.Longitude);
+
+                if (isNaN(lat) || isNaN(lng)) {
+                  skippedCount++;
+                  return null;
+                }
+                
+                const bearingText = getText(journey.Bearing);
+                const bearing = bearingText ? parseFloat(bearingText) : undefined;
+                
+                let delayInMinutes: number | undefined;
+                let status: string;
+
+                const monitoredCall = journey.MonitoredCall;
+                const onwardCallsRaw = journey.OnwardCalls?.OnwardCall;
+                const onwardCalls = onwardCallsRaw ? ensureArray(onwardCallsRaw) : [];
+                
+                let callToUse;
+                callToUse = onwardCalls.find(c => getText(c.AimedArrivalTime) && getText(c.ExpectedArrivalTime));
+                if (callToUse) {
+                    delayInMinutes = calculateDelayFromTimes(getText(callToUse.AimedArrivalTime), getText(callToUse.ExpectedArrivalTime));
+                }
+
+                if (delayInMinutes === undefined) {
+                    callToUse = onwardCalls.find(c => getText(c.AimedDepartureTime) && getText(c.ExpectedDepartureTime));
+                    if (callToUse) {
+                        delayInMinutes = calculateDelayFromTimes(getText(callToUse.AimedDepartureTime), getText(callToUse.ExpectedDepartureTime));
+                    }
+                }
+
+                if (delayInMinutes === undefined && monitoredCall) {
+                    const aimedTime = getText(monitoredCall.AimedDepartureTime) ?? getText(monitoredCall.AimedArrivalTime);
+                    const expectedTime = getText(monitoredCall.ExpectedDepartureTime) ?? getText(monitoredCall.ActualDepartureTime);
+                    delayInMinutes = calculateDelayFromTimes(aimedTime, expectedTime);
+                }
+                
+                if (delayInMinutes !== undefined) {
+                  const delay = Math.round(delayInMinutes);
+                  if (delay > 1) {
+                    status = `${delay} min late`;
+                  } else if (delay < -1) {
+                    status = `${Math.abs(delay)} min early`;
+                  } else {
+                    status = 'On Time';
+                  }
+                } else if (progressStatusText) {
+                  status = progressStatusText.charAt(0).toUpperCase() + progressStatusText.slice(1);
+                } else {
+                  status = 'Unknown';
+                }
+
+                return {
+                  fleetNumber: fleetNumber ?? 'unknown',
+                  runningBoard: runningBoard ?? 'unknown',
+                  service: service ?? 'unknown',
+                  destination: destination ?? 'unknown',
+                  direction: direction ?? 'unknown',
+                  position: { lat, lng },
+                  bearing: bearing && !isNaN(bearing) ? bearing : undefined,
+                  journeyRef: journeyRef,
+                  delay: delayInMinutes,
+                  status: status,
+                  operator: operator,
+                };
+              } catch (e) {
+                console.error(`[${operator}] Error processing individual bus record:`, e, 'Record:', JSON.stringify(activity, null, 2).slice(0, 1000));
+                return null;
+              }
+            })
+            .filter((bus): bus is Bus => bus !== null);
+
+          if (skippedCount > 0) {
+            console.log(`[${operator}] Skipped ${skippedCount} buses due to missing or invalid location data.`);
+          }
+          
+          allBuses.push(...buses);
       }
 
-      let activities = delivery?.VehicleActivity ?? [];
-      if (!activities) continue;
-      if (!Array.isArray(activities)) activities = [activities];
-      vehicleActivities.push(...activities);
-    }
+    return NextResponse.json({ buses: allBuses });
 
-    let skippedCount = 0;
-
-    const buses: Bus[] = vehicleActivities
-      .map((activity): Bus | null => {
-        try {
-          const recordedAtTimeStr = getText(activity.RecordedAtTime);
-          // If the record has no timestamp, we can't verify its freshness, so we skip it.
-          if (!recordedAtTimeStr) {
-            return null;
-          }
-
-          const recordedAt = new Date(recordedAtTimeStr);
-          // If the timestamp is invalid, skip it.
-          if (isNaN(recordedAt.getTime())) {
-            return null;
-          }
-
-          const ageInMinutes = (new Date().getTime() - recordedAt.getTime()) / (1000 * 60);
-
-          // If data is older than 3 minutes, consider it stale and remove the bus from the map.
-          if (ageInMinutes > 3) {
-            return null;
-          }
-
-          const journey = activity.MonitoredVehicleJourney;
-          if (!journey) return null;
-
-          const fleetNumber = getText(journey.VehicleRef);
-          const runningBoard = getText(journey.BlockRef);
-          const service = getText(journey.PublishedLineName);
-          const destination = getText(journey.DestinationName)?.replace(/_/g, ' ');
-          const direction = getText(journey.DirectionRef);
-          const journeyRef = getText(journey.FramedVehicleJourneyRef?.DatedVehicleJourneyRef);
-          const progressStatusText = getText(journey.ProgressStatus)?.toLowerCase() ?? '';
-
-          // --- CANCELLATION CHECK ---
-          if (progressStatusText.includes('cancelled')) {
-            return {
-              fleetNumber: fleetNumber ?? 'unknown',
-              runningBoard: runningBoard ?? 'unknown',
-              service: service ?? 'unknown',
-              destination: destination ?? 'Cancelled',
-              direction: direction ?? 'unknown',
-              journeyRef: journeyRef,
-              status: 'Cancelled',
-            };
-          }
-
-          if (!journey.VehicleLocation || !journey.VehicleLocation.Latitude || !journey.VehicleLocation.Longitude) {
-            skippedCount++;
-            return null;
-          }
-
-          const lat = parseFloat(journey.VehicleLocation.Latitude);
-          const lng = parseFloat(journey.VehicleLocation.Longitude);
-
-          if (isNaN(lat) || isNaN(lng)) {
-            skippedCount++;
-            return null;
-          }
-          
-          const bearingText = getText(journey.Bearing);
-          const bearing = bearingText ? parseFloat(bearingText) : undefined;
-          
-          let delayInMinutes: number | undefined;
-          let status: string;
-
-          const monitoredCall = journey.MonitoredCall;
-          const onwardCallsRaw = journey.OnwardCalls?.OnwardCall;
-          const onwardCalls = onwardCallsRaw ? ensureArray(onwardCallsRaw) : [];
-          
-          // --- PRIMARY DELAY CALCULATION (FROM LIVE FEED AIMED/EXPECTED) ---
-          // This is more robust as it relies directly on the feed's data.
-          let callToUse;
-          // Prioritize onward calls that have both aimed and expected arrival times
-          callToUse = onwardCalls.find(c => getText(c.AimedArrivalTime) && getText(c.ExpectedArrivalTime));
-          if (callToUse) {
-              delayInMinutes = calculateDelayFromTimes(getText(callToUse.AimedArrivalTime), getText(callToUse.ExpectedArrivalTime));
-          }
-
-          // If still no delay, try with departure times from onward calls
-          if (delayInMinutes === undefined) {
-              callToUse = onwardCalls.find(c => getText(c.AimedDepartureTime) && getText(c.ExpectedDepartureTime));
-              if (callToUse) {
-                  delayInMinutes = calculateDelayFromTimes(getText(callToUse.AimedDepartureTime), getText(callToUse.ExpectedDepartureTime));
-              }
-          }
-
-          // If still no delay, check the monitored call as a last resort
-          if (delayInMinutes === undefined && monitoredCall) {
-              const aimedTime = getText(monitoredCall.AimedDepartureTime) ?? getText(monitoredCall.AimedArrivalTime);
-              const expectedTime = getText(monitoredCall.ExpectedDepartureTime) ?? getText(monitoredCall.ActualDepartureTime);
-              delayInMinutes = calculateDelayFromTimes(aimedTime, expectedTime);
-          }
-          
-          // --- Status String Generation ---
-          if (delayInMinutes !== undefined) {
-            const delay = Math.round(delayInMinutes);
-            if (delay > 1) {
-              status = `${delay} min late`;
-            } else if (delay < -1) {
-              status = `${Math.abs(delay)} min early`;
-            } else {
-              status = 'On Time';
-            }
-          } else if (progressStatusText) {
-            status = progressStatusText.charAt(0).toUpperCase() + progressStatusText.slice(1);
-          } else {
-            status = 'Unknown';
-          }
-
-
-          return {
-            fleetNumber: fleetNumber ?? 'unknown',
-            runningBoard: runningBoard ?? 'unknown',
-            service: service ?? 'unknown',
-            destination: destination ?? 'unknown',
-            direction: direction ?? 'unknown',
-            position: { lat, lng },
-            bearing: bearing && !isNaN(bearing) ? bearing : undefined,
-            journeyRef: journeyRef,
-            delay: delayInMinutes,
-            status: status,
-          };
-        } catch (e) {
-          // If processing a single bus record fails, log it and continue instead of crashing
-          console.error('Error processing individual bus record:', e, 'Record:', JSON.stringify(activity, null, 2).slice(0, 1000));
-          return null;
-        }
-      })
-      .filter((bus): bus is Bus => bus !== null);
-
-    if (skippedCount > 0) {
-      console.log(`Skipped ${skippedCount} buses due to missing or invalid location data.`);
-    }
-
-    return NextResponse.json({ buses });
   } catch (error) {
-    console.error('Unexpected error fetching/parsing BODS XML:', error);
+    console.error('Unexpected error in buses API route:', error);
     return NextResponse.json(
       { error: `Unexpected server error: ${error instanceof Error ? error.message : String(error)}` },
       { status: 500 }

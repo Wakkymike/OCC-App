@@ -541,10 +541,11 @@ export default function BusMap({
       const markerElement = marker.getElement();
       const flagElement = markerElement.querySelector('div') as HTMLDivElement;
       
-      const isSchoolService = bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
-      const isNightBus = bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
-      const isFirstJourney = bus.journeyRef ? firstJourneyRefs.includes(bus.journeyRef) : false;
-      const isLastJourney = bus.journeyRef ? lastJourneyRefs.includes(bus.journeyRef) : false;
+      const isGnwBus = bus.operator === 'GNW';
+      const isSchoolService = isGnwBus && bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
+      const isNightBus = isGnwBus && bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
+      const isFirstJourney = isGnwBus && bus.journeyRef ? firstJourneyRefs.includes(bus.journeyRef) : false;
+      const isLastJourney = isGnwBus && bus.journeyRef ? lastJourneyRefs.includes(bus.journeyRef) : false;
 
       let runningBoardHtml = bus.runningBoard;
       if (isFirstJourney || isLastJourney) {
@@ -576,16 +577,21 @@ export default function BusMap({
           statusHtml = ` | <span style="color:${color}; font-weight: bold;">${bus.status}</span>`;
       }
 
-
-      flagElement.innerHTML = `${bus.fleetNumber} | RB: ${runningBoardHtml} | ${bus.service}${directionLabel}${indicators} | ${bus.destination}${statusHtml}`;
+      const operatorLabel = bus.operator === 'MET' ? ` <span style="color:#2563eb;font-weight:bold;">[MET]</span>` : '';
+      flagElement.innerHTML = `${bus.fleetNumber} | RB: ${runningBoardHtml} | ${bus.service}${operatorLabel}${directionLabel}${indicators} | ${bus.destination}${statusHtml}`;
       
       const svg = markerElement.querySelector('svg');
       if (svg && bus.bearing !== undefined) svg.style.transform = `rotate(${bus.bearing}deg)`;
       const isSelected = markerId === selectedBusId;
       const busBody = markerElement.querySelector('#bus-body');
       const infoFlag = markerElement.querySelector('.bus-info-flag') as HTMLDivElement;
-      if (busBody && infoFlag) {
-        busBody.setAttribute('fill', isSelected ? '#00FFFF' : '#FFC107');
+      
+      const defaultColor = bus.operator === 'GNW' ? '#FFC107' : '#60a5fa'; // Yellow for GNW, Blue for Metroline
+      if (busBody) {
+          busBody.setAttribute('fill', isSelected ? '#00FFFF' : defaultColor);
+      }
+
+      if (infoFlag) {
         if (isSelected) {
           let detailedRunningBoardHtml = `RB: ${bus.runningBoard}`;
           if (isFirstJourney || isLastJourney) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { Bus } from '@/lib/types';
 import {
@@ -32,11 +32,13 @@ export default function LiveServicePage() {
   const { buses, error, lastRefreshed } = useBusTracker();
   const [serviceFilters, setServiceFilters] = useState<Record<string, 'all' | 'inbound' | 'outbound'>>({});
 
+  const gnwBuses = useMemo(() => buses.filter(b => b.operator === 'GNW'), [buses]);
+
   const handleFilterChange = (serviceNumber: string, value: 'all' | 'inbound' | 'outbound') => {
     setServiceFilters(prev => ({ ...prev, [serviceNumber]: value }));
   };
 
-  const services = buses.reduce((acc, bus) => {
+  const services = gnwBuses.reduce((acc, bus) => {
     const serviceKey = String(bus.service);
     if (!acc[serviceKey]) {
       acc[serviceKey] = [];
@@ -78,14 +80,14 @@ export default function LiveServicePage() {
               <div>
                 <CardTitle className="text-3xl flex items-center gap-4">
                   <span>Live Service Board</span>
-                  {buses.length > 0 && (
+                  {gnwBuses.length > 0 && (
                     <Badge className="bg-chart-2 text-primary-foreground">
-                      {buses.length} buses active over {sortedServiceNumbers.length} services
+                      {gnwBuses.length} buses active over {sortedServiceNumbers.length} services
                     </Badge>
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Real-time status of all currently running services. Data refreshes automatically.
+                  Real-time status of all currently running Go North West services. Data refreshes automatically.
                 </CardDescription>
               </div>
               <Link
@@ -108,18 +110,18 @@ export default function LiveServicePage() {
             )}
           </CardHeader>
           <CardContent>
-            {!error && buses.length === 0 && (
+            {!error && gnwBuses.length === 0 && (
               <div className="flex items-center justify-center py-10 text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 <span>Loading live bus data...</span>
               </div>
             )}
-             {error && buses.length === 0 && (
+             {error && gnwBuses.length === 0 && (
               <div className="flex items-center justify-center py-10 text-destructive">
                 <span>Could not load bus data.</span>
               </div>
             )}
-            {buses.length > 0 && (
+            {gnwBuses.length > 0 && (
               <Accordion type="single" collapsible className="w-full">
                 {sortedServiceNumbers.map((serviceNumber) => (
                   <AccordionItem value={serviceNumber} key={serviceNumber}>

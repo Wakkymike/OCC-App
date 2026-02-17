@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { Layers3, Satellite, Map, Building, Bus } from 'lucide-react';
+import { Layers3, Satellite, Map, Building, Bus, Route } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { LatLng } from '@/lib/types';
 
@@ -18,6 +18,8 @@ interface MapControlsProps {
   savedRoutes: Record<string, { name: string; route: LatLng[] }>;
   selectedRouteId: string | null;
   setSelectedRouteId: (id: string | null) => void;
+  showMetroline: boolean;
+  setShowMetroline: (show: boolean) => void;
 }
 
 const styleOptions = [
@@ -36,6 +38,8 @@ export default function MapControls({
   savedRoutes,
   selectedRouteId,
   setSelectedRouteId,
+  showMetroline,
+  setShowMetroline,
 }: MapControlsProps) {
   const currentStyleId = mapStyle.split('/').pop();
 
@@ -93,6 +97,17 @@ export default function MapControls({
                     id="show-bus-stops"
                     checked={showBusStops}
                     onCheckedChange={setShowBusStops}
+                />
+           </div>
+           <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center space-x-2">
+                    <Route className="h-5 w-5" />
+                    <Label htmlFor="show-metroline" className="cursor-pointer">Show Metroline</Label>
+                </div>
+                <Switch
+                    id="show-metroline"
+                    checked={showMetroline}
+                    onCheckedChange={setShowMetroline}
                 />
            </div>
         </div>

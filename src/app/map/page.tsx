@@ -38,6 +38,7 @@ export default function Page() {
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/streets-v12');
   const [show3DBuildings, setShow3DBuildings] = useState(true);
   const [showBusStops, setShowBusStops] = useState(true);
+  const [showMetroline, setShowMetroline] = useState(false);
   const { toast } = useToast();
 
   const [metrolinkData, setMetrolinkData] = useState<MetrolinkData | null>(null);
@@ -180,9 +181,14 @@ export default function Page() {
   }, [searchParams, toast]);
 
   useEffect(() => {
-    let results = buses;
-    let isSearching = false;
+    // 1. Filter buses based on the operator toggles
+    const operatorFilteredBuses = buses.filter(bus => 
+        bus.operator === 'GNW' || (bus.operator === 'MET' && showMetroline)
+    );
 
+    // 2. Filter by search query if there is one
+    let searchFilteredBuses = operatorFilteredBuses;
+    let isSearching = false;
     if (currentSearch) {
       const { searchType, query, direction } = currentSearch;
       isSearching = query !== '' || (searchType === 'service' && direction !== 'all');
@@ -190,7 +196,7 @@ export default function Page() {
       if (isSearching) {
         const lowerCaseQuery = query.toLowerCase();
 
-        results = buses.filter((bus) => {
+        searchFilteredBuses = operatorFilteredBuses.filter((bus) => {
           if (searchType === 'fleetNumber') {
             return String(bus.fleetNumber).toLowerCase().includes(lowerCaseQuery);
           } else if (searchType === 'runningBoard') {
@@ -206,14 +212,15 @@ export default function Page() {
         });
       }
     }
+    
+    const finalDisplayBuses = searchFilteredBuses;
+    setDisplayBuses(finalDisplayBuses);
 
-    setDisplayBuses(results);
-
-    // Route recording logic
+    // 3. Handle route recording and map view updates
     if (isRecording) {
       if (!recordingBusId) {
-        // Find the first bus for the service to start tracking
-        const busToStartTracking = results.find(b => b.service === recordingService);
+        // Find the first bus for the service to start tracking from the displayed buses
+        const busToStartTracking = finalDisplayBuses.find(b => b.service === recordingService);
         if (busToStartTracking) {
           const busId = `${busToStartTracking.fleetNumber}-${busToStartTracking.runningBoard}-${busToStartTracking.service}-${busToStartTracking.direction}-${busToStartTracking.journeyRef || 'no-ref'}`;
           setRecordingBusId(busId);
@@ -222,7 +229,7 @@ export default function Page() {
         }
       } else {
         // Continue tracking the specific bus
-        const trackedBus = results.find(b => {
+        const trackedBus = finalDisplayBuses.find(b => {
            const busId = `${b.fleetNumber}-${b.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
            return busId === recordingBusId;
         });
@@ -239,8 +246,7 @@ export default function Page() {
       }
     }
 
-
-    const busToTrack = selectedBusId ? results.find(b => {
+    const busToTrack = selectedBusId ? finalDisplayBuses.find(b => {
         const busId = `${b.fleetNumber}-${b.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
         return busId === selectedBusId;
     }) : undefined;
@@ -251,16 +257,16 @@ export default function Page() {
     }
 
     if (isSearching) {
-      if (results.length === 1) {
-        const bus = results[0];
+      if (finalDisplayBuses.length === 1) {
+        const bus = finalDisplayBuses[0];
         if (bus.position) {
           const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
           setSelectedBusId(busId);
           setMapView({ center: bus.position, zoom: 16 });
         }
-      } else if (results.length > 1) {
+      } else if (finalDisplayBuses.length > 1) {
         const newBounds = new mapboxgl.LngLatBounds();
-        results.forEach((bus) => {
+        finalDisplayBuses.forEach((bus) => {
           if (bus.position) {
             newBounds.extend([bus.position.lng, bus.position.lat]);
           }
@@ -273,7 +279,7 @@ export default function Page() {
         setSelectedBusId(null);
       }
     }
-  }, [buses, currentSearch, selectedBusId, isRecording, recordingBusId, recordingService, toast, lastRecordedPosition, handleStopRecording]);
+  }, [buses, currentSearch, selectedBusId, isRecording, recordingBusId, recordingService, toast, lastRecordedPosition, handleStopRecording, showMetroline]);
 
   const handleLocationSearch = async (query: string) => {
     setSelectedBusId(null);
@@ -411,6 +417,8 @@ export default function Page() {
               savedRoutes={allAvailableRoutes}
               selectedRouteId={selectedRouteId}
               setSelectedRouteId={setSelectedRouteId}
+              showMetroline={showMetroline}
+              setShowMetroline={setShowMetroline}
             />
           </PopoverContent>
         </Popover>
