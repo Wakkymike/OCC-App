@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Upload, Home, TramFront, Users, UserPlus, Send, Clock, XCircle, Rss, PlusCircle, Trash2, LogOut } from 'lucide-react';
 import Link from 'next/link';
-import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc } from '@/firebase';
 import { collection, query, orderBy, Timestamp, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { sendSignInLinkToEmail, User } from 'firebase/auth';
 import { Switch } from '@/components/ui/switch';
@@ -24,6 +24,7 @@ interface UserProfile {
   displayName: string;
   email: string;
   isAdmin: boolean;
+  isContentCreator: boolean;
   isActive: boolean;
   passwordChangeRequired: boolean;
   forceSignOut: boolean;
@@ -55,6 +56,24 @@ function UserManagement({ users, isLoading, currentUser }: { users: UserProfile[
     toast({
       title: 'User Updated',
       description: `${user.displayName} has been ${isAdmin ? 'granted' : 'revoked'} admin privileges.`,
+    });
+  };
+  
+  const handleContentCreatorToggle = (user: UserProfile, isContentCreator: boolean) => {
+    if (user.email === 'michael.dodsworth@gonorthwest.co.uk') {
+        toast({
+            variant: 'destructive',
+            title: 'Action Forbidden',
+            description: "The super admin must have all permissions.",
+        });
+        return;
+    }
+    const userDocRef = doc(firestore, 'userProfiles', user.id);
+    updateDocumentNonBlocking(userDocRef, { isContentCreator });
+
+    toast({
+        title: 'User Updated',
+        description: `${user.displayName} has been ${isContentCreator ? 'granted' : 'revoked'} content creator privileges.`,
     });
   };
 
@@ -134,6 +153,7 @@ function UserManagement({ users, isLoading, currentUser }: { users: UserProfile[
                 <TableHead>Email</TableHead>
                 <TableHead>Active</TableHead>
                 <TableHead>Force Password Change</TableHead>
+                <TableHead>Content Creator</TableHead>
                 <TableHead>Administrator</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -156,6 +176,14 @@ function UserManagement({ users, isLoading, currentUser }: { users: UserProfile[
                       checked={user.passwordChangeRequired}
                       onCheckedChange={(isChecked) => handlePasswordChangeToggle(user, isChecked)}
                       aria-label={`Toggle force password change for ${user.displayName}`}
+                      disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'}
+                    />
+                  </TableCell>
+                  <TableCell>
+                     <Switch
+                      checked={user.isContentCreator}
+                      onCheckedChange={(isChecked) => handleContentCreatorToggle(user, isChecked)}
+                      aria-label={`Toggle content creator for ${user.displayName}`}
                       disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'}
                     />
                   </TableCell>
@@ -422,21 +450,25 @@ export default function AdminPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   
-  // State for TransXchange upload
   const [txcFile, setTxcFile] = useState<File | null>(null);
   const [isUploadingTxc, setIsUploadingTxc] = useState(false);
-  
-  // State for Metrolink upload
+
   const [metroFile, setMetroFile] = useState<File | null>(null);
   const [isUploadingMetro, setIsUploadingMetro] = useState(false);
   
   const auth = useAuth();
   const firestore = useFirestore();
-  const { user: currentUser } = useUser();
+  const { user: currentUser, isUserLoading: isCurrentUserAuthLoading } = useUser();
   const { toast } = useToast();
 
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'userProfiles'), [firestore]);
   const { data: users, isLoading: isUsersLoading } = useCollection<UserProfile>(usersCollectionRef);
+
+  const currentUserProfileRef = useMemoFirebase(() => {
+    if (!currentUser) return null;
+    return doc(firestore, 'userProfiles', currentUser.uid);
+  }, [currentUser, firestore]);
+  const { data: currentUserProfile, isLoading: isUserProfileLoading } = useDoc<UserProfile>(currentUserProfileRef);
 
   const handleTxcFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -459,7 +491,6 @@ export default function AdminPage() {
     setIsInviting(true);
 
     try {
-      // 1. Create a new invitation document to get a unique ID.
       const invitationsColRef = collection(firestore, 'invitations');
       const newInvitation = {
           email: inviteEmail,
@@ -468,7 +499,6 @@ export default function AdminPage() {
       const docRef = await addDoc(invitationsColRef, newInvitation);
       const invitationId = docRef.id;
 
-      // 2. Send the email with a link containing the unique invitation ID.
       const actionCodeSettings = {
         url: `${window.location.origin}/finish-sign-up?invitationId=${invitationId}`,
         handleCodeInApp: true,
@@ -531,7 +561,6 @@ export default function AdminPage() {
           reportContent += JSON.stringify(result.debug_info.sample_journey_pattern, null, 2);
       }
 
-
       const description = (
           <div className="mt-4 w-full text-left">
               <Label htmlFor="upload-report">Full Report (click to select all)</Label>
@@ -549,7 +578,7 @@ export default function AdminPage() {
       toast({
           title: 'Upload Report',
           description: description,
-          duration: 300000, // 5 minutes
+          duration: 300000,
       });
     } catch (error: any) {
       toast({
@@ -609,6 +638,16 @@ export default function AdminPage() {
       if (fileInput) fileInput.value = '';
     }
   };
+  
+  if (isCurrentUserAuthLoading || isUserProfileLoading) {
+    return (
+        <main className="flex min-h-screen flex-col items-center justify-center p-8">
+            <Loader2 className="h-12 w-12 animate-spin" />
+        </main>
+      )
+  }
+
+  const isFullAdmin = currentUserProfile?.isAdmin;
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-background p-8 gap-8">
@@ -625,137 +664,142 @@ export default function AdminPage() {
             </Link>
         </div>
 
-        <UserManagement users={users} isLoading={isUsersLoading} currentUser={currentUser} />
-        
-        <Card>
-            <CardHeader>
-                <div className="flex items-center gap-3">
-                    <UserPlus className="h-6 w-6" />
-                    <div>
-                        <CardTitle className="text-xl">Invite New User</CardTitle>
-                        <CardDescription>
-                          Send an email invitation to a new user to create their account.
-                        </CardDescription>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleInviteSubmit} className="space-y-4">
-                  <div className="grid w-full max-w-sm items-center gap-1.5">
-                    <Label htmlFor="invite-email">User's Email</Label>
-                    <Input
-                      id="invite-email"
-                      type="email"
-                      placeholder="new.user@example.com"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      disabled={isInviting}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" disabled={isInviting || !inviteEmail}>
-                    {isInviting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="mr-2 h-4 w-4" />
-                        Send Invitation
-                      </>
-                    )}
-                  </Button>
-                </form>
-            </CardContent>
-        </Card>
-        
-        <PendingInvitations allUsers={users} usersLoading={isUsersLoading} />
+        {isFullAdmin ? (
+            <>
+                <UserManagement users={users} isLoading={isUsersLoading} currentUser={currentUser} />
+                
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center gap-3">
+                            <UserPlus className="h-6 w-6" />
+                            <div>
+                                <CardTitle className="text-xl">Invite New User</CardTitle>
+                                <CardDescription>
+                                  Send an email invitation to a new user to create their account.
+                                </CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleInviteSubmit} className="space-y-4">
+                          <div className="grid w-full max-w-sm items-center gap-1.5">
+                            <Label htmlFor="invite-email">User's Email</Label>
+                            <Input
+                              id="invite-email"
+                              type="email"
+                              placeholder="new.user@example.com"
+                              value={inviteEmail}
+                              onChange={(e) => setInviteEmail(e.target.value)}
+                              disabled={isInviting}
+                              required
+                            />
+                          </div>
+                          <Button type="submit" disabled={isInviting || !inviteEmail}>
+                            {isInviting ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Sending...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="mr-2 h-4 w-4" />
+                                Send Invitation
+                              </>
+                            )}
+                          </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+                
+                <PendingInvitations allUsers={users} usersLoading={isUsersLoading} />
 
-        <NetworkUpdateManagement />
+                <NetworkUpdateManagement />
 
-        <Card>
-           <CardHeader>
-              <div className="flex items-center gap-3">
-                <Upload className="h-6 w-6" />
-                <div>
-                    <CardTitle className="text-xl">Bus Timetable Upload</CardTitle>
-                    <CardDescription>
-                      Upload TransXchange data to update the bus timetable reference.
-                    </CardDescription>
-                </div>
-              </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleTxcSubmit} className="space-y-4">
-              <div className="grid w-full items-center gap-1.5">
-                <Label htmlFor="txc-file-upload">TransXchange ZIP/XML File</Label>
-                <Input
-                  id="txc-file-upload"
-                  type="file"
-                  accept=".zip,.xml"
-                  onChange={handleTxcFileChange}
-                  disabled={isUploadingTxc}
-                />
-              </div>
-              <Button type="submit" disabled={isUploadingTxc || !txcFile}>
-                {isUploadingTxc ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Bus Timetable
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-        
-        <Card>
-           <CardHeader>
-              <div className="flex items-center gap-3">
-                <TramFront className="h-6 w-6" />
-                <div>
-                    <CardTitle className="text-xl">Metrolink Data Upload</CardTitle>
-                    <CardDescription>
-                      Upload Metrolink stops and lines information in JSON format.
-                    </CardDescription>
-                </div>
-              </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleMetroSubmit} className="space-y-4">
-              <div className="grid w-full items-center gap-1.5">
-                <Label htmlFor="metro-file-upload">Metrolink JSON File</Label>
-                <Input
-                  id="metro-file-upload"
-                  type="file"
-                  accept=".json"
-                  onChange={handleMetroFileChange}
-                  disabled={isUploadingMetro}
-                />
-              </div>
-              <Button type="submit" disabled={isUploadingMetro || !metroFile}>
-                {isUploadingMetro ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Metrolink Data
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
+                <Card>
+                   <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <Upload className="h-6 w-6" />
+                        <div>
+                            <CardTitle className="text-xl">Bus Timetable Upload</CardTitle>
+                            <CardDescription>
+                              Upload TransXchange data to update the bus timetable reference.
+                            </CardDescription>
+                        </div>
+                      </div>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleTxcSubmit} className="space-y-4">
+                      <div className="grid w-full items-center gap-1.5">
+                        <Label htmlFor="txc-file-upload">TransXchange ZIP/XML File</Label>
+                        <Input
+                          id="txc-file-upload"
+                          type="file"
+                          accept=".zip,.xml"
+                          onChange={handleTxcFileChange}
+                          disabled={isUploadingTxc}
+                        />
+                      </div>
+                      <Button type="submit" disabled={isUploadingTxc || !txcFile}>
+                        {isUploadingTxc ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload Bus Timetable
+                          </>
+                        )}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                   <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <TramFront className="h-6 w-6" />
+                        <div>
+                            <CardTitle className="text-xl">Metrolink Data Upload</CardTitle>
+                            <CardDescription>
+                              Upload Metrolink stops and lines information in JSON format.
+                            </CardDescription>
+                        </div>
+                      </div>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleMetroSubmit} className="space-y-4">
+                      <div className="grid w-full items-center gap-1.5">
+                        <Label htmlFor="metro-file-upload">Metrolink JSON File</Label>
+                        <Input
+                          id="metro-file-upload"
+                          type="file"
+                          accept=".json"
+                          onChange={handleMetroFileChange}
+                          disabled={isUploadingMetro}
+                        />
+                      </div>
+                      <Button type="submit" disabled={isUploadingMetro || !metroFile}>
+                        {isUploadingMetro ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload Metrolink Data
+                          </>
+                        )}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+            </>
+        ) : (
+             <NetworkUpdateManagement />
+        )}
       </div>
     </main>
   );

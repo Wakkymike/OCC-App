@@ -109,6 +109,7 @@ function FinishSignUpComponent() {
         email: user.email,
         displayName: displayName,
         isAdmin: isSuperAdmin,
+        isContentCreator: false,
         isActive: isSuperAdmin, // User must be activated by an admin unless they are super admin
         passwordChangeRequired: false,
       };

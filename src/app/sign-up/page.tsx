@@ -56,6 +56,7 @@ export default function SignUpPage() {
         email: user.email,
         displayName: displayName,
         isAdmin: isSuperAdmin,
+        isContentCreator: false,
         isActive: isSuperAdmin, // The super admin is active by default
         passwordChangeRequired: false, // Always false on initial sign-up
       };

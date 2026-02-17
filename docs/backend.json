@@ -24,6 +24,11 @@
           "description": "Flag indicating if the user has administrative privileges.",
           "default": false
         },
+        "isContentCreator": {
+          "type": "boolean",
+          "description": "Flag indicating if the user has privileges to manage content like network updates.",
+          "default": false
+        },
         "isActive": {
           "type": "boolean",
           "description": "Flag indicating if the user's account has been activated by an admin.",
@@ -40,7 +45,7 @@
             "default": false
         }
       },
-      "required": ["uid", "email", "displayName", "isAdmin", "isActive", "passwordChangeRequired", "forceSignOut"]
+      "required": ["uid", "email", "displayName", "isAdmin", "isContentCreator", "isActive", "passwordChangeRequired", "forceSignOut"]
     },
     "Invitation": {
         "title": "Invitation",
