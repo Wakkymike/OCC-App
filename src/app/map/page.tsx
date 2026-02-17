@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -17,8 +16,20 @@ import RouteRecorderDialog from '@/components/route-recorder';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
 import { useSearchParams } from 'next/navigation';
+import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+
 
 export default function Page() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, 'userProfiles', user.uid);
+  }, [user, firestore]);
+  const { data: userProfile } = useDoc<{ isAdmin: boolean }>(userProfileRef);
+  
   const { buses, error } = useBusTracker();
   const [displayBuses, setDisplayBuses] = useState<Bus[]>([]);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
@@ -391,6 +402,7 @@ export default function Page() {
         >
           <Home className="h-5 w-5" />
         </Link>
+        {userProfile?.isAdmin && (
          <Button
             variant="outline"
             size="icon"
@@ -399,6 +411,7 @@ export default function Page() {
           >
             <Radio className="h-5 w-5" />
          </Button>
+        )}
       </div>
       <div className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-center items-start gap-4">
         <LocationSearchBar onSearch={handleLocationSearch} onClear={handleLocationClear} />
