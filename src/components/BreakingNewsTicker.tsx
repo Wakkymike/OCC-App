@@ -1,25 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { Radio } from 'lucide-react';
 
 interface NewsItem {
   title: string;
   description: string;
   pubDate: string;
 }
-
-const StylizedGlobeIcon = () => (
-    <svg
-      role="img"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-      fill="currentColor"
-      className="h-6 w-6 mr-2"
-    >
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.41 3.59-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.41-3.59 8-8 8z" />
-    </svg>
-);
-
 
 export default function BreakingNewsTicker() {
   const [items, setItems] = useState<NewsItem[]>([]);
@@ -117,7 +105,7 @@ export default function BreakingNewsTicker() {
   return (
     <div className="w-full bg-destructive text-destructive-foreground h-12 flex items-center overflow-hidden">
       <div className="flex-shrink-0 flex items-center bg-red-700 text-white h-full px-4 z-10 font-bold text-sm tracking-wider">
-        <StylizedGlobeIcon />
+        <Radio className="h-6 w-6 mr-2" />
         <span className="inline-block animate-bounce-zoom">BREAKING NEWS</span>
       </div>
       <div className="flex-grow min-w-0 whitespace-nowrap">
