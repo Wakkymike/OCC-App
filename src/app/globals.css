@@ -162,7 +162,9 @@
 .ticker-content {
   display: inline-flex;
   align-items: center;
-  animation: ticker-scroll 900s linear infinite;
+  animation-name: ticker-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
 }
 
 .ticker-container:hover .ticker-content {

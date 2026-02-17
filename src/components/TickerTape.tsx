@@ -34,16 +34,14 @@ export default function TickerTape() {
         console.error(err);
         setError(err.message || 'An unknown error occurred while loading travel news.');
       } finally {
-        if (isLoading) {
-          setIsLoading(false);
-        }
+        setIsLoading(false);
       }
     }
 
     fetchNews();
     const intervalId = setInterval(fetchNews, 60000);
     return () => clearInterval(intervalId);
-  }, [isLoading]);
+  }, []);
 
   useEffect(() => {
     // We need a small delay to allow the browser to render the new items and calculate the width
@@ -66,7 +64,7 @@ export default function TickerTape() {
 
     return () => clearTimeout(timeoutId);
 
-  }, [items, isLoading]); // Recalculate whenever the news items change
+  }, [items]); // Recalculate whenever the news items change
 
   const TickerItems = ({ isDuplicate }: { isDuplicate: boolean }) => (
     <>
