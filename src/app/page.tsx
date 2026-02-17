@@ -17,7 +17,7 @@ export default function HomePage() {
             <main className="flex flex-col items-center justify-center p-8 gap-12">
                 <div className="text-center">
                     <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-6xl">
-                    Go North West Tracker
+                    OCC App
                     </h1>
                     <p className="mt-6 text-lg leading-8 text-muted-foreground">
                     Your portal for live bus tracking and service information.

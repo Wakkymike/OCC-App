@@ -5,8 +5,8 @@ import { FirebaseClientProvider } from '@/firebase';
 import ClientLayout from '@/components/ClientLayout';
 
 export const metadata: Metadata = {
-  title: 'Go NorthWest Bus Tracker',
-  description: 'Live bus tracking on a map for Go NorthWest services.',
+  title: 'OCC App',
+  description: 'Live bus tracking and service information.',
 };
 
 export default function RootLayout({
