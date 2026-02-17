@@ -24,6 +24,8 @@ interface MapControlsProps {
   setShowVisionBus: (show: boolean) => void;
   showStagecoach: boolean;
   setShowStagecoach: (show: boolean) => void;
+  showFirstBus: boolean;
+  setShowFirstBus: (show: boolean) => void;
 }
 
 const styleOptions = [
@@ -48,6 +50,8 @@ export default function MapControls({
   setShowVisionBus,
   showStagecoach,
   setShowStagecoach,
+  showFirstBus,
+  setShowFirstBus,
 }: MapControlsProps) {
   const currentStyleId = mapStyle.split('/').pop();
 
@@ -138,6 +142,17 @@ export default function MapControls({
                     id="show-stagecoach"
                     checked={showStagecoach}
                     onCheckedChange={setShowStagecoach}
+                />
+           </div>
+           <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="flex items-center space-x-2">
+                    <Bus className="h-5 w-5" />
+                    <Label htmlFor="show-firstbus" className="cursor-pointer">Show First Bus</Label>
+                </div>
+                <Switch
+                    id="show-firstbus"
+                    checked={showFirstBus}
+                    onCheckedChange={setShowFirstBus}
                 />
            </div>
         </div>
