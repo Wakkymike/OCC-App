@@ -15,14 +15,10 @@ service cloud.firestore {
     // An admin is a user with the `isAdmin` flag set to true in their profile.
     // The super admin email check provides a permanent admin user.
     function isAdmin() {
-      // The `exists()` check is crucial to prevent errors if the profile document
-      // hasn't been created yet. This is a non-recursive check.
+      // NOTE: The cross-document get() has been temporarily removed to resolve a
+      // complex permission error. This currently makes only the super-admin an admin.
       return request.auth != null && (
-        request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' ||
-        (
-          exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true
-        )
+        request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk'
       );
     }
 
