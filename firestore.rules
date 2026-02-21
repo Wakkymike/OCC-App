@@ -12,9 +12,11 @@ service cloud.firestore {
     }
     
     // Function to check if a user is a content creator.
-    // This is safe to use as it's not called recursively within user profile rules.
+    // Uses safer data extraction to prevent errors if the profile is missing.
     function isContentCreator() {
-      return isSignedIn() && get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isContentCreator == true;
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.get('isContentCreator', false) == true;
     }
 
     // Function to check if the requesting user is an admin.
@@ -54,7 +56,7 @@ service cloud.firestore {
     }
 
     match /networkUpdates/{updateId} {
-      // Explicitly allow both get and list for everyone.
+      // Explicitly allow both get and list for everyone to prevent index-based permission errors.
       allow get, list: if true;
       
       // Explicitly allow write operations only for admins or content creators.

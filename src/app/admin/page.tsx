@@ -36,9 +36,12 @@ interface Invitation {
     invitedAt: Timestamp;
 }
 
-function UserManagement({ users, isLoading, currentUser }: { users: UserProfile[] | null; isLoading: boolean, currentUser: User | null }) {
+function UserManagement({ currentUser }: { currentUser: User | null }) {
   const firestore = useFirestore();
   const { toast } = useToast();
+  
+  const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'userProfiles'), [firestore]);
+  const { data: users, isLoading } = useCollection<UserProfile>(usersCollectionRef);
 
   const handleAdminToggle = (user: UserProfile, isAdmin: boolean) => {
     if (user.uid === currentUser?.uid) {
@@ -231,9 +234,13 @@ function UserManagement({ users, isLoading, currentUser }: { users: UserProfile[
   );
 }
 
-function PendingInvitations({ allUsers, usersLoading }: { allUsers: UserProfile[] | null, usersLoading: boolean }) {
+function PendingInvitations() {
     const firestore = useFirestore();
     const { toast } = useToast();
+    
+    const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'userProfiles'), [firestore]);
+    const { data: allUsers, isLoading: usersLoading } = useCollection<UserProfile>(usersCollectionRef);
+
     const invitationsCollectionRef = useMemoFirebase(() => collection(firestore, 'invitations'), [firestore]);
     const { data: invitations, isLoading: invitationsLoading } = useCollection<Invitation>(invitationsCollectionRef);
 
@@ -322,7 +329,8 @@ function NetworkUpdateManagement() {
     const [newUpdatePriority, setNewUpdatePriority] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const updatesCollectionRef = useMemoFirebase(() => query(collection(firestore, 'networkUpdates')), [firestore]);
+    // Simple collection query to avoid index errors, sorting done in useMemo
+    const updatesCollectionRef = useMemoFirebase(() => collection(firestore, 'networkUpdates'), [firestore]);
     const { data: allUpdates, isLoading } = useCollection<NetworkUpdate>(updatesCollectionRef);
 
     const updates = useMemo(() => {
@@ -472,9 +480,6 @@ export default function AdminPage() {
   const firestore = useFirestore();
   const { user: currentUser, isUserLoading: isCurrentUserAuthLoading } = useUser();
   const { toast } = useToast();
-
-  const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'userProfiles'), [firestore]);
-  const { data: users, isLoading: isUsersLoading } = useCollection<UserProfile>(usersCollectionRef);
 
   const currentUserProfileRef = useMemoFirebase(() => {
     if (!currentUser) return null;
@@ -680,7 +685,7 @@ export default function AdminPage() {
 
         {isFullAdmin ? (
             <>
-                <UserManagement users={users} isLoading={isUsersLoading} currentUser={currentUser} />
+                <UserManagement currentUser={currentUser} />
                 
                 <Card>
                     <CardHeader>
@@ -725,7 +730,7 @@ export default function AdminPage() {
                     </CardContent>
                 </Card>
                 
-                <PendingInvitations allUsers={users} usersLoading={isUsersLoading} />
+                <PendingInvitations />
 
                 <NetworkUpdateManagement />
 
