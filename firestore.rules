@@ -10,13 +10,19 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk';
     }
 
+    // Helper to check if the current user has a specific role in their profile
+    function hasRole(roleField) {
+      let profile = get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data;
+      return profile != null && profile.get(roleField, false) == true;
+    }
+
     match /userProfiles/{userId} {
-      // A user can always read and update their own profile.
-      allow get: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
-      allow update: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
+      // Users can always read and update their own profile.
+      allow get: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || hasRole('isAdmin'));
+      allow update: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || hasRole('isAdmin'));
       
       // Only admins can list all profiles.
-      allow list: if isSignedIn() && (isSuperAdmin() || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
+      allow list: if isSignedIn() && (isSuperAdmin() || hasRole('isAdmin'));
       
       // A new user can create their own profile document.
       allow create: if isSignedIn() && request.auth.uid == userId;
@@ -25,7 +31,7 @@ service cloud.firestore {
     }
 
     match /invitations/{invitationId} {
-      allow read, write: if isSignedIn() && (isSuperAdmin() || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
+      allow read, write: if isSignedIn() && (isSuperAdmin() || hasRole('isAdmin'));
     }
 
     match /networkUpdates/{updateId} {
@@ -35,8 +41,8 @@ service cloud.firestore {
       // Admins and content creators can modify them.
       allow write: if isSignedIn() && (
         isSuperAdmin() || 
-        get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true ||
-        get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isContentCreator == true
+        hasRole('isAdmin') ||
+        hasRole('isContentCreator')
       );
     }
 

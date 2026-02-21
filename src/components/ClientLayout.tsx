@@ -35,60 +35,62 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       getDoc(userProfileRef).then(userProfileSnap => {
         const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
 
-        if (!userProfileSnap.exists() && !isPublicPage) {
-          signOut(getAuth());
+        if (!userProfileSnap.exists()) {
+          if (!isPublicPage) {
+            signOut(getAuth());
+          }
           return;
         }
         
-        if (userProfileSnap.exists()) {
-            const userProfile = userProfileSnap.data() || {};
+        const userProfile = userProfileSnap.data() || {};
 
-            if (userProfile.forceSignOut) {
-                updateDocumentNonBlocking(userProfileRef, { forceSignOut: false });
-                signOut(getAuth());
-                toast({
-                    title: "Signed Out",
-                    description: "You have been signed out by an administrator."
-                });
-                return;
-            }
-
-            if (!userProfile.isActive && !isSuperAdmin) {
-              if (!isPendingPage) {
-                router.replace('/pending-activation');
-              }
-              return;
-            }
-
-            if (userProfile.passwordChangeRequired && !isPasswordChangePage) {
-                router.replace(FORCE_PASSWORD_CHANGE_PAGE);
-                return;
-            }
-
-            if (!userProfile.passwordChangeRequired && isPasswordChangePage) {
-                router.replace('/');
-                return;
-            }
-            
-            if (isPendingPage && (userProfile.isActive || isSuperAdmin)) {
-              router.replace('/');
-              return;
-            }
-
-            if (isPublicPage && !isPendingPage) {
-                router.replace('/');
-                return;
-            }
-
-            if (isAdminPage) {
-              const isDbAdmin = userProfile.isAdmin === true;
-              const isContentCreator = userProfile.isContentCreator === true;
-
-              if (!isSuperAdmin && !isDbAdmin && !isContentCreator) {
-                router.replace('/');
-              }
-            }
+        if (userProfile.forceSignOut) {
+            updateDocumentNonBlocking(userProfileRef, { forceSignOut: false });
+            signOut(getAuth());
+            toast({
+                title: "Signed Out",
+                description: "You have been signed out by an administrator."
+            });
+            return;
         }
+
+        if (!userProfile.isActive && !isSuperAdmin) {
+          if (!isPendingPage) {
+            router.replace('/pending-activation');
+          }
+          return;
+        }
+
+        if (userProfile.passwordChangeRequired && !isPasswordChangePage) {
+            router.replace(FORCE_PASSWORD_CHANGE_PAGE);
+            return;
+        }
+
+        if (!userProfile.passwordChangeRequired && isPasswordChangePage) {
+            router.replace('/');
+            return;
+        }
+        
+        if (isPendingPage && (userProfile.isActive || isSuperAdmin)) {
+          router.replace('/');
+          return;
+        }
+
+        if (isAdminPage) {
+          const isDbAdmin = userProfile.isAdmin === true;
+          const isContentCreator = userProfile.isContentCreator === true;
+
+          if (!isSuperAdmin && !isDbAdmin && !isContentCreator) {
+            router.replace('/');
+          }
+          return;
+        }
+
+        if (isPublicPage && !isPendingPage) {
+            router.replace('/');
+            return;
+        }
+
       }).catch((err) => {
           console.error("Layout auth check failed", err);
           signOut(getAuth());

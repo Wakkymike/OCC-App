@@ -51,10 +51,6 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
   };
   
   const handleContentCreatorToggle = (user: UserProfile, isContentCreator: boolean) => {
-    if (user.email === 'michael.dodsworth@gonorthwest.co.uk') {
-        toast({ variant: 'destructive', title: 'Action Forbidden', description: "The super admin must have all permissions." });
-        return;
-    }
     const userDocRef = doc(firestore, 'userProfiles', user.id);
     const updateData: any = { isContentCreator };
     if (isContentCreator) updateData.isActive = true;
