@@ -60,10 +60,7 @@ export default function BusMap({
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
-    if (!mapboxgl.accessToken) {
-      console.error('Mapbox access token is not set. The map cannot be initialized.');
-      return;
-    }
+    if (!mapboxgl.accessToken) return;
 
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
@@ -79,7 +76,6 @@ export default function BusMap({
     map.addControl(new mapboxgl.NavigationControl());
 
     const setupOptionalLayers = (map: mapboxgl.Map) => {
-        // 3D Buildings
         if (!map.getLayer('3d-buildings')) {
             const layers = map.getStyle().layers;
             const labelLayerId = layers.find(
@@ -101,7 +97,6 @@ export default function BusMap({
                 'layout': { 'visibility': 'none' },
             }, labelLayerId);
         }
-        // Traffic
         if (!map.getSource('mapbox-traffic')) {
             map.addSource('mapbox-traffic', { type: 'vector', url: 'mapbox://mapbox.mapbox-traffic-v1' });
         }
@@ -127,7 +122,6 @@ export default function BusMap({
                 layout: { 'visibility': 'visible' },
             });
         }
-        // Bus Stops
         if (!map.getLayer('bus-stops')) {
             map.addLayer({
                 id: 'bus-stops',
@@ -137,20 +131,12 @@ export default function BusMap({
                 filter: ['all', ['==', 'subclass', 'bus']],
                 minzoom: 14.5,
                 paint: {
-                    'circle-radius': [
-                        'interpolate',
-                        ['linear'],
-                        ['zoom'],
-                        14.5, 2,
-                        18, 5
-                    ],
+                    'circle-radius': ['interpolate', ['linear'], ['zoom'], 14.5, 2, 18, 5],
                     'circle-color': mapStyle.includes('dark') ? '#4dabf7' : '#1971c2',
                     'circle-stroke-color': 'white',
                     'circle-stroke-width': 1.5
                 },
-                layout: {
-                    'visibility': 'none',
-                },
+                layout: { 'visibility': 'none' },
             });
         }
     };
@@ -167,8 +153,6 @@ export default function BusMap({
 
     map.on('load', handleStyleLoad);
     map.on('style.load', handleStyleLoad);
-
-    map.on('error', (e) => console.error('A Mapbox error occurred:', e.error));
     map.on('click', () => setSelectedBusId(null));
 
     return () => {
@@ -179,7 +163,6 @@ export default function BusMap({
         mapRef.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -198,176 +181,45 @@ export default function BusMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map?.isStyleLoaded()) return;
-
     const stopLayerId = 'bus-stops';
     if (!map.getLayer(stopLayerId)) return;
-    
     map.setLayoutProperty(stopLayerId, 'visibility', showBusStops ? 'visible' : 'none');
-
-    const popup = new mapboxgl.Popup({
-        closeButton: false,
-        closeOnClick: false,
-        className: 'bus-stop-popup'
-    });
-
-    const handleStopClick = (e: mapboxgl.MapLayerMouseEvent) => {
-        if (!e.features?.length) return;
-        const feature = e.features[0];
-        if (feature.geometry.type === 'Point' && feature.properties?.name) {
-             const coordinates = feature.geometry.coordinates.slice();
-             const stopName = feature.properties.name;
-             while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-                coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-            }
-            popup.setLngLat(coordinates as [number, number]).setHTML(stopName).addTo(map);
-        }
-    };
-
-    const handleMouseEnter = (e: mapboxgl.MapLayerMouseEvent) => {
-        if (e.features?.length) map.getCanvas().style.cursor = 'pointer';
-    };
-    const handleMouseLeave = () => {
-        map.getCanvas().style.cursor = '';
-        popup.remove();
-    };
-
-    if (showBusStops) {
-        map.on('click', stopLayerId, handleStopClick);
-        map.on('mouseenter', stopLayerId, handleMouseEnter);
-        map.on('mouseleave', stopLayerId, handleMouseLeave);
-    }
-
-    return () => {
-        if (map.isStyleLoaded()) {
-            map.off('click', stopLayerId, handleStopClick);
-            map.off('mouseenter', stopLayerId, handleMouseEnter);
-            map.off('mouseleave', stopLayerId, handleMouseLeave);
-        }
-        if (popup.isOpen()) popup.remove();
-    }
   }, [showBusStops, styleRevision]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.isStyleLoaded() || !metrolinkData || (!metrolinkData.stops.length && !metrolinkData.lines.length)) return;
-
+    if (!map?.isStyleLoaded() || !metrolinkData) return;
     const stopsById = new Map(metrolinkData.stops.map(s => [s.id, [s.lng, s.lat] as [number, number]]));
-
     const lineFeatures = metrolinkData.lines.map(line => ({
         type: 'Feature' as const,
         geometry: {
             type: 'LineString' as const,
             coordinates: line.path.map(stopId => stopsById.get(stopId)).filter((p): p is [number, number] => !!p)
         },
-        properties: {
-            color: line.color,
-            name: line.name
-        }
+        properties: { color: line.color, name: line.name }
     }));
-    
     const lineSourceId = 'metrolink-lines';
     const lineSource = map.getSource(lineSourceId) as mapboxgl.GeoJSONSource;
-    if (lineSource) {
-        lineSource.setData({ type: 'FeatureCollection', features: lineFeatures });
-    } else {
-        map.addSource(lineSourceId, {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: lineFeatures }
-        });
-    }
-
+    if (lineSource) lineSource.setData({ type: 'FeatureCollection', features: lineFeatures });
+    else map.addSource(lineSourceId, { type: 'geojson', data: { type: 'FeatureCollection', features: lineFeatures } });
     const lineLayerId = 'metrolink-lines-layer';
     if (!map.getLayer(lineLayerId)) {
-        const beforeId = map.getLayer('route-display-layer') ? 'route-display-layer' : 'bus-stops';
         map.addLayer({
             id: lineLayerId,
             type: 'line',
             source: lineSourceId,
             layout: { 'line-join': 'round', 'line-cap': 'round' },
             paint: { 'line-color': ['get', 'color'], 'line-width': 4, 'line-opacity': 0.8 }
-        }, beforeId);
-    }
-    
-    const stopFeatures = metrolinkData.stops.map(stop => ({
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [stop.lng, stop.lat] },
-        properties: { name: stop.name, lines: stop.lines.join(', ') }
-    }));
-    
-    const stopSourceId = 'metrolink-stops';
-    const stopSource = map.getSource(stopSourceId) as mapboxgl.GeoJSONSource;
-    if (stopSource) {
-        stopSource.setData({ type: 'FeatureCollection', features: stopFeatures });
-    } else {
-        map.addSource(stopSourceId, {
-            type: 'geojson',
-            data: { type: 'FeatureCollection', features: stopFeatures }
-        });
-    }
-
-    const stopLayerId = 'metrolink-stops-layer';
-    if (!map.getLayer(stopLayerId)) {
-        map.addLayer({
-            id: stopLayerId,
-            type: 'circle',
-            source: stopSourceId,
-            paint: {
-                'circle-radius': 6,
-                'circle-color': '#ffffff',
-                'circle-stroke-color': '#000000',
-                'circle-stroke-width': 2.5
-            }
-        });
-    }
-    
-    const tramPopup = new mapboxgl.Popup({
-      className: 'bus-stop-popup', // reuse style
-      closeButton: false,
-      closeOnClick: false,
-    });
-    
-    const onTramStopEnter = (e: mapboxgl.MapLayerMouseEvent) => {
-      if (!e.features?.length) return;
-      map.getCanvas().style.cursor = 'pointer';
-      const feature = e.features[0];
-      if (feature.geometry.type === 'Point' && feature.properties) {
-        const coords = feature.geometry.coordinates.slice() as [number, number];
-        const { name, lines } = feature.properties;
-        const description = `<div class="font-bold">${name}</div><div>Lines: ${lines}</div>`;
-
-        while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
-            coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
-        }
-        tramPopup.setLngLat(coords).setHTML(description).addTo(map);
-      }
-    };
-    
-    const onTramStopLeave = () => {
-      map.getCanvas().style.cursor = '';
-      tramPopup.remove();
-    };
-
-    map.on('mouseenter', stopLayerId, onTramStopEnter);
-    map.on('mouseleave', stopLayerId, onTramStopLeave);
-    
-    return () => {
-      if (map.isStyleLoaded()) {
-        map.off('mouseenter', stopLayerId, onTramStopEnter);
-        map.off('mouseleave', stopLayerId, onTramStopLeave);
-      }
-      if (tramPopup.isOpen()) tramPopup.remove();
+        }, 'bus-stops');
     }
   }, [metrolinkData, styleRevision]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map?.isStyleLoaded()) return;
-
     const sourceId = 'route-display-source';
     const layerId = 'route-display-layer';
-
     const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource;
-
     const lineString: GeoJSON.Feature<GeoJSON.LineString> = {
         type: 'Feature',
         properties: {},
@@ -376,107 +228,19 @@ export default function BusMap({
             coordinates: routeToDisplay ? routeToDisplay.map(p => [p.lng, p.lat]) : []
         }
     };
-    
-    if (source) {
-        source.setData(lineString);
-    } else {
-        map.addSource(sourceId, {
-            type: 'geojson',
-            data: lineString
-        });
-    }
-
+    if (source) source.setData(lineString);
+    else map.addSource(sourceId, { type: 'geojson', data: lineString });
     if (!map.getLayer(layerId)) {
         map.addLayer({
             id: layerId,
             type: 'line',
             source: sourceId,
-            layout: {
-                'line-join': 'round',
-                'line-cap': 'round'
-            },
-            paint: {
-                'line-color': '#8a2be2', // A distinct color like blue-violet
-                'line-width': 5,
-                'line-opacity': 0.8
-            }
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#8a2be2', 'line-width': 5, 'line-opacity': 0.8 }
         }, 'bus-stops');
     }
-    
     map.setLayoutProperty(layerId, 'visibility', routeToDisplay && routeToDisplay.length > 1 ? 'visible' : 'none');
-
   }, [routeToDisplay, styleRevision]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map?.isStyleLoaded()) return;
-
-    const sourceId = 'journey-plan-source';
-    const layerId = 'journey-plan-layer';
-
-    // Clear old markers
-    if (journeyStartMarkerRef.current) journeyStartMarkerRef.current.remove();
-    if (journeyEndMarkerRef.current) journeyEndMarkerRef.current.remove();
-    journeyStartMarkerRef.current = null;
-    journeyEndMarkerRef.current = null;
-
-    const lineString: GeoJSON.Feature<GeoJSON.LineString> = {
-        type: 'Feature',
-        properties: {},
-        geometry: {
-            type: 'LineString',
-            coordinates: journeyPlan ? journeyPlan.path.map(p => [p.lng, p.lat]) : []
-        }
-    };
-    
-    const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource;
-    if (source) {
-        source.setData(lineString);
-    } else {
-        map.addSource(sourceId, {
-            type: 'geojson',
-            data: lineString
-        });
-    }
-
-    if (!map.getLayer(layerId)) {
-        map.addLayer({
-            id: layerId,
-            type: 'line',
-            source: sourceId,
-            layout: {
-                'line-join': 'round',
-                'line-cap': 'round'
-            },
-            paint: {
-                'line-color': '#0891b2', // A nice cyan color
-                'line-width': 8,
-                'line-opacity': 0.75,
-                'line-dasharray': [0, 2],
-            }
-        }, 'route-display-layer'); // Draw below recorded routes, but above metrolink
-    }
-    
-    map.setLayoutProperty(layerId, 'visibility', journeyPlan && journeyPlan.path.length > 1 ? 'visible' : 'none');
-
-    // Add markers for start and end
-    if (journeyPlan) {
-        const startEl = document.createElement('div');
-        startEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>`;
-        journeyStartMarkerRef.current = new mapboxgl.Marker(startEl)
-            .setLngLat(journeyPlan.startStop)
-            .setPopup(new mapboxgl.Popup({ offset: 25, className: 'bus-stop-popup' }).setHTML(`<b>Get on:</b> Service ${journeyPlan.service}<br/>To: ${journeyPlan.destination}`))
-            .addTo(map);
-
-        const endEl = document.createElement('div');
-        endEl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#ef4444" stroke="white" stroke-width="1.5"><path d="M21 10.5C21 17.5 12 23 12 23C12 23 3 17.5 3 10.5C3 6.35786 7.02944 3 12 3C16.9706 3 21 6.35786 21 10.5Z"/><circle cx="12" cy="10.5" r="3" fill="white"/></svg>`;
-        journeyEndMarkerRef.current = new mapboxgl.Marker(endEl)
-            .setLngLat(journeyPlan.endStop)
-            .setPopup(new mapboxgl.Popup({ offset: 25, className: 'bus-stop-popup' }).setHTML(`<b>Get off here</b>`))
-            .addTo(map);
-    }
-
-  }, [journeyPlan, styleRevision]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -511,6 +275,7 @@ export default function BusMap({
       let marker = markersRef.current[markerId];
       if (!marker) {
         const el = document.createElement('div');
+        el.className = 'bus-marker-container';
         el.style.display = 'flex';
         el.style.flexDirection = 'column';
         el.style.alignItems = 'center';
@@ -545,14 +310,16 @@ export default function BusMap({
       } else {
         animateMarkerPosition(marker, bus.position, markerId);
       }
+      
       const markerElement = marker.getElement();
       const flagElement = markerElement.querySelector('div') as HTMLDivElement;
       
       const isGnwBus = bus.operator === 'GNW';
       const isSchoolService = isGnwBus && bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
       const isNightBus = isGnwBus && bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
-      const isFirstJourney = isGnwBus && bus.journeyRef ? firstJourneyRefs.includes(bus.journeyRef) : false;
-      const isLastJourney = isGnwBus && bus.journeyRef ? lastJourneyRefs.includes(bus.journeyRef) : false;
+      // Explicitly gate flashing logic by isGnwBus to ensure it only applies to Go North West
+      const isFirstJourney = isGnwBus && bus.journeyRef && firstJourneyRefs.includes(bus.journeyRef);
+      const isLastJourney = isGnwBus && bus.journeyRef && lastJourneyRefs.includes(bus.journeyRef);
 
       let runningBoardHtml = bus.runningBoard;
       if (isFirstJourney || isLastJourney) {
@@ -568,34 +335,16 @@ export default function BusMap({
       else if (bus.direction.toLowerCase() === 'outbound') directionLabel = ` <span style="color:green;">[O]</span>`;
       
       let statusHtml = '';
-      let color = '#333';
-      const lowerCaseStatus = bus.status.toLowerCase();
-
       if (bus.status && bus.status !== 'Unknown') {
-          if (lowerCaseStatus.includes('late')) {
-              color = '#a94442'; // red
-          } else if (lowerCaseStatus.includes('early')) {
-              color = '#31708f'; // blue
-          } else if (lowerCaseStatus.includes('on time')) {
-              color = '#3c763d'; // green
-          } else if (lowerCaseStatus.includes('cancelled')) {
-              color = '#a94442'; // red
-          }
+          let color = '#333';
+          const lowerCaseStatus = bus.status.toLowerCase();
+          if (lowerCaseStatus.includes('late')) color = '#a94442';
+          else if (lowerCaseStatus.includes('early')) color = '#31708f';
+          else if (lowerCaseStatus.includes('on time')) color = '#3c763d';
           statusHtml = ` | <span style="color:${color}; font-weight: bold;">${bus.status}</span>`;
       }
 
-      let operatorLabel = '';
-      if (bus.operator === 'MET') {
-        operatorLabel = ` <span style="color:#2563eb;font-weight:bold;">[MET]</span>`;
-      } else if (bus.operator === 'VB') {
-        operatorLabel = ` <span style="color:#16a34a;font-weight:bold;">[VB]</span>`;
-      } else if (bus.operator === 'SC') {
-        operatorLabel = ` <span style="color:#ef4444;font-weight:bold;">[SC]</span>`;
-      } else if (bus.operator === 'FB') {
-        operatorLabel = ` <span style="color:#a855f7;font-weight:bold;">[FB]</span>`;
-      } else if (bus.operator === 'DB') {
-        operatorLabel = ` <span style="color:#f97316;font-weight:bold;">[DB]</span>`;
-      }
+      let operatorLabel = bus.operator !== 'GNW' ? ` <span style="font-weight:bold; color:#666;">[${bus.operator}]</span>` : '';
       
       flagElement.innerHTML = `${bus.fleetNumber} | RB: ${runningBoardHtml} | ${bus.service}${operatorLabel}${directionLabel}${indicators} | ${bus.destination}${statusHtml}`;
       
@@ -605,42 +354,25 @@ export default function BusMap({
       const busBody = markerElement.querySelector('#bus-body');
       const infoFlag = markerElement.querySelector('.bus-info-flag') as HTMLDivElement;
       
-      const defaultColor = bus.operator === 'GNW'
-          ? '#FFC107' // Yellow for GNW
-          : bus.operator === 'MET'
-          ? '#60a5fa' // Blue for Metroline
-          : bus.operator === 'VB'
-          ? '#4ade80' // Green for VisionBus
-          : bus.operator === 'SC'
-          ? '#ef4444' // Red for Stagecoach
-          : bus.operator === 'FB'
-          ? '#a855f7' // Purple for First Bus
-          : bus.operator === 'DB'
-          ? '#f97316' // Orange for Diamond
-          : '#ef4444'; 
+      const defaultColor = bus.operator === 'GNW' ? '#FFC107' : 
+                           bus.operator === 'MET' ? '#60a5fa' : 
+                           bus.operator === 'VB' ? '#4ade80' : 
+                           bus.operator === 'SC' ? '#ef4444' : 
+                           bus.operator === 'FB' ? '#a855f7' : 
+                           bus.operator === 'DB' ? '#f97316' : '#ef4444'; 
           
-      if (busBody) {
-          busBody.setAttribute('fill', isSelected ? '#00FFFF' : defaultColor);
-      }
+      if (busBody) busBody.setAttribute('fill', isSelected ? '#00FFFF' : defaultColor);
 
       if (infoFlag) {
         if (isSelected) {
-          let detailedRunningBoardHtml = `RB: ${bus.runningBoard}`;
-          if (isFirstJourney || isLastJourney) {
-            detailedRunningBoardHtml = `<span class="blinking-rb">${detailedRunningBoardHtml}</span>`;
-          }
-          
-          const schoolInfo = isSchoolService ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[SCHOOL SERVICE]</div>` : '';
-          const nightBusInfo = isNightBus ? `<div style="color:red; font-weight:bold; margin-bottom: 4px;">[NIGHT BUS]</div>` : '';
-          const journeyInfo = bus.journeyRef ? `<div><div style="font-weight: bold; color: green;">Journey Number</div><div>${bus.journeyRef}</div></div>` : '';
-          const runningBoardInfo = bus.runningBoard ? `<div style="margin-top: 4px;"><div style="font-weight: bold;">Running Board</div><div>${detailedRunningBoardHtml}</div></div>` : '';
-          
-          let statusDisplay = '';
-          if (bus.status && bus.status !== 'Unknown') {
-              statusDisplay = `<div style="color:${color}; font-weight: bold; margin-bottom: 4px;">${bus.status}</div>`;
-          }
-
-          infoFlag.innerHTML = `${statusDisplay}${schoolInfo}${nightBusInfo}${journeyInfo}${runningBoardInfo}`;
+          let detailedRB = bus.runningBoard;
+          if (isFirstJourney || isLastJourney) detailedRB = `<span class="blinking-rb">${detailedRB}</span>`;
+          infoFlag.innerHTML = `
+            ${isSchoolService ? '<div style="color:red; font-weight:bold;">[SCHOOL SERVICE]</div>' : ''}
+            ${isNightBus ? '<div style="color:purple; font-weight:bold;">[NIGHT BUS]</div>' : ''}
+            <div><span style="font-weight:bold;">Journey:</span> ${bus.journeyRef || 'N/A'}</div>
+            <div><span style="font-weight:bold;">Running Board:</span> ${detailedRB}</div>
+          `;
           infoFlag.style.display = 'block';
         } else {
           infoFlag.style.display = 'none';
@@ -650,97 +382,44 @@ export default function BusMap({
 
     currentMarkerIds.forEach((id) => {
       if (markersRef.current[id]) {
-        if (animationFrameRefs.current[id]) {
-          cancelAnimationFrame(animationFrameRefs.current[id]);
-          delete animationFrameRefs.current[id];
-        }
         markersRef.current[id].remove();
         delete markersRef.current[id];
       }
-      if (id === selectedBusId) setSelectedBusId(null);
     });
   }, [buses, selectedBusId, setSelectedBusId, styleRevision]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-
     if (placeMarkerRef.current) {
       placeMarkerRef.current.remove();
       placeMarkerRef.current = null;
     }
-
     if (searchedPlace) {
       const el = document.createElement('div');
       el.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 10.5C21 17.5 12 23 12 23C12 23 3 17.5 3 10.5C3 6.35786 7.02944 3 12 3C16.9706 3 21 6.35786 21 10.5Z" fill="#FF4136" stroke="white" stroke-width="1.5"/><circle cx="12" cy="10.5" r="3" fill="white"/></svg>`.trim();
-      const marker = new mapboxgl.Marker(el).setLngLat(searchedPlace).addTo(map);
-      placeMarkerRef.current = marker;
+      placeMarkerRef.current = new mapboxgl.Marker(el).setLngLat(searchedPlace).addTo(map);
       map.flyTo({ center: searchedPlace, zoom: 14, essential: true });
     } else if (mapView) {
-      if (mapView.bounds) {
-        map.fitBounds(mapView.bounds, { padding: 100, maxZoom: 15 });
-      } else if (mapView.center) {
-        map.flyTo({ center: mapView.center, zoom: mapView.zoom || 16, essential: true });
-      }
+      if (mapView.bounds) map.fitBounds(mapView.bounds, { padding: 100, maxZoom: 15 });
+      else if (mapView.center) map.flyTo({ center: mapView.center, zoom: mapView.zoom || 16, essential: true });
     }
   }, [searchedPlace, mapView, styleRevision]);
 
-  // Effect for roadworks
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.isStyleLoaded()) return;
-
-    const currentRoadworkIds = new Set(Object.keys(roadworksMarkersRef.current));
-
+    if (!map || !map.isStyleLoaded()) return;
+    Object.values(roadworksMarkersRef.current).forEach(m => m.remove());
+    roadworksMarkersRef.current = {};
     if (roadworks && showRoadworks) {
       roadworks.forEach((work) => {
-        const markerId = work.id;
-        currentRoadworkIds.delete(markerId);
-
-        const severityColor = {
-          low: '#22c55e', // green
-          moderate: '#f97316', // orange
-          high: '#ef4444', // red
-        }[work.severity];
-        
+        const color = work.severity === 'high' ? '#ef4444' : work.severity === 'moderate' ? '#f97316' : '#22c55e';
         const el = document.createElement('div');
-        el.style.cursor = 'pointer';
-        el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="${severityColor}" stroke="white" stroke-width="1.5" style="filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));"><path d="M12 2L2 22h20L12 2z" /></svg>`;
-        
-        const popup = new mapboxgl.Popup({ offset: 25, className: 'bus-stop-popup' })
-            .setHTML(`
-                <div class="font-bold">${work.title}</div>
-                <div>${work.description}</div>
-                <div class="text-xs mt-1">Updated: ${new Date(work.pubDate).toLocaleString()}</div>
-            `);
-
-        let marker = roadworksMarkersRef.current[markerId];
-        if (!marker) {
-          marker = new mapboxgl.Marker(el)
-            .setLngLat([work.location.lng, work.location.lat])
-            .setPopup(popup)
-            .addTo(map);
-          roadworksMarkersRef.current[markerId] = marker;
-        } else {
-            marker.setLngLat([work.location.lng, work.location.lat]);
-        }
+        el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1.5"><path d="M12 2L2 22h20L12 2z" /></svg>`;
+        const marker = new mapboxgl.Marker(el).setLngLat([work.location.lng, work.location.lat]).setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`<b>${work.title}</b><br/>${work.description}`)).addTo(map);
+        roadworksMarkersRef.current[work.id] = marker;
       });
     }
-
-    // Remove old markers
-    currentRoadworkIds.forEach(id => {
-      roadworksMarkersRef.current[id]?.remove();
-      delete roadworksMarkersRef.current[id];
-    });
-
-    // If showRoadworks is false, remove all of them
-    if (!showRoadworks) {
-        Object.keys(roadworksMarkersRef.current).forEach(id => {
-            roadworksMarkersRef.current[id]?.remove();
-            delete roadworksMarkersRef.current[id];
-        });
-    }
-
   }, [roadworks, showRoadworks, styleRevision]);
 
   return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />;

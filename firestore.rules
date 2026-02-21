@@ -10,19 +10,18 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk';
     }
 
-    // Helper to check if the current user has a specific role in their profile
-    function hasRole(roleField) {
-      let profile = get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data;
-      return profile != null && profile.get(roleField, false) == true;
+    // Direct check to avoid recursion in rules evaluation
+    function getProfileData() {
+      return get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data;
     }
 
     match /userProfiles/{userId} {
       // Users can always read and update their own profile.
-      allow get: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || hasRole('isAdmin'));
-      allow update: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || hasRole('isAdmin'));
+      allow get: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || getProfileData().get('isAdmin', false) == true);
+      allow update: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || getProfileData().get('isAdmin', false) == true);
       
       // Only admins can list all profiles.
-      allow list: if isSignedIn() && (isSuperAdmin() || hasRole('isAdmin'));
+      allow list: if isSignedIn() && (isSuperAdmin() || getProfileData().get('isAdmin', false) == true);
       
       // A new user can create their own profile document.
       allow create: if isSignedIn() && request.auth.uid == userId;
@@ -31,7 +30,7 @@ service cloud.firestore {
     }
 
     match /invitations/{invitationId} {
-      allow read, write: if isSignedIn() && (isSuperAdmin() || hasRole('isAdmin'));
+      allow read, write: if isSignedIn() && (isSuperAdmin() || getProfileData().get('isAdmin', false) == true);
     }
 
     match /networkUpdates/{updateId} {
@@ -41,8 +40,8 @@ service cloud.firestore {
       // Admins and content creators can modify them.
       allow write: if isSignedIn() && (
         isSuperAdmin() || 
-        hasRole('isAdmin') ||
-        hasRole('isContentCreator')
+        getProfileData().get('isAdmin', false) == true ||
+        getProfileData().get('isContentCreator', false) == true
       );
     }
 

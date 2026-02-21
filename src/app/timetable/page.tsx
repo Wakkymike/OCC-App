@@ -27,6 +27,8 @@ import { Label } from '@/components/ui/label';
 
 const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
 const nightBusRunningBoards = ['3691', '3692', '3693', '1091', '1092', '1093', '21091', '21092', '21093', '23691', '23692', '23693', '11091', '11092', '11093', '13691', '13692', '13693'];
+const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
+const lastJourneyRefs = ['8001', '8002', '8301', '8302', '8601', '8602'];
 
 export default function LiveServicePage() {
   const { buses, error, lastRefreshed } = useBusTracker();
@@ -40,28 +42,16 @@ export default function LiveServicePage() {
 
   const services = gnwBuses.reduce((acc, bus) => {
     const serviceKey = String(bus.service);
-    if (!acc[serviceKey]) {
-      acc[serviceKey] = [];
-    }
+    if (!acc[serviceKey]) acc[serviceKey] = [];
     acc[serviceKey].push(bus);
-    // Sort buses within a service by direction then destination
-    acc[serviceKey].sort((a, b) => {
-      if (a.direction < b.direction) return -1;
-      if (a.direction > b.direction) return 1;
-      if (a.destination < b.destination) return -1;
-      if (a.destination > b.destination) return 1;
-      return 0;
-    });
+    acc[serviceKey].sort((a, b) => (a.direction.localeCompare(b.direction)) || (a.destination.localeCompare(b.destination)));
     return acc;
   }, {} as Record<string, Bus[]>);
 
   const sortedServiceNumbers = Object.keys(services).sort((a, b) => {
-    // Attempt to sort numerically, fallback to string sort
     const numA = parseInt(a, 10);
     const numB = parseInt(b, 10);
-    if (!isNaN(numA) && !isNaN(numB)) {
-      return numA - numB;
-    }
+    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
     return a.localeCompare(b);
   });
   
@@ -82,43 +72,24 @@ export default function LiveServicePage() {
                   <span>Live Service Board</span>
                   {gnwBuses.length > 0 && (
                     <Badge className="bg-chart-2 text-primary-foreground">
-                      {gnwBuses.length} buses active over {sortedServiceNumbers.length} services
+                      {gnwBuses.length} Go North West buses active
                     </Badge>
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Real-time status of all currently running Go North West services. Data refreshes automatically.
+                  Real-time status of all currently running Go North West services.
                 </CardDescription>
               </div>
-              <Link
-                  href="/"
-                  className={buttonVariants({ variant: 'outline', size: 'icon' })}
-                  aria-label="Home"
-                >
-                  <Home className="h-5 w-5" />
-                </Link>
+              <Link href="/" className={buttonVariants({ variant: 'outline', size: 'icon' })} aria-label="Home">
+                <Home className="h-5 w-5" />
+              </Link>
             </div>
-            {lastRefreshed && (
-                <div className="text-sm text-muted-foreground pt-2">
-                    Data last refreshed at: {lastRefreshed.toLocaleString()}
-                </div>
-            )}
-            {error && (
-                <div className="text-sm text-destructive pt-1">
-                    Error receiving data: {error}
-                </div>
-            )}
           </CardHeader>
           <CardContent>
-            {!error && gnwBuses.length === 0 && (
+            {gnwBuses.length === 0 && !error && (
               <div className="flex items-center justify-center py-10 text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                <span>Loading live bus data...</span>
-              </div>
-            )}
-             {error && gnwBuses.length === 0 && (
-              <div className="flex items-center justify-center py-10 text-destructive">
-                <span>Could not load bus data.</span>
+                <span>Loading live Go North West data...</span>
               </div>
             )}
             {gnwBuses.length > 0 && (
@@ -128,31 +99,23 @@ export default function LiveServicePage() {
                     <AccordionTrigger className="text-xl">
                       <div className="flex items-center gap-4">
                         <span>Service {serviceNumber}</span>
-                        <Badge variant="outline">{services[serviceNumber].length} buses active</Badge>
+                        <Badge variant="outline">{services[serviceNumber].length} buses</Badge>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="flex items-center gap-6 px-4 py-3 border-b">
-                        <span className="text-sm font-medium text-muted-foreground">Filter by direction:</span>
+                        <span className="text-sm font-medium text-muted-foreground">Filter direction:</span>
                         <RadioGroup
                           value={serviceFilters[serviceNumber] || 'all'}
-                          onValueChange={(value: 'all' | 'inbound' | 'outbound') => {
-                              handleFilterChange(serviceNumber, value);
-                          }}
+                          onValueChange={(value: 'all' | 'inbound' | 'outbound') => handleFilterChange(serviceNumber, value)}
                           className="flex items-center gap-4"
                         >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="all" id={`r-${serviceNumber}-all`} />
-                            <Label htmlFor={`r-${serviceNumber}-all`}>All</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="inbound" id={`r-${serviceNumber}-inbound`} />
-                            <Label htmlFor={`r-${serviceNumber}-inbound`}>Inbound</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="outbound" id={`r-${serviceNumber}-outbound`} />
-                            <Label htmlFor={`r-${serviceNumber}-outbound`}>Outbound</Label>
-                          </div>
+                          {['all', 'inbound', 'outbound'].map(v => (
+                            <div key={v} className="flex items-center space-x-2">
+                              <RadioGroupItem value={v} id={`r-${serviceNumber}-${v}`} />
+                              <Label htmlFor={`r-${serviceNumber}-${v}`}>{v.charAt(0).toUpperCase() + v.slice(1)}</Label>
+                            </div>
+                          ))}
                         </RadioGroup>
                       </div>
                       <Table>
@@ -168,28 +131,32 @@ export default function LiveServicePage() {
                           {services[serviceNumber]
                             .filter(bus => {
                               const filter = serviceFilters[serviceNumber] || 'all';
-                              if (filter === 'all') return true;
-                              return bus.direction.toLowerCase() === filter;
+                              return filter === 'all' || bus.direction.toLowerCase() === filter;
                             })
                             .map((bus) => {
                                 const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
-                                const isSchoolService = bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
-                                const isNightBus = bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
+                                const isSchool = bus.journeyRef && schoolJourneyRefs.includes(bus.journeyRef);
+                                const isNight = bus.runningBoard && nightBusRunningBoards.includes(bus.runningBoard);
+                                // Restricted flashing logic for GNW buses
+                                const isFirst = bus.journeyRef && firstJourneyRefs.includes(bus.journeyRef);
+                                const isLast = bus.journeyRef && lastJourneyRefs.includes(bus.journeyRef);
                                 
                                 return (
-                                    <TableRow key={`${bus.fleetNumber}-${bus.journeyRef}`}>
-                                    <TableCell>
-                                      <Link href={`/map?busId=${encodeURIComponent(busId)}`} className={buttonVariants({ variant: 'link', size: 'sm' })}>
-                                        {bus.fleetNumber}
-                                      </Link>
-                                    </TableCell>
-                                    <TableCell>{bus.runningBoard}</TableCell>
-                                    <TableCell className="font-medium">
+                                    <TableRow key={busId}>
+                                      <TableCell>
+                                        <Link href={`/map?busId=${encodeURIComponent(busId)}`} className={buttonVariants({ variant: 'link', size: 'sm' })}>
+                                          {bus.fleetNumber}
+                                        </Link>
+                                      </TableCell>
+                                      <TableCell className={isFirst || isLast ? 'blinking-rb text-white font-bold' : ''}>
+                                        {bus.runningBoard}
+                                      </TableCell>
+                                      <TableCell className="font-medium">
                                         {bus.destination}
-                                        {isSchoolService && <span className="ml-2 text-destructive font-semibold">[SCHOOL SERVICE]</span>}
-                                        {isNightBus && <span className="ml-2 text-destructive font-semibold">[NIGHT BUS]</span>}
-                                    </TableCell>
-                                    <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
+                                        {isSchool && <span className="ml-2 text-destructive text-[10px] font-bold">[SCHOOL]</span>}
+                                        {isNight && <span className="ml-2 text-purple-600 text-[10px] font-bold">[NIGHT]</span>}
+                                      </TableCell>
+                                      <TableCell>{getDirectionLabel(bus.direction)}</TableCell>
                                     </TableRow>
                                 );
                             })}
