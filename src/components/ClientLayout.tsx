@@ -41,7 +41,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }
         
         if (userProfileSnap.exists()) {
-            const userProfile = userProfileSnap.data();
+            const userProfile = userProfileSnap.data() || {};
 
             if (userProfile.forceSignOut) {
                 updateDocumentNonBlocking(userProfileRef, { forceSignOut: false });
@@ -89,7 +89,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               }
             }
         }
-      }).catch(() => {
+      }).catch((err) => {
+          console.error("Layout auth check failed", err);
           signOut(getAuth());
       });
     } else {

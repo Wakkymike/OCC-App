@@ -2,55 +2,30 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions for reusable logic
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-    
-    // Optimized role check that avoids recursion
-    function hasRole(roleField) {
-      return isSignedIn() && 
-             get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data[roleField] == true;
-    }
-
-    // Direct check for admin status
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' ||
-        get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true
-      );
-    }
-
-    // Direct check for content creator status
-    function isContentCreator() {
-      return isSignedIn() && (
-        isAdmin() ||
-        get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isContentCreator == true
-      );
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk';
     }
 
     match /userProfiles/{userId} {
       // A user can always read and update their own profile.
-      allow get: if isOwner(userId) || (isSignedIn() && (request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true));
-      allow update: if isOwner(userId) || (isSignedIn() && (request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true));
+      allow get: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
+      allow update: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
       
       // Only admins can list all profiles.
-      allow list: if isSignedIn() && (request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
+      allow list: if isSignedIn() && (isSuperAdmin() || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
       
       // A new user can create their own profile document.
-      allow create: if isOwner(userId) && request.resource.data.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId;
 
       allow delete: if false;
     }
 
     match /invitations/{invitationId} {
-      allow create, list, delete: if isSignedIn() && (request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
-      allow get: if true;
-      allow update: if false;
+      allow read, write: if isSignedIn() && (isSuperAdmin() || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
     }
 
     match /networkUpdates/{updateId} {
@@ -58,14 +33,13 @@ service cloud.firestore {
       allow read: if isSignedIn();
       
       // Admins and content creators can modify them.
-      allow create, update, delete: if isSignedIn() && (
-        request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' || 
+      allow write: if isSignedIn() && (
+        isSuperAdmin() || 
         get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true ||
         get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isContentCreator == true
       );
     }
 
-    // Default-deny all other collections/documents
     match /{path=**} {
       allow read, write: if false;
     }

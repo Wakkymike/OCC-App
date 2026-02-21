@@ -217,6 +217,8 @@ function NetworkUpdateManagement() {
             });
             toast({ title: 'Update Added' });
             setTitle(''); setDetails('');
+        } catch (error) {
+            console.error(error);
         } finally {
             setIsSubmitting(false);
         }
@@ -237,7 +239,9 @@ function NetworkUpdateManagement() {
                     <Button type="submit" disabled={isSubmitting}>Add Update</Button>
                 </form>
                 <div className="space-y-4">
-                    {isLoading ? <Loader2 className="animate-spin" /> : updates?.map(update => (
+                    {isLoading ? (
+                        <div className="flex justify-center p-4"><Loader2 className="animate-spin" /></div>
+                    ) : updates?.map(update => (
                         <div key={update.id} className="flex items-start gap-4 p-3 border rounded-lg">
                             <div className="flex-grow">
                                 <p className="font-bold">{update.title}</p>
@@ -273,6 +277,8 @@ export default function AdminPage() {
       await sendSignInLinkToEmail(auth, inviteEmail, { url: `${window.location.origin}/finish-sign-up?invitationId=${docRef.id}`, handleCodeInApp: true });
       toast({ title: 'Invitation Sent' });
       setInviteEmail('');
+    } catch (error) {
+      console.error(error);
     } finally {
       setIsInviting(false);
     }
@@ -288,7 +294,7 @@ export default function AdminPage() {
     <main className="flex min-h-screen flex-col items-center bg-background p-8 gap-8">
        <div className="w-full max-w-4xl space-y-8">
         <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold">Admin Panel</h1>
+            <h1 className="text-3xl font-bold text-foreground">OCC App Admin</h1>
             <Button asChild variant="outline"><Link href="/"><Home className="mr-2 h-5 w-5" />Home</Link></Button>
         </div>
 
