@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut } from 'lucide-react';
 import Link from 'next/link';
@@ -57,7 +56,6 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
         return;
     }
     const userDocRef = doc(firestore, 'userProfiles', user.id);
-    // When giving content creator rights, we also ensure the account is active.
     const updateData: any = { isContentCreator };
     if (isContentCreator) updateData.isActive = true;
     

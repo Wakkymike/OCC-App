@@ -11,31 +11,35 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
     
-    // Function to check if the requesting user has a specific role in their profile.
+    // Optimized role check that avoids recursion
     function hasRole(roleField) {
       return isSignedIn() && 
-             exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.get(roleField, false) == true;
+             get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data[roleField] == true;
     }
 
+    // Direct check for admin status
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' ||
-        hasRole('isAdmin')
+        get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true
       );
     }
 
+    // Direct check for content creator status
     function isContentCreator() {
-      return hasRole('isContentCreator');
+      return isSignedIn() && (
+        isAdmin() ||
+        get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isContentCreator == true
+      );
     }
 
     match /userProfiles/{userId} {
       // A user can always read and update their own profile.
-      allow get: if isOwner(userId) || isAdmin();
-      allow update: if isOwner(userId) || isAdmin();
+      allow get: if isOwner(userId) || (isSignedIn() && (request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true));
+      allow update: if isOwner(userId) || (isSignedIn() && (request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true));
       
       // Only admins can list all profiles.
-      allow list: if isAdmin();
+      allow list: if isSignedIn() && (request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
       
       // A new user can create their own profile document.
       allow create: if isOwner(userId) && request.resource.data.uid == userId;
@@ -44,17 +48,21 @@ service cloud.firestore {
     }
 
     match /invitations/{invitationId} {
-      allow create, list, delete: if isAdmin();
+      allow create, list, delete: if isSignedIn() && (request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true);
       allow get: if true;
       allow update: if false;
     }
 
     match /networkUpdates/{updateId} {
-      // Everyone can read network updates.
-      allow read: if true;
+      // Everyone who is signed in can read network updates.
+      allow read: if isSignedIn();
       
-      // Only admins and content creators can modify them.
-      allow create, update, delete: if isAdmin() || isContentCreator();
+      // Admins and content creators can modify them.
+      allow create, update, delete: if isSignedIn() && (
+        request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' || 
+        get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true ||
+        get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isContentCreator == true
+      );
     }
 
     // Default-deny all other collections/documents
