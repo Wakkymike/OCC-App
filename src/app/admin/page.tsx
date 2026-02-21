@@ -6,17 +6,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, Home, TramFront, Users, UserPlus, Send, Clock, XCircle, Rss, PlusCircle, Trash2, LogOut } from 'lucide-react';
+import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc } from '@/firebase';
-import { collection, query, orderBy, Timestamp, addDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, Timestamp } from 'firebase/firestore';
 import { sendSignInLinkToEmail, User } from 'firebase/auth';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { format } from 'date-fns';
 import type { NetworkUpdate } from '@/lib/types';
 import { Textarea } from '@/components/ui/textarea';
-
 
 interface UserProfile {
   id: string;
@@ -59,8 +57,10 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
         return;
     }
     const userDocRef = doc(firestore, 'userProfiles', user.id);
+    // When giving content creator rights, we also ensure the account is active.
     const updateData: any = { isContentCreator };
     if (isContentCreator) updateData.isActive = true;
+    
     updateDocumentNonBlocking(userDocRef, updateData);
     toast({ title: 'User Updated', description: `${user.displayName} has been ${isContentCreator ? 'granted' : 'revoked'} content creator privileges.` });
   };
@@ -312,7 +312,12 @@ export default function AdminPage() {
         ) : isContentCreator ? (
              <NetworkUpdateManagement />
         ) : (
-            <Card><CardHeader><CardTitle>Access Denied</CardTitle></CardHeader></Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Access Denied</CardTitle>
+                <CardDescription>You do not have administrative or content management permissions.</CardDescription>
+              </CardHeader>
+            </Card>
         )}
       </div>
     </main>

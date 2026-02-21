@@ -11,32 +11,31 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
     
-    // Function to check if a user is a content creator.
-    function isContentCreator() {
+    // Function to check if the requesting user has a specific role in their profile.
+    function hasRole(roleField) {
       return isSignedIn() && 
              exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.get('isContentCreator', false) == true;
+             get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.get(roleField, false) == true;
     }
 
-    // Function to check if the requesting user is an admin.
     function isAdmin() {
-      // Prioritize the hardcoded super admin for immediate access.
-      // Then check the database flag. Recursion is avoided because the userProfiles
-      // get rule does not call isAdmin().
       return isSignedIn() && (
         request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' ||
-        (exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.get('isAdmin', false) == true)
+        hasRole('isAdmin')
       );
     }
 
+    function isContentCreator() {
+      return hasRole('isContentCreator');
+    }
+
     match /userProfiles/{userId} {
-      // A user can always get and update their own profile.
-      // This rule is critical for breaking recursion in helper functions.
-      allow get, update: if isOwner(userId);
+      // A user can always read and update their own profile.
+      allow get: if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) || isAdmin();
       
-      // Admins get full read (list) and write (update) access to all profiles.
-      allow list, update: if isAdmin();
+      // Only admins can list all profiles.
+      allow list: if isAdmin();
       
       // A new user can create their own profile document.
       allow create: if isOwner(userId) && request.resource.data.uid == userId;
