@@ -12,7 +12,6 @@ service cloud.firestore {
     }
     
     // Function to check if a user is a content creator.
-    // Uses safer data extraction to prevent errors if the profile is missing.
     function isContentCreator() {
       return isSignedIn() && 
              exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
@@ -20,46 +19,42 @@ service cloud.firestore {
     }
 
     // Function to check if the requesting user is an admin.
-    // An admin is a user with the `isAdmin` flag set to true in their profile.
-    // The super admin email check provides a permanent admin user.
     function isAdmin() {
-      // NOTE: The cross-document get() has been temporarily removed to resolve a
-      // complex permission error. This currently makes only the super-admin an admin.
-      return request.auth != null && (
-        request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk'
+      // Prioritize the hardcoded super admin for immediate access.
+      // Then check the database flag. Recursion is avoided because the userProfiles
+      // get rule does not call isAdmin().
+      return isSignedIn() && (
+        request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' ||
+        (exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.get('isAdmin', false) == true)
       );
     }
 
     match /userProfiles/{userId} {
       // A user can always get and update their own profile.
-      // This rule is critical for breaking the recursion in the isAdmin() function.
+      // This rule is critical for breaking recursion in helper functions.
       allow get, update: if isOwner(userId);
       
       // Admins get full read (list) and write (update) access to all profiles.
-      // This is additive to the `isOwner` rule above.
       allow list, update: if isAdmin();
       
       // A new user can create their own profile document.
       allow create: if isOwner(userId) && request.resource.data.uid == userId;
 
-      // Nobody can delete profiles from the client.
       allow delete: if false;
     }
 
     match /invitations/{invitationId} {
-      // Admins can create, list, and delete invitations.
       allow create, list, delete: if isAdmin();
-      // An unauthenticated user can read a single invitation to verify it.
       allow get: if true;
-      // No one can update an invitation.
       allow update: if false;
     }
 
     match /networkUpdates/{updateId} {
-      // Explicitly allow both get and list for everyone to prevent index-based permission errors.
-      allow get, list: if true;
+      // Everyone can read network updates.
+      allow read: if true;
       
-      // Explicitly allow write operations only for admins or content creators.
+      // Only admins and content creators can modify them.
       allow create, update, delete: if isAdmin() || isContentCreator();
     }
 

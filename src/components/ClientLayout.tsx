@@ -20,7 +20,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     if (isUserLoading) {
-      return; // Wait until user state is determined.
+      return;
     }
 
     const isPublicPage = PUBLIC_PAGES.includes(pathname);
@@ -28,9 +28,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const isPendingPage = pathname === '/pending-activation';
     const isPasswordChangePage = pathname === FORCE_PASSWORD_CHANGE_PAGE;
 
-
     if (user) {
-      // User is authenticated, now check their profile status (active, admin).
       const db = getFirestore();
       const userProfileRef = doc(db, 'userProfiles', user.uid);
       
@@ -83,8 +81,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             }
 
             if (isAdminPage) {
-              const isDbAdmin = userProfile.isAdmin;
-              const isContentCreator = userProfile.isContentCreator;
+              const isDbAdmin = userProfile.isAdmin === true;
+              const isContentCreator = userProfile.isContentCreator === true;
 
               if (!isSuperAdmin && !isDbAdmin && !isContentCreator) {
                 router.replace('/');
