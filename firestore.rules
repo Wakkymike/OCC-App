@@ -10,31 +10,21 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk';
     }
 
-    // Direct check for admin status without helper functions to avoid recursive rule evaluation
-    function isAdmin() {
-      return isSuperAdmin() || get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true;
+    // Direct check for roles without nested functions to prevent recursion
+    function getUserData() {
+      return get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data;
     }
 
     match /userProfiles/{userId} {
-      // Users can read their own profile. Admins can read any profile.
-      allow get: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || isAdmin());
-      
-      // Only admins can list all profiles.
-      allow list: if isSignedIn() && (isSuperAdmin() || isAdmin());
-      
-      // Users can create their own profile during sign up.
+      allow get: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || getUserData().isAdmin == true);
+      allow list: if isSignedIn() && (isSuperAdmin() || getUserData().isAdmin == true);
       allow create: if isSignedIn() && request.auth.uid == userId;
-      
-      // Users can update their own profile (e.g. password change flag). Admins can update any profile.
-      allow update: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || isAdmin());
-
-      // Only admins or super admins can delete profiles.
-      allow delete: if isSignedIn() && (isSuperAdmin() || isAdmin());
+      allow update: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || getUserData().isAdmin == true);
+      allow delete: if isSignedIn() && (isSuperAdmin() || getUserData().isAdmin == true);
     }
 
     match /invitations/{invitationId} {
-      // Invitations are restricted to admins.
-      allow read, write: if isSignedIn() && (isSuperAdmin() || isAdmin());
+      allow read, write: if isSignedIn() && (isSuperAdmin() || getUserData().isAdmin == true);
     }
 
     match /networkUpdates/{updateId} {
@@ -44,8 +34,8 @@ service cloud.firestore {
       // Admins and content creators can modify them.
       allow write: if isSignedIn() && (
         isSuperAdmin() || 
-        isAdmin() ||
-        get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isContentCreator == true
+        getUserData().isAdmin == true ||
+        getUserData().isContentCreator == true
       );
     }
 

@@ -68,11 +68,11 @@ export default function LiveServicePage() {
           <CardHeader>
              <div className="flex items-start justify-between gap-4">
               <div>
-                <CardTitle className="text-3xl flex items-center gap-4">
+                <CardTitle className="text-3xl flex flex-wrap items-center gap-4">
                   <span>Live Service Board</span>
                   {gnwBuses.length > 0 && (
                     <Badge className="bg-chart-2 text-primary-foreground">
-                      {gnwBuses.length} Go North West buses active
+                      {gnwBuses.length} active buses over {sortedServiceNumbers.length} services
                     </Badge>
                   )}
                 </CardTitle>
@@ -137,9 +137,11 @@ export default function LiveServicePage() {
                                 const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
                                 const isSchool = bus.journeyRef && schoolJourneyRefs.includes(bus.journeyRef);
                                 const isNight = bus.runningBoard && nightBusRunningBoards.includes(bus.runningBoard);
-                                // Restricted flashing logic for GNW buses
-                                const isFirst = bus.journeyRef && firstJourneyRefs.includes(bus.journeyRef);
-                                const isLast = bus.journeyRef && lastJourneyRefs.includes(bus.journeyRef);
+                                
+                                // Restricted flashing logic EXCLUSIVELY for Go North West
+                                const isGnw = bus.operator === 'GNW';
+                                const isFirst = isGnw && bus.journeyRef && firstJourneyRefs.includes(bus.journeyRef);
+                                const isLast = isGnw && bus.journeyRef && lastJourneyRefs.includes(bus.journeyRef);
                                 
                                 return (
                                     <TableRow key={busId}>
