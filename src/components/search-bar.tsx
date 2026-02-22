@@ -24,7 +24,7 @@ interface SearchBarProps {
 }
 
 export default function SearchBar({ onSearch, onClear }: SearchBarProps) {
-  const [searchType, setSearchType] = useState('service');
+  const [searchType, setSearchType] = useState('fleetNumber');
   const [query, setQuery] = useState('');
   const [direction, setDirection] = useState<'all' | 'inbound' | 'outbound'>(
     'all'
