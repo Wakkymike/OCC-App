@@ -26,7 +26,8 @@ service cloud.firestore {
       // A new user can create their own profile document.
       allow create: if isSignedIn() && request.auth.uid == userId;
 
-      allow delete: if false;
+      // Only admins or super admins can delete profiles.
+      allow delete: if isSignedIn() && (isSuperAdmin() || getProfileData().get('isAdmin', false) == true);
     }
 
     match /invitations/{invitationId} {

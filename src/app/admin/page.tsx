@@ -14,6 +14,17 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { NetworkUpdate } from '@/lib/types';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface UserProfile {
   id: string;
@@ -85,6 +96,12 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
     toast({ title: 'User Session Flagged', description: `${user.displayName} will be signed out on their next page load.` });
   };
 
+  const handleDeleteUser = (user: UserProfile) => {
+    const userDocRef = doc(firestore, 'userProfiles', user.id);
+    deleteDocumentNonBlocking(userDocRef);
+    toast({ title: 'User Deleted', description: `${user.displayName} has been removed from the system.` });
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -133,10 +150,32 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
                   <TableCell>
                      <Switch checked={user.isAdmin} onCheckedChange={(v) => handleAdminToggle(user, v)} disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'} />
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => handleForceSignOut(user)} disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk' || user.uid === currentUser?.uid}>
-                        <LogOut className="h-5 w-5 text-destructive" />
+                  <TableCell className="text-right flex items-center justify-end gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => handleForceSignOut(user)} title="Force Sign Out" disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk' || user.uid === currentUser?.uid}>
+                        <LogOut className="h-4 w-4 text-destructive" />
                     </Button>
+                    
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" title="Delete User" disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk' || user.uid === currentUser?.uid}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will permanently delete {user.displayName}'s user profile. This action cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteUser(user)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                    Delete User
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                   </TableCell>
                 </TableRow>
               ))}
