@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc } from '@/firebase';
-import { collection, addDoc, serverTimestamp, doc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs } from 'firebase/firestore';
 import { sendSignInLinkToEmail, User } from 'firebase/auth';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -96,10 +96,23 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
     toast({ title: 'User Session Flagged', description: `${user.displayName} will be signed out on their next page load.` });
   };
 
-  const handleDeleteUser = (user: UserProfile) => {
+  const handleDeleteUser = async (user: UserProfile) => {
+    // 1. Delete the profile document
     const userDocRef = doc(firestore, 'userProfiles', user.id);
     deleteDocumentNonBlocking(userDocRef);
-    toast({ title: 'User Deleted', description: `${user.displayName} has been removed from the system.` });
+    
+    // 2. Also cleanup any existing invitations for this email to truly clear the database footprint
+    const invitationsRef = collection(firestore, 'invitations');
+    const q = query(invitationsRef, where("email", "==", user.email));
+    const querySnapshot = await getDocs(q);
+    querySnapshot.forEach((invDoc) => {
+        deleteDocumentNonBlocking(doc(firestore, 'invitations', invDoc.id));
+    });
+
+    toast({ 
+        title: 'User Deleted', 
+        description: `${user.displayName} removed. Note: Login must be manually removed from Firebase Auth to reuse email.` 
+    });
   };
 
   return (
@@ -109,7 +122,7 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
           <Users className="h-6 w-6" />
           <div>
             <CardTitle className="text-xl">User Management</CardTitle>
-            <CardDescription>Activate, deactivate, and grant privileges to users.</CardDescription>
+            <CardDescription>Manage user roles, access, and account status.</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -163,15 +176,17 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogTitle>Delete User Account?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This will permanently delete {user.displayName}'s user profile. This action cannot be undone.
+                                    This will permanently delete {user.displayName}'s profile and associated data from the database. 
+                                    <br/><br/>
+                                    <strong>Note:</strong> To reuse this email for a new account, you must also manually delete the user from the Firebase Authentication console.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => handleDeleteUser(user)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                    Delete User
+                                    Delete Profile
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
