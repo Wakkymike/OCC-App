@@ -1,12 +1,34 @@
+'use client';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Map, Radio, Shield, Route } from 'lucide-react';
+import { Map, Radio, Shield, Route, Loader2 } from 'lucide-react';
 import UserMenu from '@/components/auth/UserMenu';
 import TickerTape from '@/components/TickerTape';
 import BreakingNewsTicker from '@/components/BreakingNewsTicker';
 import NetworkUpdatesBox from '@/components/NetworkUpdatesBox';
+import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 export default function HomePage() {
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, 'userProfiles', user.uid);
+  }, [user, firestore]);
+
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<{ 
+    isAdmin: boolean; 
+    isContentCreator: boolean 
+  }>(userProfileRef);
+
+  const isSuperAdmin = user?.email === 'michael.dodsworth@gonorthwest.co.uk';
+  const isAdmin = userProfile?.isAdmin === true || isSuperAdmin;
+  const isContentCreator = userProfile?.isContentCreator === true;
+  const canAccessAdmin = isAdmin || isContentCreator;
+
   return (
     <div className="flex flex-col h-screen bg-background">
         <BreakingNewsTicker />
@@ -41,12 +63,22 @@ export default function HomePage() {
                         Live Service Board
                         </Link>
                     </Button>
-                    <Button asChild size="lg" variant="secondary">
-                        <Link href="/admin">
-                        <Shield className="mr-2 h-5 w-5" />
-                        Admin Panel
-                        </Link>
-                    </Button>
+
+                    {/* Conditional rendering of Admin Panel button */}
+                    {isUserLoading || isProfileLoading ? (
+                         <Button size="lg" variant="secondary" disabled>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Checking Access...
+                        </Button>
+                    ) : canAccessAdmin ? (
+                        <Button asChild size="lg" variant="secondary">
+                            <Link href="/admin">
+                            <Shield className="mr-2 h-5 w-5" />
+                            Admin Panel
+                            </Link>
+                        </Button>
+                    ) : null}
+
                     </div>
                 </div>
 
