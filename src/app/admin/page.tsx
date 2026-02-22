@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc } from '@/firebase';
-import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { sendSignInLinkToEmail, User } from 'firebase/auth';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -97,22 +97,35 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
   };
 
   const handleDeleteUser = async (user: UserProfile) => {
-    // 1. Delete the profile document
-    const userDocRef = doc(firestore, 'userProfiles', user.id);
-    deleteDocumentNonBlocking(userDocRef);
-    
-    // 2. Also cleanup any existing invitations for this email to truly clear the database footprint
-    const invitationsRef = collection(firestore, 'invitations');
-    const q = query(invitationsRef, where("email", "==", user.email));
-    const querySnapshot = await getDocs(q);
-    querySnapshot.forEach((invDoc) => {
-        deleteDocumentNonBlocking(doc(firestore, 'invitations', invDoc.id));
-    });
+    try {
+        // 1. Explicitly strip all privileges and roles first to ensure no persistence
+        const userDocRef = doc(firestore, 'userProfiles', user.id);
+        await updateDoc(userDocRef, { 
+            isAdmin: false, 
+            isContentCreator: false, 
+            isActive: false, 
+            forceSignOut: true 
+        });
 
-    toast({ 
-        title: 'User Deleted', 
-        description: `${user.displayName} removed. Note: Login must be manually removed from Firebase Auth to reuse email.` 
-    });
+        // 2. Delete the profile document itself
+        deleteDocumentNonBlocking(userDocRef);
+        
+        // 3. Cleanup any pending invitations for this email
+        const invitationsRef = collection(firestore, 'invitations');
+        const q = query(invitationsRef, where("email", "==", user.email));
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach((invDoc) => {
+            deleteDocumentNonBlocking(doc(firestore, 'invitations', invDoc.id));
+        });
+
+        toast({ 
+            title: 'User Deleted', 
+            description: `${user.displayName} and all privileges removed. Note: To fully clear for reuse, manual removal from Firebase Auth is required.` 
+        });
+    } catch (error) {
+        console.error("Failed to delete user fully:", error);
+        toast({ variant: 'destructive', title: 'Deletion Failed', description: 'Could not fully remove user privileges.' });
+    }
   };
 
   return (
@@ -178,15 +191,15 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Delete User Account?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This will permanently delete {user.displayName}'s profile and associated data from the database. 
+                                    This will strip all privileges and permanently delete {user.displayName}'s profile. 
                                     <br/><br/>
-                                    <strong>Note:</strong> To reuse this email for a new account, you must also manually delete the user from the Firebase Authentication console.
+                                    <strong>Note:</strong> To reuse this email for a brand new registration, you must also manually delete the user from the Firebase Authentication console.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => handleDeleteUser(user)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                    Delete Profile
+                                    Confirm Deletion
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
