@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useEffect, useRef } from 'react';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import type { MonitoredHazard } from '@/lib/types';
 
@@ -24,17 +23,18 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
 }
 
 export function AlertMonitor() {
+  const { user } = useUser();
   const { buses } = useBusTracker();
   const firestore = useFirestore();
   
-  const hazardsRef = useMemoFirebase(() => collection(firestore, 'monitoredHazards'), [firestore]);
+  // Only create the collection reference if the user is signed in to avoid permission errors
+  const hazardsRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
   const { data: monitoredHazards } = useCollection<MonitoredHazard>(hazardsRef);
   
-  // Track triggered alerts to avoid spamming Firestore
   const lastCheckRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
-    if (!monitoredHazards || !buses || buses.length === 0) return;
+    if (!user || !monitoredHazards || !buses || buses.length === 0) return;
 
     const gnwBuses = buses.filter(b => b.operator === 'GNW' && b.position);
     
@@ -53,11 +53,9 @@ export function AlertMonitor() {
           const alertKey = `${busId}-${hazard.id}`;
           const now = Date.now();
           
-          // Only check/create alert once every 5 minutes per bus/hazard pair if it stays in zone
           if (!lastCheckRef.current[alertKey] || now - lastCheckRef.current[alertKey] > 300000) {
             lastCheckRef.current[alertKey] = now;
             
-            // Check if there's already an active alert for this pair
             const alertsRef = collection(firestore, 'activeAlerts');
             const q = query(alertsRef, where("busId", "==", busId), where("hazardId", "==", hazard.id));
             const existing = await getDocs(q);
@@ -77,7 +75,7 @@ export function AlertMonitor() {
         }
       }
     });
-  }, [buses, monitoredHazards, firestore]);
+  }, [buses, monitoredHazards, firestore, user]);
 
   return null;
 }

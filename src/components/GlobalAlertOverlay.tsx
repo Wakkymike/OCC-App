@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
@@ -12,7 +11,8 @@ export function GlobalAlertOverlay() {
   const firestore = useFirestore();
   const { user } = useUser();
   
-  const alertsRef = useMemoFirebase(() => collection(firestore, 'activeAlerts'), [firestore]);
+  // Only query alerts if the user is authenticated
+  const alertsRef = useMemoFirebase(() => user ? collection(firestore, 'activeAlerts') : null, [firestore, user]);
   const { data: alerts } = useCollection<ActiveAlert>(alertsRef);
   
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
@@ -20,7 +20,7 @@ export function GlobalAlertOverlay() {
   
   const isAdmin = profile?.isAdmin || user?.email === 'michael.dodsworth@gonorthwest.co.uk';
 
-  if (!alerts || alerts.length === 0) return null;
+  if (!user || !alerts || alerts.length === 0) return null;
 
   const handleDismiss = (alertId: string) => {
     if (!isAdmin) return;
