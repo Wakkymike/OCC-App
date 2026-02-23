@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -32,6 +31,7 @@ interface BusMapProps {
   showRoadworks: boolean;
   hazards: Hazard[] | null;
   showHazards: boolean;
+  showGeofences: boolean;
 }
 
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
@@ -75,6 +75,7 @@ export default function BusMap({
   showRoadworks,
   hazards,
   showHazards,
+  showGeofences,
 }: BusMapProps) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -139,7 +140,7 @@ export default function BusMap({
         
         setRelocatingMonitorId(null);
         map.getCanvas().style.cursor = '';
-        toast({ title: 'Geofence Updated', description: 'The geofence center has been moved to the selected location.' });
+        toast({ title: 'Geofence Updated', description: 'Monitoring zone relocated.' });
         return;
       }
       setSelectedBusId(null);
@@ -174,7 +175,9 @@ export default function BusMap({
           id: 'geofence-fills',
           type: 'fill',
           source: 'geofences',
-          layout: {},
+          layout: {
+            'visibility': showGeofences ? 'visible' : 'none'
+          },
           paint: {
             'fill-color': '#10b981',
             'fill-opacity': 0.15
@@ -185,7 +188,9 @@ export default function BusMap({
           id: 'geofence-outlines',
           type: 'line',
           source: 'geofences',
-          layout: {},
+          layout: {
+            'visibility': showGeofences ? 'visible' : 'none'
+          },
           paint: {
             'line-color': '#10b981',
             'line-width': 2,
@@ -201,6 +206,14 @@ export default function BusMap({
       map.once('style.load', setupLayers);
     }
   }, [mapLoaded, styleRevision]);
+
+  // Update geofence layer visibility independently
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !map.getLayer('geofence-fills')) return;
+    map.setLayoutProperty('geofence-fills', 'visibility', showGeofences ? 'visible' : 'none');
+    map.setLayoutProperty('geofence-outlines', 'visibility', showGeofences ? 'visible' : 'none');
+  }, [showGeofences, mapLoaded]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -235,7 +248,7 @@ export default function BusMap({
       radius,
       createdAt: serverTimestamp()
     });
-    toast({ title: 'Geofence Added', description: `New monitoring zone active for ${hazard.value}.` });
+    toast({ title: 'Geofence Added', description: 'Monitoring zone active.' });
   };
 
   const handleRemoveGeofence = useCallback((monitorId: string) => {
@@ -259,10 +272,10 @@ export default function BusMap({
         const el = document.createElement('div');
         el.className = 'hazard-marker cursor-pointer';
         
-        let color = '#3b82f6'; // Default Width
-        if (hazard.type === 'height') color = '#ef4444'; // Height
-        if (hazard.type === 'both') color = '#9333ea'; // Both
-        if (isMonitored) color = '#10b981'; // Active Geofence
+        let color = '#3b82f6';
+        if (hazard.type === 'height') color = '#ef4444';
+        if (hazard.type === 'both') color = '#9333ea';
+        if (isMonitored) color = '#10b981';
 
         el.innerHTML = `
           <div style="background:${color}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); display: flex; align-items:center; gap: 4px;">
@@ -289,7 +302,6 @@ export default function BusMap({
             .setPopup(new mapboxgl.Popup({ offset: 25, maxWidth: '300px' }).setDOMContent(popupContent))
             .addTo(map);
 
-        // Management UI for Admins only
         if (isAdmin) {
           const listContainer = popupContent.querySelector('.monitors-list');
           if (listContainer) {
@@ -332,7 +344,7 @@ export default function BusMap({
           if (addContainer) {
             const label = document.createElement('label');
             label.className = 'text-[10px] font-bold block mb-1';
-            label.innerText = 'Add New Geofence (Radius m):';
+            label.innerText = 'Add Zone (Radius m):';
             
             const input = document.createElement('input');
             input.type = 'number';
@@ -348,13 +360,12 @@ export default function BusMap({
             addContainer.appendChild(input);
             addContainer.appendChild(btn);
           }
-        } else {
-            // For non-admins, show that monitoring is active if applicable
+        } else if (isMonitored) {
             const listContainer = popupContent.querySelector('.monitors-list');
-            if (listContainer && isMonitored) {
+            if (listContainer) {
                 listContainer.innerHTML = `
                     <div class="flex items-center gap-2 text-[10px] text-green-600 font-bold bg-green-50 p-2 rounded">
-                        <ShieldAlert class="h-3 w-3" /> Monitoring Active (${monitors.length} zones)
+                        <ShieldAlert class="h-3 w-3" /> Monitoring Active
                     </div>
                 `;
             }
@@ -490,7 +501,7 @@ export default function BusMap({
       {!mapLoaded && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/80 gap-3">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="font-bold text-muted-foreground">Initializing Map Engine...</p>
+          <p className="font-bold text-muted-foreground">Initializing Map...</p>
         </div>
       )}
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />

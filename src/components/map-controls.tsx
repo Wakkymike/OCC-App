@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { Layers3, Satellite, Map, Building, Bus, ChevronDown, Triangle } from 'lucide-react';
+import { Layers3, Satellite, Map, Building, Bus, ChevronDown, Triangle, Shield } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,8 @@ interface MapControlsProps {
   setShowRoadworks: (show: boolean) => void;
   showHazards: boolean;
   setShowHazards: (show: boolean) => void;
+  showGeofences: boolean;
+  setShowGeofences: (show: boolean) => void;
 }
 
 const styleOptions = [
@@ -78,6 +80,8 @@ export default function MapControls({
   setShowRoadworks,
   showHazards,
   setShowHazards,
+  showGeofences,
+  setShowGeofences,
 }: MapControlsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const currentStyleId = mapStyle.split('/').pop();
@@ -149,6 +153,17 @@ export default function MapControls({
                         id="show-hazards"
                         checked={showHazards}
                         onCheckedChange={setShowHazards}
+                    />
+               </div>
+               <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
+                    <div className="flex items-center space-x-2 text-green-600">
+                        <Shield className="h-4 w-4" />
+                        <Label htmlFor="show-geofences" className="text-sm cursor-pointer text-foreground">Monitoring Zones</Label>
+                    </div>
+                    <Switch
+                        id="show-geofences"
+                        checked={showGeofences}
+                        onCheckedChange={setShowGeofences}
                     />
                </div>
                <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">

@@ -50,7 +50,7 @@ export default function Page() {
     direction: 'all' | 'inbound' | 'outbound';
   } | null>(null);
 
-  // New state for map layers
+  // Map layer states
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/streets-v12');
   const [show3DBuildings, setShow3DBuildings] = useState(true);
   const [showBusStops, setShowBusStops] = useState(true);
@@ -62,6 +62,7 @@ export default function Page() {
   const [showDiamondBus, setShowDiamondBus] = useState(false);
   const [showRoadworks, setShowRoadworks] = useState(true);
   const [showHazards, setShowHazards] = useState(true);
+  const [showGeofences, setShowGeofences] = useState(true);
   const { toast } = useToast();
 
   const [metrolinkData, setMetrolinkData] = useState<MetrolinkData | null>(null);
@@ -187,11 +188,6 @@ export default function Page() {
           setTxcRoutes(data.txcRoutes || {});
         } else {
           console.error('Failed to fetch TransXchange routes');
-          toast({
-              variant: 'destructive',
-              title: 'Could not load routes',
-              description: 'Failed to load routes from TransXchange data.',
-          });
         }
       } catch (err) {
         console.error('Error fetching TransXchange routes:', err);
@@ -247,29 +243,25 @@ export default function Page() {
     // 3. Handle route recording and map view updates
     if (isRecording) {
       if (!recordingBusId) {
-        // Find the first bus for the service to start tracking from the displayed buses
         const busToStartTracking = finalDisplayBuses.find(b => b.service === recordingService);
         if (busToStartTracking) {
           const busId = `${busToStartTracking.fleetNumber}-${busToStartTracking.runningBoard}-${busToStartTracking.service}-${busToStartTracking.direction}-${busToStartTracking.journeyRef || 'no-ref'}`;
           setRecordingBusId(busId);
-          setActiveRecordingRoute([]); // Reset route when a new journey is picked up
+          setActiveRecordingRoute([]);
           toast({ title: 'Recording Started', description: `Now recording route for bus ${busToStartTracking.fleetNumber} on service ${recordingService}.`});
         }
       } else {
-        // Continue tracking the specific bus
         const trackedBus = finalDisplayBuses.find(b => {
            const busId = `${b.fleetNumber}-${b.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
            return busId === recordingBusId;
         });
         if (trackedBus && trackedBus.position) {
-          // Add point if it has moved
           if (!lastRecordedPosition || trackedBus.position.lat !== lastRecordedPosition.lat || trackedBus.position.lng !== lastRecordedPosition.lng) {
              setActiveRecordingRoute(prev => [...prev, trackedBus.position!]);
           }
         } else {
-          // Bus is no longer in the feed, stop recording
           handleStopRecording();
-          toast({ title: 'Recording Stopped', description: `Bus ${recordingBusId.split('-')[0]} is no longer being tracked. Route saved.`});
+          toast({ title: 'Recording Stopped', description: `Bus tracking ended. Route saved.`});
         }
       }
     }
@@ -324,16 +316,11 @@ export default function Page() {
         toast({
           variant: 'destructive',
           title: 'Location not found',
-          description: `Could not find a location for "${query}". Please try another search.`,
+          description: `Could not find a location for "${query}".`,
         });
       }
     } catch (error) {
       console.error('Geocoding error:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Search Error',
-        description: 'An error occurred while searching for the location.',
-      });
     }
   };
 
@@ -377,9 +364,9 @@ export default function Page() {
         type: "Feature",
         properties: {
             name: routeToExport.name,
-            service: routeToExport.name.split(' ')[1], // basic parsing
+            service: routeToExport.name.split(' ')[1],
             busId: routeToExport.busId,
-            recordedAt: selectedRouteId.includes('-') && !isNaN(parseInt(selectedRouteId.split('-').pop()!)) ? new Date(parseInt(selectedRouteId.split('-').pop()!)).toISOString() : new Date().toISOString(),
+            recordedAt: new Date().toISOString(),
         },
         geometry: {
             type: "LineString",
@@ -396,7 +383,7 @@ export default function Page() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast({ title: 'Export Successful', description: `The route ${routeToExport.name} has been downloaded.` });
+    toast({ title: 'Export Successful', description: `Route downloaded.` });
   };
   
   return (
@@ -465,6 +452,8 @@ export default function Page() {
               setShowRoadworks={setShowRoadworks}
               showHazards={showHazards}
               setShowHazards={setShowHazards}
+              showGeofences={showGeofences}
+              setShowGeofences={setShowGeofences}
             />
           </PopoverContent>
         </Popover>
@@ -485,6 +474,7 @@ export default function Page() {
         showRoadworks={showRoadworks}
         hazards={hazards}
         showHazards={showHazards}
+        showGeofences={showGeofences}
       />
       <RouteRecorderDialog
         isOpen={isRecorderOpen}
