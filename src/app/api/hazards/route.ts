@@ -14,7 +14,7 @@ const CACHE_DURATION = 1000 * 60 * 60; // 1 hour caching
 function formatToImperial(val: string | undefined): string | null {
   if (!val) return null;
 
-  // If already imperial, just return it
+  // If already imperial (e.g. 13' 6"), just return it
   if (val.includes("'") || val.includes('"')) {
     return val.trim();
   }
@@ -29,11 +29,9 @@ function formatToImperial(val: string | undefined): string | null {
     const feet = Math.floor(totalInches / 12);
     const inches = Math.round(totalInches % 12);
 
-    // Round up inches if they reach 12
-    if (inches === 12) {
-      return `${feet + 1}' 0"`;
-    }
-
+    // Standard sign formatting
+    if (inches === 0) return `${feet}'`;
+    if (inches === 12) return `${feet + 1}'`;
     return `${feet}' ${inches}"`;
   }
 
@@ -48,7 +46,7 @@ export async function GET() {
     return NextResponse.json({ hazards: cachedHazards, source: 'cache' });
   }
 
-  // Bounding box for Greater Manchester/North West area
+  // Bounding box for Greater Manchester area
   const bbox = '53.34,-2.68,53.65,-2.10';
   const query = `
     [out:json][timeout:25];
@@ -72,7 +70,6 @@ export async function GET() {
     });
 
     if (!response.ok) {
-      // If we're being rate limited but have a cache, return it
       if (response.status === 429 && cachedHazards) {
         return NextResponse.json({ hazards: cachedHazards, source: 'stale-cache' });
       }
@@ -111,7 +108,6 @@ export async function GET() {
         value = `W: ${widthImperial}`;
       }
 
-      // We only return the hazard if it has a useful description or tag data, avoiding generic fallbacks
       const description = el.tags?.description || el.tags?.name || el.tags?.operator || '';
 
       return {
@@ -129,7 +125,6 @@ export async function GET() {
     return NextResponse.json({ hazards, source: 'live' });
   } catch (error: any) {
     console.error('Error fetching hazards:', error);
-    // Fallback to cache on network failure if available
     if (cachedHazards) {
         return NextResponse.json({ hazards: cachedHazards, source: 'error-fallback' });
     }
