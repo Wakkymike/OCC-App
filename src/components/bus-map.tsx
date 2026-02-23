@@ -7,9 +7,6 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard } from '@/lib/types';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
-import { ShieldAlert, MapPin, Ruler } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
 
@@ -35,8 +32,6 @@ interface BusMapProps {
   showHazards: boolean;
 }
 
-const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
-const nightBusRunningBoards = ['3691', '3692', '3693', '1091', '1092', '1093', '21091', '21092', '21093', '23691', '23692', '23693', '11091', '11092', '11093', '13691', '13692', '13693'];
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
 const lastJourneyRefs = ['8001', '8002', '8301', '8302', '8601', '8602'];
 
@@ -64,8 +59,6 @@ export default function BusMap({
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
   const roadworksMarkersRef = useRef<Record<string, mapboxgl.Marker>>({});
   const hazardsMarkersRef = useRef<Record<string, mapboxgl.Marker>>({});
-  const placeMarkerRef = useRef<mapboxgl.Marker | null>(null);
-  const animationFrameRefs = useRef<Record<string, number>>({});
   const [styleRevision, setStyleRevision] = useState(0);
 
   const monitoredRef = useMemoFirebase(() => collection(firestore, 'monitoredHazards'), [firestore]);
@@ -83,14 +76,14 @@ export default function BusMap({
       container: mapContainerRef.current,
       style: mapStyle,
       center: [-2.24, 53.48],
-      zoom: 15,
+      zoom: 14,
       pitch: 45,
       bearing: -17.6,
       antialias: true,
     });
 
     mapRef.current = map;
-    map.addControl(new mapboxgl.NavigationControl());
+    map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
 
     const handleStyleLoad = () => {
       setStyleRevision(rev => rev + 1);
@@ -101,7 +94,6 @@ export default function BusMap({
     map.on('click', () => setSelectedBusId(null));
 
     return () => {
-      Object.values(animationFrameRefs.current).forEach(cancelAnimationFrame);
       if (mapRef.current) mapRef.current.remove();
     };
   }, []);
@@ -112,7 +104,6 @@ export default function BusMap({
     map.setStyle(mapStyle);
   }, [mapStyle]);
 
-  // Geofence management for hazards
   const handleSetGeofence = (hazard: Hazard, radius: number) => {
     if (!isAdmin) return;
     const docRef = doc(firestore, 'monitoredHazards', hazard.id);
@@ -123,18 +114,18 @@ export default function BusMap({
     }, { merge: true });
   };
 
-  // Hazards Marker Logic
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !map.getCanvasContainer()) return;
+    if (!map || !map.isStyleLoaded()) return;
 
     Object.values(hazardsMarkersRef.current).forEach(m => m.remove());
     hazardsMarkersRef.current = {};
 
     if (hazards && showHazards) {
       hazards.forEach((hazard) => {
-        const isMonitored = monitoredHazards?.some(m => m.id === hazard.id);
-        const radius = monitoredHazards?.find(m => m.id === hazard.id)?.radius || 100;
+        const monitoringInfo = monitoredHazards?.find(m => m.id === hazard.id);
+        const isMonitored = !!monitoringInfo;
+        const radius = monitoringInfo?.radius || 100;
 
         const el = document.createElement('div');
         const color = isMonitored ? '#10b981' : (hazard.type === 'height' ? '#e11d48' : hazard.type === 'width' ? '#2563eb' : '#9333ea');
@@ -163,21 +154,17 @@ export default function BusMap({
         if (isAdmin) {
           const control = popupContent.querySelector('.geofence-control');
           if (control) {
-            const label = document.createElement('label');
-            label.className = 'text-[10px] font-semibold uppercase mb-1 block';
-            label.innerText = 'Geofence Radius (m)';
-            control.appendChild(label);
-
             const input = document.createElement('input');
             input.type = 'number';
             input.value = radius.toString();
             input.className = 'w-full mb-2 p-1 text-sm border rounded bg-background';
-            control.appendChild(input);
-
+            
             const btn = document.createElement('button');
             btn.className = `w-full py-2 px-3 text-xs font-bold rounded flex items-center justify-center gap-2 ${isMonitored ? 'bg-destructive text-white' : 'bg-primary text-primary-foreground'}`;
             btn.innerHTML = isMonitored ? 'Stop Monitoring' : 'Start Monitoring';
             btn.onclick = () => handleSetGeofence(hazard, parseInt(input.value));
+            
+            control.appendChild(input);
             control.appendChild(btn);
           }
         }
@@ -196,10 +183,9 @@ export default function BusMap({
     }
   }, [hazards, showHazards, styleRevision, monitoredHazards, isAdmin]);
 
-  // Bus Marker Logic
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !map.getCanvasContainer()) return;
+    if (!map || !map.isStyleLoaded()) return;
 
     const currentMarkerIds = new Set(Object.keys(markersRef.current));
     buses.forEach((bus) => {
@@ -230,10 +216,7 @@ export default function BusMap({
         const arrow = document.createElement('div');
         arrow.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="transition: transform 0.2s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.4));"><rect id="bus-body" x="5" y="2" width="14" height="20" rx="3" fill="#FFC107" stroke="black" stroke-width="1"/><rect x="7" y="4" width="10" height="4" fill="#333"/><rect x="7" y="16" width="10" height="4" fill="#333"/><line x1="5" y1="10" x2="19" y2="10" stroke="black" stroke-width="1"/></svg>`;
         
-        const svgNode = arrow.firstChild;
-        if (svgNode) {
-          el.appendChild(svgNode);
-        }
+        if (arrow.firstChild) el.appendChild(arrow.firstChild);
         
         try {
           marker = new mapboxgl.Marker(el).setLngLat([bus.position.lng, bus.position.lat]).addTo(map);
@@ -272,10 +255,9 @@ export default function BusMap({
     });
   }, [buses, selectedBusId, styleRevision]);
 
-  // Roadworks Marker Logic
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !map.getCanvasContainer()) return;
+    if (!map || !map.isStyleLoaded()) return;
 
     Object.values(roadworksMarkersRef.current).forEach(m => m.remove());
     roadworksMarkersRef.current = {};
@@ -293,7 +275,6 @@ export default function BusMap({
               <div class="p-2">
                 <p class="font-bold text-sm">${rw.title}</p>
                 <p class="text-xs text-muted-foreground mt-1">${rw.description}</p>
-                <p class="text-[10px] mt-2 font-semibold uppercase">Severity: ${rw.severity}</p>
               </div>
             `))
             .addTo(map);
@@ -305,7 +286,6 @@ export default function BusMap({
     }
   }, [roadworks, showRoadworks, styleRevision]);
 
-  // Map View Management
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapView) return;
@@ -321,5 +301,5 @@ export default function BusMap({
     }
   }, [mapView]);
 
-  return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />;
+  return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full bg-muted" />;
 }
