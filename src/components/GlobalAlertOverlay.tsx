@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, deleteDoc, doc } from 'firebase/firestore';
 import type { ActiveAlert } from '@/lib/types';
 import { AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react';
@@ -15,15 +16,10 @@ export function GlobalAlertOverlay() {
   const alertsRef = useMemoFirebase(() => user ? collection(firestore, 'activeAlerts') : null, [firestore, user]);
   const { data: alerts } = useCollection<ActiveAlert>(alertsRef);
   
-  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
-  const { data: profile } = useDoc<any>(userProfileRef);
-  
-  const isAdmin = profile?.isAdmin || user?.email === 'michael.dodsworth@gonorthwest.co.uk';
-
   if (!user || !alerts || alerts.length === 0) return null;
 
   const handleDismiss = (alertId: string) => {
-    if (!isAdmin) return;
+    // Any logged-in user can now dismiss alerts
     deleteDoc(doc(firestore, 'activeAlerts', alertId));
   };
 
@@ -48,24 +44,15 @@ export function GlobalAlertOverlay() {
               <p className="opacity-80">LOCATION: {alert.hazardDescription}</p>
               <p className="text-xs opacity-50">TIME: {alert.timestamp?.toDate().toLocaleString()}</p>
             </CardContent>
-            {isAdmin && (
-              <CardFooter>
-                <Button 
-                  onClick={() => handleDismiss(alert.id)}
-                  className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  <CheckCircle2 className="mr-2 h-5 w-5" />
-                  Acknowledge & Dismiss Alert
-                </Button>
-              </CardFooter>
-            )}
-            {!isAdmin && (
-              <CardFooter>
-                <p className="text-sm font-semibold italic text-center w-full">
-                  Waiting for Administrator Acknowledgment...
-                </p>
-              </CardFooter>
-            )}
+            <CardFooter>
+              <Button 
+                onClick={() => handleDismiss(alert.id)}
+                className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                <CheckCircle2 className="mr-2 h-5 w-5" />
+                Acknowledge & Dismiss Alert
+              </Button>
+            </CardFooter>
           </Card>
         ))}
       </div>

@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, deleteDoc, doc, updateDoc, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
+import { collection, deleteDoc, doc, query, orderBy, limit } from 'firebase/firestore';
 import type { ActiveAlert, AlertHistory } from '@/lib/types';
 import { AlertTriangle, ShieldAlert, CheckCircle2, Home, History, Bus as BusIcon, Clock, MapPin, ListFilter } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -24,20 +24,10 @@ export default function RRAListPage() {
     return query(collection(firestore, 'alertHistory'), orderBy('timestamp', 'desc'), limit(50));
   }, [firestore, user]);
   const { data: history, isLoading: isHistoryLoading } = useCollection<AlertHistory>(historyRef);
-  
-  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
-  const { data: profile } = useDoc<any>(userProfileRef);
-  
-  const isAdmin = profile?.isAdmin || user?.email === 'michael.dodsworth@gonorthwest.co.uk';
 
-  const handleDismiss = async (alertId: string, monitorId: string, busId: string) => {
-    if (!isAdmin) return;
-    
-    // 1. Remove the active alert
+  const handleDismiss = async (alertId: string) => {
+    // Any logged-in user can now dismiss alerts from the system
     deleteDoc(doc(firestore, 'activeAlerts', alertId));
-
-    // 2. We don't necessarily update history here unless we tracked IDs, 
-    // but the system already logs history at the moment of breach as requested.
   };
 
   return (
@@ -99,7 +89,7 @@ export default function RRAListPage() {
                         <TableHead>Restriction</TableHead>
                         <TableHead>Location</TableHead>
                         <TableHead>Time</TableHead>
-                        {isAdmin && <TableHead className="text-right">Action</TableHead>}
+                        <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -128,18 +118,16 @@ export default function RRAListPage() {
                               <Clock className="h-3 w-3" /> {alert.timestamp?.toDate().toLocaleTimeString()}
                             </span>
                           </TableCell>
-                          {isAdmin && (
-                            <TableCell className="text-right">
-                              <Button 
-                                size="sm" 
-                                variant="destructive" 
-                                onClick={() => handleDismiss(alert.id, alert.monitorId, alert.busId)}
-                                className="h-8"
-                              >
-                                Dismiss
-                              </Button>
-                            </TableCell>
-                          )}
+                          <TableCell className="text-right">
+                            <Button 
+                              size="sm" 
+                              variant="destructive" 
+                              onClick={() => handleDismiss(alert.id)}
+                              className="h-8"
+                            >
+                              Dismiss
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
