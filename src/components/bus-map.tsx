@@ -6,7 +6,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard } from '@/lib/types';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
-import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -37,7 +37,6 @@ interface BusMapProps {
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
 const lastJourneyRefs = ['8001', '8002', '8301', '8302', '8601', '8602'];
 
-// Helper to create a circle polygon for Mapbox GeoJSON
 function createGeoJSONCircle(center: LatLng, radiusInMeters: number) {
   const points = 64;
   const coords = {
@@ -88,8 +87,8 @@ export default function BusMap({
   
   const [mapLoaded, setMapLoaded] = useState(false);
   const [styleRevision, setStyleRevision] = useState(0);
-  const [relocatingHazardId, setRelocatingHazardId] = useState<string | null>(null);
-  const relocatingHazardIdRef = useRef<string | null>(null);
+  const [relocatingMonitorId, setRelocatingMonitorId] = useState<string | null>(null);
+  const relocatingMonitorIdRef = useRef<string | null>(null);
 
   const monitoredRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
   const { data: monitoredHazards } = useCollection<MonitoredHazard>(monitoredRef);
@@ -99,10 +98,9 @@ export default function BusMap({
   const isAdmin = userProfile?.isAdmin || user?.email === 'michael.dodsworth@gonorthwest.co.uk';
 
   useEffect(() => {
-    relocatingHazardIdRef.current = relocatingHazardId;
-  }, [relocatingHazardId]);
+    relocatingMonitorIdRef.current = relocatingMonitorId;
+  }, [relocatingMonitorId]);
 
-  // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
@@ -132,14 +130,14 @@ export default function BusMap({
     map.on('style.load', () => setStyleRevision(prev => prev + 1));
     
     map.on('click', (e) => {
-      if (relocatingHazardIdRef.current) {
-        const hazardId = relocatingHazardIdRef.current;
+      if (relocatingMonitorIdRef.current) {
+        const monitorId = relocatingMonitorIdRef.current;
         const newCenter = { lat: e.lngLat.lat, lng: e.lngLat.lng };
         
-        const docRef = doc(firestore, 'monitoredHazards', hazardId);
+        const docRef = doc(firestore, 'monitoredHazards', monitorId);
         updateDoc(docRef, { geofenceCenter: newCenter });
         
-        setRelocatingHazardId(null);
+        setRelocatingMonitorId(null);
         map.getCanvas().style.cursor = '';
         toast({ title: 'Geofence Updated', description: 'The geofence center has been moved to the selected location.' });
         return;
@@ -155,14 +153,12 @@ export default function BusMap({
     };
   }, [firestore, setSelectedBusId, toast]);
 
-  // Handle Style Changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     map.setStyle(mapStyle);
   }, [mapStyle]);
 
-  // Geofence Visualization Layers
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
@@ -206,7 +202,6 @@ export default function BusMap({
     }
   }, [mapLoaded, styleRevision]);
 
-  // Update Geofence Data
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded || !map.getSource('geofences')) return;
@@ -229,25 +224,26 @@ export default function BusMap({
     });
   }, [monitoredHazards, mapLoaded]);
 
-  const handleSetGeofence = (hazard: Hazard, radius: number) => {
+  const handleAddGeofence = (hazard: Hazard, radius: number) => {
     if (!isAdmin) return;
-    const docRef = doc(firestore, 'monitoredHazards', hazard.id);
-    setDoc(docRef, {
-      ...hazard,
+    addDoc(collection(firestore, 'monitoredHazards'), {
+      hazardId: hazard.id,
+      type: hazard.type,
+      value: hazard.value,
+      location: hazard.location,
+      description: hazard.description,
       radius,
       createdAt: serverTimestamp()
-    }, { merge: true });
-    toast({ title: 'Geofence Active', description: `Monitoring active for ${hazard.value} restriction.` });
+    });
+    toast({ title: 'Geofence Added', description: `New monitoring zone active for ${hazard.value}.` });
   };
 
-  const handleRemoveGeofence = useCallback((hazardId: string) => {
+  const handleRemoveGeofence = useCallback((monitorId: string) => {
     if (!isAdmin) return;
-    const docRef = doc(firestore, 'monitoredHazards', hazardId);
-    deleteDoc(docRef);
-    toast({ title: 'Monitoring Stopped', description: 'Geofence tracking removed for this restriction.' });
+    deleteDoc(doc(firestore, 'monitoredHazards', monitorId));
+    toast({ title: 'Geofence Removed' });
   }, [isAdmin, firestore, toast]);
 
-  // Hazard Markers
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
@@ -257,9 +253,8 @@ export default function BusMap({
 
     if (hazards && showHazards) {
       hazards.forEach((hazard) => {
-        const monitoringInfo = monitoredHazards?.find(m => m.id === hazard.id);
-        const isMonitored = !!monitoringInfo;
-        const radius = monitoringInfo?.radius || 100;
+        const monitors = monitoredHazards?.filter(m => m.hazardId === hazard.id) || [];
+        const isMonitored = monitors.length > 0;
 
         const el = document.createElement('div');
         el.className = 'hazard-marker cursor-pointer';
@@ -271,72 +266,94 @@ export default function BusMap({
 
         el.innerHTML = `
           <div style="background:${color}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); display: flex; align-items:center; gap: 4px;">
-            ${isMonitored ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' : ''}
+            ${isMonitored ? `<span style="background:white; color:${color}; padding:0 3px; border-radius:2px;">${monitors.length}</span>` : ''}
             ${hazard.value}
           </div>
           <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid ${color}; margin: -2px auto 0;"></div>
         `;
 
         const popupContent = document.createElement('div');
-        popupContent.className = 'p-3 space-y-3 min-w-[200px] text-foreground';
+        popupContent.className = 'p-3 space-y-3 min-w-[240px] text-foreground max-h-[400px] overflow-y-auto';
         popupContent.innerHTML = `
           <div class="space-y-1">
-            <h3 class="font-bold text-sm uppercase text-muted-foreground">${hazard.type} Restriction</h3>
-            <p class="text-xl font-black">${hazard.value}</p>
-            ${hazard.description ? `<p class="text-xs opacity-70">${hazard.description}</p>` : ''}
+            <h3 class="font-bold text-[10px] uppercase text-muted-foreground">${hazard.type} Restriction</h3>
+            <p class="text-lg font-black">${hazard.value}</p>
+            ${hazard.description ? `<p class="text-[10px] opacity-70 italic">${hazard.description}</p>` : ''}
           </div>
-          <div class="pt-2 border-t geofence-control"></div>
+          <div class="pt-2 border-t space-y-3 monitors-list"></div>
+          <div class="pt-2 border-t add-monitor"></div>
         `;
 
         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
             .setLngLat([hazard.location.lng, hazard.location.lat])
-            .setPopup(new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupContent))
+            .setPopup(new mapboxgl.Popup({ offset: 25, maxWidth: '300px' }).setDOMContent(popupContent))
             .addTo(map);
 
         if (isAdmin) {
-          const control = popupContent.querySelector('.geofence-control');
-          if (control) {
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.value = radius.toString();
-            input.className = 'w-full mb-2 p-1 text-sm border rounded bg-background';
-            
-            if (isMonitored) {
+          const listContainer = popupContent.querySelector('.monitors-list');
+          if (listContainer) {
+            monitors.forEach((m, idx) => {
+                const item = document.createElement('div');
+                item.className = 'p-2 border rounded bg-secondary/20 space-y-2';
+                item.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold">Monitor #${idx + 1}</span>
+                        <span class="text-[10px] opacity-60">${m.radius}m</span>
+                    </div>
+                `;
+
+                const actions = document.createElement('div');
+                actions.className = 'grid grid-cols-2 gap-2';
+
                 const moveBtn = document.createElement('button');
-                moveBtn.className = 'w-full py-2 px-3 text-xs font-bold rounded bg-secondary mb-2 hover:bg-secondary/80 transition-colors';
-                moveBtn.innerHTML = relocatingHazardId === hazard.id ? 'Click Map...' : 'Relocate Geofence Center';
+                moveBtn.className = 'py-1 px-2 text-[10px] font-bold rounded bg-secondary hover:bg-secondary/80';
+                moveBtn.innerHTML = relocatingMonitorId === m.id ? 'Click Map...' : 'Relocate';
                 moveBtn.onclick = (e) => {
                     e.stopPropagation();
-                    setRelocatingHazardId(hazard.id);
+                    setRelocatingMonitorId(m.id);
                     marker.getPopup().remove();
                     map.getCanvas().style.cursor = 'crosshair';
-                    toast({ title: 'Relocation Active', description: 'Click anywhere on the map to set the geofence center.' });
                 };
-                control.appendChild(moveBtn);
-            }
 
-            const btn = document.createElement('button');
-            btn.className = `w-full py-2 px-3 text-xs font-bold rounded flex items-center justify-center gap-2 ${isMonitored ? 'bg-destructive text-white' : 'bg-primary text-primary-foreground'}`;
-            btn.innerHTML = isMonitored ? 'Stop Monitoring' : 'Start Monitoring';
-            btn.onclick = () => {
-              if (isMonitored) {
-                handleRemoveGeofence(hazard.id);
-              } else {
-                handleSetGeofence(hazard, parseInt(input.value));
-              }
-            };
+                const delBtn = document.createElement('button');
+                delBtn.className = 'py-1 px-2 text-[10px] font-bold rounded bg-destructive text-white';
+                delBtn.innerHTML = 'Remove';
+                delBtn.onclick = () => handleRemoveGeofence(m.id);
+
+                actions.appendChild(moveBtn);
+                actions.appendChild(delBtn);
+                item.appendChild(actions);
+                listContainer.appendChild(item);
+            });
+          }
+
+          const addContainer = popupContent.querySelector('.add-monitor');
+          if (addContainer) {
+            const label = document.createElement('label');
+            label.className = 'text-[10px] font-bold block mb-1';
+            label.innerText = 'Add New Geofence (Radius m):';
             
-            control.appendChild(input);
-            control.appendChild(btn);
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.value = '100';
+            input.className = 'w-full mb-2 p-1 text-sm border rounded bg-background';
+            
+            const btn = document.createElement('button');
+            btn.className = 'w-full py-2 px-3 text-xs font-bold rounded bg-primary text-primary-foreground';
+            btn.innerHTML = 'Add Geofence';
+            btn.onclick = () => handleAddGeofence(hazard, parseInt(input.value));
+            
+            addContainer.appendChild(label);
+            addContainer.appendChild(input);
+            addContainer.appendChild(btn);
           }
         }
             
         hazardsMarkersRef.current[hazard.id] = marker;
       });
     }
-  }, [hazards, showHazards, mapLoaded, styleRevision, monitoredHazards, isAdmin, relocatingHazardId, toast, handleRemoveGeofence]);
+  }, [hazards, showHazards, mapLoaded, styleRevision, monitoredHazards, isAdmin, relocatingMonitorId, toast, handleRemoveGeofence]);
 
-  // Bus Markers
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded || !map.getCanvasContainer()) return;
@@ -411,7 +428,6 @@ export default function BusMap({
     });
   }, [buses, selectedBusId, mapLoaded, styleRevision, setSelectedBusId]);
 
-  // Roadwork Markers
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded || !map.getCanvasContainer()) return;
@@ -443,7 +459,6 @@ export default function BusMap({
     }
   }, [roadworks, showRoadworks, mapLoaded, styleRevision]);
 
-  // Handle View Updates
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapView || !mapLoaded) return;

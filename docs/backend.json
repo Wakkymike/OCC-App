@@ -20,12 +20,19 @@
     "MonitoredHazard": {
       "title": "Monitored Hazard",
       "type": "object",
-      "description": "A road restriction being actively monitored via geofencing.",
+      "description": "A geofence monitor associated with a road restriction.",
       "properties": {
-        "hazardId": { "type": "string" },
+        "hazardId": { "type": "string", "description": "The ID of the source hazard." },
         "type": { "type": "string", "enum": ["height", "width", "both"] },
         "value": { "type": "string" },
         "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "geofenceCenter": {
           "type": "object",
           "properties": {
             "lat": { "type": "number" },
@@ -47,6 +54,7 @@
         "fleetNumber": { "type": "string" },
         "service": { "type": "string" },
         "hazardId": { "type": "string" },
+        "monitorId": { "type": "string", "description": "The ID of the specific geofence monitor triggered." },
         "hazardValue": { "type": "string" },
         "hazardDescription": { "type": "string" },
         "timestamp": { "type": "string", "format": "date-time" }
@@ -62,9 +70,9 @@
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "Stores individual user profiles."
     },
-    "/monitoredHazards/{hazardId}": {
+    "/monitoredHazards/{monitorId}": {
       "schema": { "$ref": "#/entities/MonitoredHazard" },
-      "description": "Active geofences for road hazards."
+      "description": "Collection of active geofence monitors."
     },
     "/activeAlerts/{alertId}": {
       "schema": { "$ref": "#/entities/ActiveAlert" },

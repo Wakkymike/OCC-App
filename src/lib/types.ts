@@ -72,9 +72,15 @@ export interface Hazard {
   description: string;
 }
 
-export interface MonitoredHazard extends Hazard {
+export interface MonitoredHazard {
+  id: string; // Firestore Document ID
+  hazardId: string; // The original hazard ID
+  type: 'height' | 'width' | 'both';
+  value: string;
+  location: LatLng;
+  geofenceCenter?: LatLng;
+  description: string;
   radius: number;
-  geofenceCenter?: LatLng; // Custom center for the geofence
   createdAt: Timestamp;
 }
 
@@ -84,6 +90,7 @@ export interface ActiveAlert {
   fleetNumber: string;
   service: string;
   hazardId: string;
+  monitorId: string;
   hazardValue: string;
   hazardDescription: string;
   timestamp: Timestamp;
