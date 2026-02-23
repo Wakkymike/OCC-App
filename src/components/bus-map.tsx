@@ -123,9 +123,10 @@ export default function BusMap({
     }, { merge: true });
   };
 
+  // Hazards Marker Logic
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !map.isStyleLoaded() || !map.getCanvasContainer()) return;
 
     Object.values(hazardsMarkersRef.current).forEach(m => m.remove());
     hazardsMarkersRef.current = {};
@@ -160,39 +161,45 @@ export default function BusMap({
         `;
 
         if (isAdmin) {
-          const control = popupContent.querySelector('.geofence-control')!;
-          const label = document.createElement('label');
-          label.className = 'text-[10px] font-semibold uppercase mb-1 block';
-          label.innerText = 'Geofence Radius (m)';
-          control.appendChild(label);
+          const control = popupContent.querySelector('.geofence-control');
+          if (control) {
+            const label = document.createElement('label');
+            label.className = 'text-[10px] font-semibold uppercase mb-1 block';
+            label.innerText = 'Geofence Radius (m)';
+            control.appendChild(label);
 
-          const input = document.createElement('input');
-          input.type = 'number';
-          input.value = radius.toString();
-          input.className = 'w-full mb-2 p-1 text-sm border rounded bg-background';
-          control.appendChild(input);
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.value = radius.toString();
+            input.className = 'w-full mb-2 p-1 text-sm border rounded bg-background';
+            control.appendChild(input);
 
-          const btn = document.createElement('button');
-          btn.className = `w-full py-2 px-3 text-xs font-bold rounded flex items-center justify-center gap-2 ${isMonitored ? 'bg-destructive text-white' : 'bg-primary text-primary-foreground'}`;
-          btn.innerHTML = isMonitored ? 'Stop Monitoring' : 'Start Monitoring';
-          btn.onclick = () => handleSetGeofence(hazard, parseInt(input.value));
-          control.appendChild(btn);
+            const btn = document.createElement('button');
+            btn.className = `w-full py-2 px-3 text-xs font-bold rounded flex items-center justify-center gap-2 ${isMonitored ? 'bg-destructive text-white' : 'bg-primary text-primary-foreground'}`;
+            btn.innerHTML = isMonitored ? 'Stop Monitoring' : 'Start Monitoring';
+            btn.onclick = () => handleSetGeofence(hazard, parseInt(input.value));
+            control.appendChild(btn);
+          }
         }
 
-        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
-          .setLngLat([hazard.location.lng, hazard.location.lat])
-          .setPopup(new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupContent))
-          .addTo(map);
-          
-        hazardsMarkersRef.current[hazard.id] = marker;
+        try {
+          const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+            .setLngLat([hazard.location.lng, hazard.location.lat])
+            .setPopup(new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupContent))
+            .addTo(map);
+            
+          hazardsMarkersRef.current[hazard.id] = marker;
+        } catch (e) {
+          console.error("Failed to add hazard marker", e);
+        }
       });
     }
   }, [hazards, showHazards, styleRevision, monitoredHazards, isAdmin]);
 
-  // Restore live bus markers logic
+  // Bus Marker Logic
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !map.isStyleLoaded() || !map.getCanvasContainer()) return;
 
     const currentMarkerIds = new Set(Object.keys(markersRef.current));
     buses.forEach((bus) => {
@@ -222,24 +229,39 @@ export default function BusMap({
         
         const arrow = document.createElement('div');
         arrow.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="transition: transform 0.2s linear; filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.4));"><rect id="bus-body" x="5" y="2" width="14" height="20" rx="3" fill="#FFC107" stroke="black" stroke-width="1"/><rect x="7" y="4" width="10" height="4" fill="#333"/><rect x="7" y="16" width="10" height="4" fill="#333"/><line x1="5" y1="10" x2="19" y2="10" stroke="black" stroke-width="1"/></svg>`;
-        el.appendChild(arrow.firstChild!);
         
-        marker = new mapboxgl.Marker(el).setLngLat([bus.position.lng, bus.position.lat]).addTo(map);
-        markersRef.current[markerId] = marker;
+        const svgNode = arrow.firstChild;
+        if (svgNode) {
+          el.appendChild(svgNode);
+        }
+        
+        try {
+          marker = new mapboxgl.Marker(el).setLngLat([bus.position.lng, bus.position.lat]).addTo(map);
+          markersRef.current[markerId] = marker;
+        } catch (e) {
+          console.error("Failed to add bus marker", e);
+          return;
+        }
       } else {
         marker.setLngLat([bus.position.lng, bus.position.lat]);
       }
       
       const el = marker.getElement();
-      const flag = el.querySelector('div') as HTMLDivElement;
-      const isSelected = markerId === selectedBusId;
+      const flag = el.querySelector('div');
       const busBody = el.querySelector('#bus-body');
       
+      if (flag) {
+        const isFirst = bus.operator === 'GNW' && bus.journeyRef && firstJourneyRefs.includes(bus.journeyRef);
+        const isLast = bus.operator === 'GNW' && bus.journeyRef && lastJourneyRefs.includes(bus.journeyRef);
+        flag.innerHTML = `${bus.fleetNumber} | ${bus.service} | ${bus.destination}`;
+        flag.className = (isFirst || isLast) ? 'blinking-rb' : '';
+      }
+
+      const isSelected = markerId === selectedBusId;
       const isGnw = bus.operator === 'GNW';
       const color = isGnw ? '#FFC107' : '#ef4444';
       if (busBody) busBody.setAttribute('fill', isSelected ? '#00FFFF' : color);
       
-      flag.innerHTML = `${bus.fleetNumber} | ${bus.service} | ${bus.destination}`;
       const svg = el.querySelector('svg');
       if (svg && bus.bearing !== undefined) svg.style.transform = `rotate(${bus.bearing}deg)`;
     });
@@ -249,6 +271,55 @@ export default function BusMap({
       delete markersRef.current[id];
     });
   }, [buses, selectedBusId, styleRevision]);
+
+  // Roadworks Marker Logic
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !map.getCanvasContainer()) return;
+
+    Object.values(roadworksMarkersRef.current).forEach(m => m.remove());
+    roadworksMarkersRef.current = {};
+
+    if (roadworks && showRoadworks) {
+      roadworks.forEach((rw) => {
+        const el = document.createElement('div');
+        const color = rw.severity === 'high' ? '#ef4444' : rw.severity === 'moderate' ? '#f59e0b' : '#3b82f6';
+        el.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="${color}" stroke="black" stroke-width="1.5"><path d="M12 2L2 22h20L12 2z"/></svg>`;
+        
+        try {
+          const marker = new mapboxgl.Marker(el)
+            .setLngLat([rw.location.lng, rw.location.lat])
+            .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+              <div class="p-2">
+                <p class="font-bold text-sm">${rw.title}</p>
+                <p class="text-xs text-muted-foreground mt-1">${rw.description}</p>
+                <p class="text-[10px] mt-2 font-semibold uppercase">Severity: ${rw.severity}</p>
+              </div>
+            `))
+            .addTo(map);
+          roadworksMarkersRef.current[rw.id] = marker;
+        } catch (e) {
+          console.error("Failed to add roadwork marker", e);
+        }
+      });
+    }
+  }, [roadworks, showRoadworks, styleRevision]);
+
+  // Map View Management
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapView) return;
+
+    if (mapView.bounds) {
+      map.fitBounds(mapView.bounds, { padding: 50, duration: 1000 });
+    } else if (mapView.center) {
+      map.flyTo({
+        center: [mapView.center.lng, mapView.center.lat],
+        zoom: mapView.zoom || map.getZoom(),
+        duration: 1000,
+      });
+    }
+  }, [mapView]);
 
   return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />;
 }
