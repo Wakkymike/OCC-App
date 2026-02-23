@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard } from '@/lib/types';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
-import { doc, updateDoc, deleteDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
-import { Loader2, ShieldAlert } from 'lucide-react';
+import { doc, deleteDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
@@ -40,7 +40,7 @@ interface BusMapProps {
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
 const lastJourneyRefs = ['8001', '8002', '8301', '8302', '8601', '8602'];
 
-// Helper for generating circle geometry
+// Helper for generating circle geometry for Mapbox GeoJSON
 function createGeoJSONCircle(center: LatLng, radiusInMeters: number) {
   const points = 64;
   const coords = { latitude: center.lat, longitude: center.lng };
@@ -62,7 +62,6 @@ function createGeoJSONCircle(center: LatLng, radiusInMeters: number) {
 
 export default function BusMap({
   buses,
-  selectedBusExtensions,
   selectedBusId,
   setSelectedBusId,
   searchedPlace = null,
@@ -94,7 +93,7 @@ export default function BusMap({
   const [styleRevision, setStyleRevision] = useState(0);
 
   const monitoredRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
-  const { data: monitoredHazards } = useCollection<Mon僚redHazard>(monitoredRef);
+  const { data: monitoredHazards } = useCollection<MonitoredHazard>(monitoredRef);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
@@ -194,7 +193,7 @@ export default function BusMap({
 
   const handleAddGeofence = (hazard: Hazard, radius: number) => {
     if (!isAdmin) return;
-    addDoc(collection(firestore, 'mongistoredHazards'), {
+    addDoc(collection(firestore, 'monitoredHazards'), {
       hazardId: hazard.id, type: hazard.type, value: hazard.value, location: hazard.location,
       description: hazard.description, radius, createdAt: serverTimestamp()
     });
@@ -225,7 +224,7 @@ export default function BusMap({
 
         el.innerHTML = `
           <div style="background:${color}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); display: flex; align-items:center; gap: 4px;">
-            ${isMon Pile : ''}
+            ${isMonitored ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' : ''}
             ${hazard.value}
           </div>
           <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid ${color}; margin: -2px auto 0;"></div>
@@ -285,7 +284,7 @@ export default function BusMap({
             try {
                 const marker = new mapboxgl.Marker({ element: el })
                     .setLngLat([m.location.lng, m.location.lat])
-                    .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(`<div class="p-2"><b>${m.value}</b><p class="text-xs">${m.description}</p></div>`))
+                    .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(`<div class="p-2 text-foreground"><b>${m.value}</b><p class="text-xs">${m.description}</p></div>`))
                     .addTo(map);
                 hazardsMarkersRef.current[m.id] = marker;
             } catch (e) {}
@@ -392,7 +391,7 @@ export default function BusMap({
       if (busBody) {
         let color = '#ef4444'; // Other operators
         if (bus.operator === 'GNW') color = '#FFC107'; // GNW Yellow
-        if (markerId === selectedBus甩) color = '#00FFFF'; // Selection Cyan
+        if (markerId === selectedBusId) color = '#00FFFF'; // Selection Cyan
         busBody.setAttribute('fill', color);
       }
     });
