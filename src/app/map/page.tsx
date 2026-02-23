@@ -33,6 +33,10 @@ export default function Page() {
   }, [user, firestore]);
   const { data: userProfile } = useDoc<{ isAdmin: boolean }>(userProfileRef);
   
+  // Consolidated Admin Check
+  const isSuperAdmin = user?.email === 'michael.dodsworth@gonorthwest.co.uk';
+  const isAdmin = !!userProfile?.isAdmin || isSuperAdmin;
+
   const { buses, error: busError } = useBusTracker();
   const { roadworks, error: roadworksError } = useRoadworksTracker();
   const { hazards, error: hazardsError } = useHazardsTracker();
@@ -62,7 +66,7 @@ export default function Page() {
   const [showFirstBus, setShowFirstBus] = useState(false);
   const [showDiamondBus, setShowDiamondBus] = useState(false);
   const [showRoadworks, setShowRoadworks] = useState(true);
-  const [showHazards, setShowHazards] = useState(false); // Default to off
+  const [showHazards, setShowHazards] = useState(false); 
   const [showGeofences, setShowGeofences] = useState(true);
   
   const [manualGeofenceMode, setManualGeofenceMode] = useState(false);
@@ -408,7 +412,7 @@ export default function Page() {
         >
           <Home className="h-5 w-5" />
         </Link>
-        {userProfile?.isAdmin && (
+        {isAdmin && (
          <div className="flex gap-2">
             <Button
                 variant="outline"
