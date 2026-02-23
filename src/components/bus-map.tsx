@@ -7,7 +7,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard } from '@/lib/types';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
 import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldAlert, Navigation, Trash2, Plus, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
@@ -246,7 +246,7 @@ export default function BusMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapLoaded) return;
+    if (!map || !mapLoaded || !map.getCanvasContainer()) return;
 
     Object.values(hazardsMarkersRef.current).forEach(m => m.remove());
     hazardsMarkersRef.current = {};
@@ -259,10 +259,10 @@ export default function BusMap({
         const el = document.createElement('div');
         el.className = 'hazard-marker cursor-pointer';
         
-        let color = '#3b82f6';
-        if (hazard.type === 'height') color = '#ef4444';
-        if (hazard.type === 'both') color = '#9333ea';
-        if (isMonitored) color = '#10b981';
+        let color = '#3b82f6'; // Default Width
+        if (hazard.type === 'height') color = '#ef4444'; // Height
+        if (hazard.type === 'both') color = '#9333ea'; // Both
+        if (isMonitored) color = '#10b981'; // Active Geofence
 
         el.innerHTML = `
           <div style="background:${color}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); display: flex; align-items:center; gap: 4px;">
@@ -289,6 +289,7 @@ export default function BusMap({
             .setPopup(new mapboxgl.Popup({ offset: 25, maxWidth: '300px' }).setDOMContent(popupContent))
             .addTo(map);
 
+        // Management UI for Admins only
         if (isAdmin) {
           const listContainer = popupContent.querySelector('.monitors-list');
           if (listContainer) {
@@ -347,6 +348,16 @@ export default function BusMap({
             addContainer.appendChild(input);
             addContainer.appendChild(btn);
           }
+        } else {
+            // For non-admins, show that monitoring is active if applicable
+            const listContainer = popupContent.querySelector('.monitors-list');
+            if (listContainer && isMonitored) {
+                listContainer.innerHTML = `
+                    <div class="flex items-center gap-2 text-[10px] text-green-600 font-bold bg-green-50 p-2 rounded">
+                        <ShieldAlert class="h-3 w-3" /> Monitoring Active (${monitors.length} zones)
+                    </div>
+                `;
+            }
         }
             
         hazardsMarkersRef.current[hazard.id] = marker;
