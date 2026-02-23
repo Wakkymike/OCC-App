@@ -32,13 +32,11 @@ export function GlobalAlertOverlay() {
   if (!user || !alerts || alerts.length === 0) return null;
 
   const handleAcknowledge = (alertId: string) => {
-    // Acknowledging an alert hides the global overlay but keeps it in the active list
-    // for validation on the RRA Dashboard.
     updateDoc(doc(firestore, 'activeAlerts', alertId), { isAcknowledged: true });
   };
 
   return (
-    <div className="fixed inset-0 z-[99999] bg-black/90 flex flex-col items-center justify-center p-4 overflow-y-auto backdrop-blur-sm">
+    <div className="fixed inset-0 z-[99999] bg-black/95 flex flex-col items-center justify-center p-4 overflow-y-auto backdrop-blur-md">
       <div className="w-full max-w-2xl space-y-8 py-10">
         <div className="flex flex-col items-center text-center gap-4 text-destructive animate-pulse">
           <ShieldAlert className="h-24 w-24" />
@@ -52,7 +50,7 @@ export function GlobalAlertOverlay() {
         
         <div className="space-y-6">
           {alerts.map((alert) => (
-            <Card key={alert.id} className="border-4 border-destructive bg-card shadow-[0_0_50px_rgba(239,68,68,0.3)] overflow-hidden">
+            <Card key={alert.id} className="border-4 border-destructive bg-card shadow-[0_0_60px_rgba(239,68,68,0.4)] overflow-hidden">
               <CardHeader className="bg-destructive/10 border-b border-destructive/20">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -86,7 +84,7 @@ export function GlobalAlertOverlay() {
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground justify-end">
                     <Clock className="h-4 w-4" />
-                    <span>{alert.timestamp?.toDate().toLocaleTimeString()}</span>
+                    <span>{alert.timestamp?.toDate ? alert.timestamp.toDate().toLocaleTimeString() : 'Resolving time...'}</span>
                   </div>
                 </div>
               </CardContent>

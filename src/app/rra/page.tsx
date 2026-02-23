@@ -24,8 +24,10 @@ export default function RRAListPage() {
   const alerts = useMemo(() => {
     if (!allAlerts) return null;
     return [...allAlerts].sort((a, b) => {
+        const timeA = a.timestamp?.seconds || 0;
+        const timeB = b.timestamp?.seconds || 0;
         if (a.isAcknowledged === b.isAcknowledged) {
-            return b.timestamp?.seconds - a.timestamp?.seconds;
+            return timeB - timeA;
         }
         return a.isAcknowledged ? 1 : -1;
     });
@@ -38,9 +40,17 @@ export default function RRAListPage() {
   const { data: history, isLoading: isHistoryLoading } = useCollection<AlertHistory>(historyRef);
 
   const handleClearAlert = async (alertId: string) => {
-    // This is the final resolution of an alert. 
-    // Any logged-in user can clear it after verifying the incident.
     deleteDoc(doc(firestore, 'activeAlerts', alertId));
+  };
+
+  const formatTimestamp = (ts: any) => {
+    if (!ts || !ts.toDate) return '--:--';
+    return ts.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
+  const formatDate = (ts: any) => {
+    if (!ts || !ts.toDate) return '--/--/--';
+    return ts.toDate().toLocaleDateString();
   };
 
   return (
@@ -140,7 +150,7 @@ export default function RRAListPage() {
                           </TableCell>
                           <TableCell>
                             <span className="text-xs flex items-center gap-1 text-muted-foreground">
-                              <Clock className="h-3 w-3" /> {alert.timestamp?.toDate().toLocaleTimeString()}
+                              <Clock className="h-3 w-3" /> {formatTimestamp(alert.timestamp)}
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
@@ -218,8 +228,8 @@ export default function RRAListPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col text-xs text-muted-foreground">
-                              <span>{log.timestamp?.toDate().toLocaleDateString()}</span>
-                              <span className="font-mono">{log.timestamp?.toDate().toLocaleTimeString()}</span>
+                              <span>{formatDate(log.timestamp)}</span>
+                              <span className="font-mono">{formatTimestamp(log.timestamp)}</span>
                             </div>
                           </TableCell>
                         </TableRow>
