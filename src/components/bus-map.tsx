@@ -85,7 +85,6 @@ export default function BusMap({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
-  const roadworksMarkersRef = useRef<Record<string, mapboxgl.Marker>>({});
   const hazardsMarkersRef = useRef<Record<string, mapboxgl.Marker>>({});
   
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -294,33 +293,39 @@ export default function BusMap({
   // Geofence Zones (Circles) Layer
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapLoaded || !map.isStyleLoaded()) return;
+    if (!map || !mapLoaded) return;
 
-    if (!map.getSource('geofences')) {
-      map.addSource('geofences', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map.addLayer({
-        id: 'geofence-fill',
-        type: 'fill',
-        source: 'geofences',
-        paint: { 'fill-color': '#10b981', 'fill-opacity': 0.15 }
-      });
-      map.addLayer({
-        id: 'geofence-outline',
-        type: 'line',
-        source: 'geofences',
-        paint: { 'line-color': '#059669', 'line-width': 2, 'line-dasharray': [2, 2] }
-      });
-    }
+    const setupLayer = () => {
+      if (!map.isStyleLoaded()) return;
 
-    const source = map.getSource('geofences') as mapboxgl.GeoJSONSource;
-    if (source) {
-      const features = (showGeofences && monitoredHazards) ? monitoredHazards.map(m => ({
-        type: 'Feature',
-        geometry: { type: 'Polygon', coordinates: createGeoJSONCircle(m.geofenceCenter || m.location, m.radius) },
-        properties: { id: m.id }
-      })) : [];
-      source.setData({ type: 'FeatureCollection', features: features as any });
-    }
+      if (!map.getSource('geofences')) {
+        map.addSource('geofences', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addLayer({
+          id: 'geofence-fill',
+          type: 'fill',
+          source: 'geofences',
+          paint: { 'fill-color': '#10b981', 'fill-opacity': 0.15 }
+        });
+        map.addLayer({
+          id: 'geofence-outline',
+          type: 'line',
+          source: 'geofences',
+          paint: { 'line-color': '#059669', 'line-width': 2, 'line-dasharray': [2, 2] }
+        });
+      }
+
+      const source = map.getSource('geofences') as mapboxgl.GeoJSONSource;
+      if (source) {
+        const features = (showGeofences && monitoredHazards) ? monitoredHazards.map(m => ({
+          type: 'Feature',
+          geometry: { type: 'Polygon', coordinates: createGeoJSONCircle(m.geofenceCenter || m.location, m.radius) },
+          properties: { id: m.id }
+        })) : [];
+        source.setData({ type: 'FeatureCollection', features: features as any });
+      }
+    };
+
+    setupLayer();
   }, [monitoredHazards, showGeofences, mapLoaded, styleRevision]);
 
   // Bus Markers Layer
@@ -332,7 +337,6 @@ export default function BusMap({
     
     buses.forEach((bus) => {
       if (!bus.position) return;
-      // Re-aligning marker ID with construction in page.tsx for selection highlighting
       const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
       currentMarkerIds.delete(markerId);
       
@@ -341,7 +345,7 @@ export default function BusMap({
         const el = document.createElement('div');
         el.className = 'bus-marker';
         el.style.cursor = 'pointer';
-        el.style.pointerEvents = 'auto'; // Ensure click works despite parent CSS
+        el.style.pointerEvents = 'auto';
         el.addEventListener('click', (e) => { 
           e.stopPropagation(); 
           setSelectedBusId(markerId); 
@@ -349,46 +353,48 @@ export default function BusMap({
         
         const flag = document.createElement('div');
         flag.className = 'bus-flag';
-        flag.style.backgroundColor = 'rgba(0,0,0,0.85)'; // Ensure high contrast
+        flag.style.backgroundColor = 'rgba(30, 30, 30, 0.9)';
         el.appendChild(flag);
         
-        const iconDiv = document.createElement('div');
-        iconDiv.innerHTML = `
+        const iconContainer = document.createElement('div');
+        iconContainer.innerHTML = `
           <svg width="32" height="32" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5))">
-            <rect id="bus-body" x="4" y="2" width="16" height="20" rx="3" fill="#FFC107" stroke="black" stroke-width="1.5"/>
+            <rect class="bus-body-rect" x="4" y="2" width="16" height="20" rx="3" fill="#FFC107" stroke="black" stroke-width="1.5"/>
             <rect x="6" y="4" width="12" height="6" rx="1" fill="#333"/>
             <rect x="6" y="14" width="12" height="1" fill="rgba(255,255,255,0.3)"/>
             <line x1="8" y1="2" x2="8" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
             <line x1="12" y1="2" x2="12" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
             <line x1="16" y1="2" x2="16" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
           </svg>`;
-        el.appendChild(iconDiv.firstChild!);
+        el.appendChild(iconContainer);
         
         try {
           marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
             .setLngLat([bus.position.lng, bus.position.lat])
             .addTo(map);
           markersRef.current[markerId] = marker;
-        } catch (e) {}
+        } catch (e) {
+          console.error("Failed to add bus marker", e);
+        }
       } else {
         marker.setLngLat([bus.position.lng, bus.position.lat]);
       }
       
       const el = marker.getElement();
       const flag = el.querySelector('.bus-flag') as HTMLDivElement;
-      const busBody = el.querySelector('#bus-body');
+      const busBody = el.querySelector('.bus-body-rect');
       
       if (flag) {
         const dirLabel = bus.direction?.toLowerCase() === 'inbound' ? '[I]' : '[O]';
         const isSpecial = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
         
-        // Exact flag content requested: Fleet number, service number, [I][O], destination, board number
-        flag.innerText = `${bus.fleetNumber} | ${bus.service} | ${dirLabel} ${bus.destination} | ${bus.runningBoard}`;
+        // Exact format: Fleet number, service number, inbound/outbound [I][O] destination and board number
+        flag.innerText = `${bus.fleetNumber} | ${bus.service} | ${dirLabel} ${bus.destination} | Board: ${bus.runningBoard}`;
         flag.className = `bus-flag ${isSpecial ? 'blinking-rb' : ''}`;
       }
 
       if (busBody) {
-        let color = '#ef4444'; // Other operators (Red)
+        let color = '#ef4444'; // Other (Red)
         if (bus.operator === 'GNW') color = '#FFC107'; // GNW (Yellow)
         if (markerId === selectedBusId) color = '#00FFFF'; // Selection (Cyan)
         busBody.setAttribute('fill', color);
