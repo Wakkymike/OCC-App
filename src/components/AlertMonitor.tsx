@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -63,6 +64,7 @@ export function AlertMonitor() {
             lastAlertTimeRef.current[alertKey] = now;
             
             const alertsRef = collection(firestore, 'activeAlerts');
+            const historyRef = collection(firestore, 'alertHistory');
             
             // Check if there is an existing UNRESOLVED alert for this specific bus and monitor
             const q = query(
@@ -74,8 +76,7 @@ export function AlertMonitor() {
             const existing = await getDocs(q);
             
             if (existing.empty) {
-              // Create a new active alert record
-              addDoc(alertsRef, {
+              const alertData = {
                 busId,
                 fleetNumber: bus.fleetNumber,
                 service: bus.service,
@@ -84,7 +85,13 @@ export function AlertMonitor() {
                 hazardValue: monitor.value,
                 hazardDescription: monitor.description,
                 timestamp: serverTimestamp(),
-              });
+              };
+
+              // Create a new active alert record (ephemeral)
+              addDoc(alertsRef, alertData);
+
+              // Create a persistent log record (eternal)
+              addDoc(historyRef, alertData);
             }
           }
         }

@@ -95,3 +95,17 @@ export interface ActiveAlert {
   hazardDescription: string;
   timestamp: Timestamp;
 }
+
+export interface AlertHistory {
+  id: string;
+  busId: string;
+  fleetNumber: string;
+  service: string;
+  hazardId: string;
+  monitorId: string;
+  hazardValue: string;
+  hazardDescription: string;
+  timestamp: Timestamp;
+  acknowledgedAt?: Timestamp;
+  acknowledgedBy?: string;
+}

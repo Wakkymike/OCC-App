@@ -60,6 +60,24 @@
         "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["busId", "fleetNumber", "service", "hazardId", "hazardValue", "timestamp"]
+    },
+    "AlertHistory": {
+      "title": "Alert History",
+      "type": "object",
+      "description": "A persistent log of geofence breaches for auditing.",
+      "properties": {
+        "busId": { "type": "string" },
+        "fleetNumber": { "type": "string" },
+        "service": { "type": "string" },
+        "hazardId": { "type": "string" },
+        "monitorId": { "type": "string" },
+        "hazardValue": { "type": "string" },
+        "hazardDescription": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "acknowledgedAt": { "type": "string", "format": "date-time" },
+        "acknowledgedBy": { "type": "string" }
+      },
+      "required": ["busId", "fleetNumber", "service", "hazardId", "monitorId", "hazardValue", "timestamp"]
     }
   },
   "auth": {
@@ -77,6 +95,10 @@
     "/activeAlerts/{alertId}": {
       "schema": { "$ref": "#/entities/ActiveAlert" },
       "description": "Live alerts for geofence breaches."
+    },
+    "/alertHistory/{historyId}": {
+      "schema": { "$ref": "#/entities/AlertHistory" },
+      "description": "Permanent log of all historical geofence breaches."
     }
   }
 }

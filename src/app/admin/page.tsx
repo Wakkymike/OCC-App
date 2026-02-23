@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin } from 'lucide-react';
+import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc } from '@/firebase';
 import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
@@ -20,8 +20,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
@@ -261,9 +259,14 @@ function GeofenceManagement() {
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center gap-3 text-primary">
-                    <ShieldAlert className="h-6 w-6" />
-                    <CardTitle className="text-xl">Active Geofence Monitors</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-primary">
+                      <ShieldAlert className="h-6 w-6" />
+                      <CardTitle className="text-xl">Active Geofence Monitors</CardTitle>
+                  </div>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/rra"><History className="mr-2 h-4 w-4" />View Breach History</Link>
+                  </Button>
                 </div>
                 <CardDescription>Hazards currently triggering alerts for GNW vehicles.</CardDescription>
             </CardHeader>
