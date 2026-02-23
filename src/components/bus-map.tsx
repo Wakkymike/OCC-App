@@ -6,8 +6,9 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard } from '@/lib/types';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
 
@@ -36,6 +37,29 @@ interface BusMapProps {
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
 const lastJourneyRefs = ['8001', '8002', '8301', '8302', '8601', '8602'];
 
+// Helper to create a circle polygon for Mapbox GeoJSON
+function createGeoJSONCircle(center: LatLng, radiusInMeters: number) {
+  const points = 64;
+  const coords = {
+    latitude: center.lat,
+    longitude: center.lng
+  };
+  const km = radiusInMeters / 1000;
+  const ret = [];
+  const distanceX = km / (111.32 * Math.cos((coords.latitude * Math.PI) / 180));
+  const distanceY = km / 110.574;
+
+  let theta, x, y;
+  for (let i = 0; i < points; i++) {
+    theta = (i / points) * (2 * Math.PI);
+    x = distanceX * Math.cos(theta);
+    y = distanceY * Math.sin(theta);
+    ret.push([coords.longitude + x, coords.latitude + y]);
+  }
+  ret.push(ret[0]);
+  return [ret];
+}
+
 export default function BusMap({
   buses,
   selectedBusId,
@@ -55,6 +79,7 @@ export default function BusMap({
 }: BusMapProps) {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
@@ -63,6 +88,8 @@ export default function BusMap({
   
   const [mapLoaded, setMapLoaded] = useState(false);
   const [styleRevision, setStyleRevision] = useState(0);
+  const [relocatingHazardId, setRelocatingHazardId] = useState<string | null>(null);
+  const relocatingHazardIdRef = useRef<string | null>(null);
 
   const monitoredRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
   const { data: monitoredHazards } = useCollection<MonitoredHazard>(monitoredRef);
@@ -70,6 +97,10 @@ export default function BusMap({
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
   const isAdmin = userProfile?.isAdmin || user?.email === 'michael.dodsworth@gonorthwest.co.uk';
+
+  useEffect(() => {
+    relocatingHazardIdRef.current = relocatingHazardId;
+  }, [relocatingHazardId]);
 
   // Initialize Map
   useEffect(() => {
@@ -99,7 +130,22 @@ export default function BusMap({
     }
     
     map.on('style.load', () => setStyleRevision(prev => prev + 1));
-    map.on('click', () => setSelectedBusId(null));
+    
+    map.on('click', (e) => {
+      if (relocatingHazardIdRef.current) {
+        const hazardId = relocatingHazardIdRef.current;
+        const newCenter = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+        
+        const docRef = doc(firestore, 'monitoredHazards', hazardId);
+        updateDoc(docRef, { geofenceCenter: newCenter });
+        
+        setRelocatingHazardId(null);
+        map.getCanvas().style.cursor = '';
+        toast({ title: 'Geofence Updated', description: 'The geofence center has been moved to the selected location.' });
+        return;
+      }
+      setSelectedBusId(null);
+    });
 
     return () => {
       if (mapRef.current) {
@@ -107,7 +153,7 @@ export default function BusMap({
         mapRef.current = null;
       }
     };
-  }, []);
+  }, [firestore, setSelectedBusId, toast]);
 
   // Handle Style Changes
   useEffect(() => {
@@ -115,6 +161,73 @@ export default function BusMap({
     if (!map) return;
     map.setStyle(mapStyle);
   }, [mapStyle]);
+
+  // Geofence Visualization Layers
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const setupLayers = () => {
+      if (!map.getSource('geofences')) {
+        map.addSource('geofences', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+
+        map.addLayer({
+          id: 'geofence-fills',
+          type: 'fill',
+          source: 'geofences',
+          layout: {},
+          paint: {
+            'fill-color': '#10b981',
+            'fill-opacity': 0.15
+          }
+        });
+
+        map.addLayer({
+          id: 'geofence-outlines',
+          type: 'line',
+          source: 'geofences',
+          layout: {},
+          paint: {
+            'line-color': '#10b981',
+            'line-width': 2,
+            'line-dasharray': [2, 2]
+          }
+        });
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      setupLayers();
+    } else {
+      map.once('style.load', setupLayers);
+    }
+  }, [mapLoaded, styleRevision]);
+
+  // Update Geofence Data
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !map.getSource('geofences')) return;
+
+    const features = monitoredHazards?.map(h => {
+        const center = h.geofenceCenter || h.location;
+        return {
+            type: 'Feature',
+            geometry: {
+                type: 'Polygon',
+                coordinates: createGeoJSONCircle(center, h.radius)
+            },
+            properties: { id: h.id }
+        };
+    }) || [];
+
+    (map.getSource('geofences') as mapboxgl.GeoJSONSource).setData({
+        type: 'FeatureCollection',
+        features: features as any
+    });
+  }, [monitoredHazards, mapLoaded]);
 
   const handleSetGeofence = (hazard: Hazard, radius: number) => {
     if (!isAdmin) return;
@@ -124,6 +237,7 @@ export default function BusMap({
       radius,
       createdAt: serverTimestamp()
     }, { merge: true });
+    toast({ title: 'Geofence Active', description: `Monitoring active for ${hazard.value} restriction.` });
   };
 
   // Hazard Markers
@@ -131,7 +245,6 @@ export default function BusMap({
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    // Clear existing
     Object.values(hazardsMarkersRef.current).forEach(m => m.remove());
     hazardsMarkersRef.current = {};
 
@@ -144,11 +257,10 @@ export default function BusMap({
         const el = document.createElement('div');
         el.className = 'hazard-marker cursor-pointer';
         
-        // Color coding
-        let color = '#3b82f6'; // Default blue
-        if (hazard.type === 'height') color = '#ef4444'; // Red for height
-        if (hazard.type === 'both') color = '#9333ea'; // Purple for both
-        if (isMonitored) color = '#10b981'; // Green if monitored
+        let color = '#3b82f6';
+        if (hazard.type === 'height') color = '#ef4444';
+        if (hazard.type === 'both') color = '#9333ea';
+        if (isMonitored) color = '#10b981';
 
         el.innerHTML = `
           <div style="background:${color}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); display: flex; align-items:center; gap: 4px;">
@@ -169,6 +281,11 @@ export default function BusMap({
           <div class="pt-2 border-t geofence-control"></div>
         `;
 
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+            .setLngLat([hazard.location.lng, hazard.location.lat])
+            .setPopup(new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupContent))
+            .addTo(map);
+
         if (isAdmin) {
           const control = popupContent.querySelector('.geofence-control');
           if (control) {
@@ -177,6 +294,20 @@ export default function BusMap({
             input.value = radius.toString();
             input.className = 'w-full mb-2 p-1 text-sm border rounded bg-background';
             
+            if (isMonitored) {
+                const moveBtn = document.createElement('button');
+                moveBtn.className = 'w-full py-2 px-3 text-xs font-bold rounded bg-secondary mb-2 hover:bg-secondary/80 transition-colors';
+                moveBtn.innerHTML = relocatingHazardId === hazard.id ? 'Click Map...' : 'Relocate Geofence Center';
+                moveBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    setRelocatingHazardId(hazard.id);
+                    marker.getPopup().remove();
+                    map.getCanvas().style.cursor = 'crosshair';
+                    toast({ title: 'Relocation Active', description: 'Click anywhere on the map to set the geofence center.' });
+                };
+                control.appendChild(moveBtn);
+            }
+
             const btn = document.createElement('button');
             btn.className = `w-full py-2 px-3 text-xs font-bold rounded flex items-center justify-center gap-2 ${isMonitored ? 'bg-destructive text-white' : 'bg-primary text-primary-foreground'}`;
             btn.innerHTML = isMonitored ? 'Stop Monitoring' : 'Start Monitoring';
@@ -186,25 +317,16 @@ export default function BusMap({
             control.appendChild(btn);
           }
         }
-
-        try {
-          const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
-            .setLngLat([hazard.location.lng, hazard.location.lat])
-            .setPopup(new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupContent))
-            .addTo(map);
             
-          hazardsMarkersRef.current[hazard.id] = marker;
-        } catch (e) {
-          console.error("Failed to add hazard marker", e);
-        }
+        hazardsMarkersRef.current[hazard.id] = marker;
       });
     }
-  }, [hazards, showHazards, mapLoaded, styleRevision, monitoredHazards, isAdmin]);
+  }, [hazards, showHazards, mapLoaded, styleRevision, monitoredHazards, isAdmin, relocatingHazardId, toast]);
 
   // Bus Markers
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapLoaded) return;
+    if (!map || !mapLoaded || !map.getCanvasContainer()) return;
 
     const currentMarkerIds = new Set(Object.keys(markersRef.current));
     buses.forEach((bus) => {
@@ -274,12 +396,12 @@ export default function BusMap({
       markersRef.current[id].remove();
       delete markersRef.current[id];
     });
-  }, [buses, selectedBusId, mapLoaded, styleRevision]);
+  }, [buses, selectedBusId, mapLoaded, styleRevision, setSelectedBusId]);
 
   // Roadwork Markers
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapLoaded) return;
+    if (!map || !mapLoaded || !map.getCanvasContainer()) return;
 
     Object.values(roadworksMarkersRef.current).forEach(m => m.remove());
     roadworksMarkersRef.current = {};

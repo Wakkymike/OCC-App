@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -27,7 +28,6 @@ export function AlertMonitor() {
   const { buses } = useBusTracker();
   const firestore = useFirestore();
   
-  // Only create the collection reference if the user is signed in to avoid permission errors
   const hazardsRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
   const { data: monitoredHazards } = useCollection<MonitoredHazard>(hazardsRef);
   
@@ -42,11 +42,13 @@ export function AlertMonitor() {
       const busId = `${bus.fleetNumber}-${bus.service}`;
       
       for (const hazard of monitoredHazards) {
+        // Use custom geofence center if provided, otherwise fallback to hazard location
+        const center = hazard.geofenceCenter || hazard.location;
         const distance = getDistanceInMeters(
           bus.position!.lat,
           bus.position!.lng,
-          hazard.location.lat,
-          hazard.location.lng
+          center.lat,
+          center.lng
         );
 
         if (distance <= hazard.radius) {

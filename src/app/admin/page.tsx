@@ -273,7 +273,7 @@ function GeofenceManagement() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Restriction</TableHead>
-                                <TableHead>Location</TableHead>
+                                <TableHead>Area/Center</TableHead>
                                 <TableHead>Radius</TableHead>
                                 <TableHead className="text-right">Action</TableHead>
                             </TableRow>
@@ -285,7 +285,18 @@ function GeofenceManagement() {
                                         <Badge variant="outline" className="mr-2 uppercase">{m.type}</Badge>
                                         <span className="font-bold">{m.value}</span>
                                     </TableCell>
-                                    <TableCell className="text-xs truncate max-w-[200px]">{m.description}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span className="text-xs truncate max-w-[150px]">{m.description}</span>
+                                            {m.geofenceCenter ? (
+                                                <span className="text-[10px] text-muted-foreground italic flex items-center gap-1">
+                                                    <MapPin className="h-2 w-2" /> Custom Center Set
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] text-muted-foreground italic">Default Center</span>
+                                            )}
+                                        </div>
+                                    </TableCell>
                                     <TableCell>{m.radius}m</TableCell>
                                     <TableCell className="text-right">
                                         <Button variant="ghost" size="icon" onClick={() => handleRemove(m.id)}>

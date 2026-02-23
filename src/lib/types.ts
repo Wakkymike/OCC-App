@@ -74,6 +74,7 @@ export interface Hazard {
 
 export interface MonitoredHazard extends Hazard {
   radius: number;
+  geofenceCenter?: LatLng; // Custom center for the geofence
   createdAt: Timestamp;
 }
 
