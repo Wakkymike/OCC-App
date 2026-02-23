@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -5,14 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut } from 'lucide-react';
+import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc } from '@/firebase';
 import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { sendSignInLinkToEmail, User } from 'firebase/auth';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { NetworkUpdate } from '@/lib/types';
+import type { NetworkUpdate, MonitoredHazard } from '@/lib/types';
 import { Textarea } from '@/components/ui/textarea';
 import {
   AlertDialog,
@@ -25,6 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Badge } from '@/components/ui/badge';
 
 interface UserProfile {
   id: string;
@@ -98,7 +100,6 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
 
   const handleDeleteUser = async (user: UserProfile) => {
     try {
-        // 1. Explicitly strip all privileges and roles first to ensure no persistence
         const userDocRef = doc(firestore, 'userProfiles', user.id);
         await updateDoc(userDocRef, { 
             isAdmin: false, 
@@ -106,25 +107,17 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
             isActive: false, 
             forceSignOut: true 
         });
-
-        // 2. Delete the profile document itself
         deleteDocumentNonBlocking(userDocRef);
-        
-        // 3. Cleanup any pending invitations for this email
         const invitationsRef = collection(firestore, 'invitations');
         const q = query(invitationsRef, where("email", "==", user.email));
         const querySnapshot = await getDocs(q);
         querySnapshot.forEach((invDoc) => {
             deleteDocumentNonBlocking(doc(firestore, 'invitations', invDoc.id));
         });
-
-        toast({ 
-            title: 'User Deleted', 
-            description: `${user.displayName} and all privileges removed. Note: To fully clear for reuse, manual removal from Firebase Auth is required.` 
-        });
+        toast({ title: 'User Deleted' });
     } catch (error) {
-        console.error("Failed to delete user fully:", error);
-        toast({ variant: 'destructive', title: 'Deletion Failed', description: 'Could not fully remove user privileges.' });
+        console.error(error);
+        toast({ variant: 'destructive', title: 'Deletion Failed' });
     }
   };
 
@@ -191,9 +184,7 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Delete User Account?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This will strip all privileges and permanently delete {user.displayName}'s profile. 
-                                    <br/><br/>
-                                    <strong>Note:</strong> To reuse this email for a brand new registration, you must also manually delete the user from the Firebase Authentication console.
+                                    This will strip all privileges and permanently delete {user.displayName}'s profile.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -254,6 +245,68 @@ function PendingInvitations() {
             </CardContent>
         </Card>
     );
+}
+
+function GeofenceManagement() {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const hazardsRef = useMemoFirebase(() => collection(firestore, 'monitoredHazards'), [firestore]);
+    const { data: monitored, isLoading } = useCollection<MonitoredHazard>(hazardsRef);
+
+    const handleRemove = (id: string) => {
+        deleteDocumentNonBlocking(doc(firestore, 'monitoredHazards', id));
+        toast({ title: 'Monitor Removed' });
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-3 text-primary">
+                    <ShieldAlert className="h-6 w-6" />
+                    <CardTitle className="text-xl">Active Geofence Monitors</CardTitle>
+                </div>
+                <CardDescription>Hazards currently triggering alerts for GNW vehicles.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Restriction</TableHead>
+                                <TableHead>Location</TableHead>
+                                <TableHead>Radius</TableHead>
+                                <TableHead className="text-right">Action</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {monitored?.map((m) => (
+                                <TableRow key={m.id}>
+                                    <TableCell>
+                                        <Badge variant="outline" className="mr-2 uppercase">{m.type}</Badge>
+                                        <span className="font-bold">{m.value}</span>
+                                    </TableCell>
+                                    <TableCell className="text-xs truncate max-w-[200px]">{m.description}</TableCell>
+                                    <TableCell>{m.radius}m</TableCell>
+                                    <TableCell className="text-right">
+                                        <Button variant="ghost" size="icon" onClick={() => handleRemove(m.id)}>
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                            {monitored?.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                        No active geofences. Go to the Map to add some.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                )}
+            </CardContent>
+        </Card>
+    )
 }
 
 function NetworkUpdateManagement() {
@@ -374,6 +427,7 @@ export default function AdminPage() {
                     </CardContent>
                 </Card>
                 <PendingInvitations />
+                <GeofenceManagement />
                 <NetworkUpdateManagement />
             </>
         ) : isContentCreator ? (

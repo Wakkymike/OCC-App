@@ -1,100 +1,57 @@
+
 {
   "entities": {
     "UserProfile": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserProfile",
       "type": "object",
-      "description": "Represents a user's profile within the application. It stores user-specific information and their assigned roles.",
+      "description": "Represents a user's profile within the application.",
       "properties": {
-        "uid": {
-          "type": "string",
-          "description": "Unique identifier for the UserProfile, matching the Firebase Auth UID."
-        },
-        "email": {
-          "type": "string",
-          "description": "The user's email address, used for login.",
-          "format": "email"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "A user-friendly name for display purposes."
-        },
-        "isAdmin": {
-          "type": "boolean",
-          "description": "Flag indicating if the user has administrative privileges.",
-          "default": false
-        },
-        "isContentCreator": {
-          "type": "boolean",
-          "description": "Flag indicating if the user has privileges to manage content like network updates.",
-          "default": false
-        },
-        "isActive": {
-          "type": "boolean",
-          "description": "Flag indicating if the user's account has been activated by an admin.",
-          "default": false
-        },
-        "passwordChangeRequired": {
-            "type": "boolean",
-            "description": "Flag indicating if the user must change their password on the next login.",
-            "default": false
-        },
-        "forceSignOut": {
-            "type": "boolean",
-            "description": "If true, the user will be automatically signed out on their next interaction.",
-            "default": false
-        }
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "isAdmin": { "type": "boolean", "default": false },
+        "isContentCreator": { "type": "boolean", "default": false },
+        "isActive": { "type": "boolean", "default": false },
+        "passwordChangeRequired": { "type": "boolean", "default": false },
+        "forceSignOut": { "type": "boolean", "default": false }
       },
       "required": ["uid", "email", "displayName", "isAdmin", "isContentCreator", "isActive", "passwordChangeRequired", "forceSignOut"]
     },
-    "Invitation": {
-        "title": "Invitation",
-        "type": "object",
-        "description": "Represents an invitation for a new user to join the application.",
-        "properties": {
-            "email": {
-                "type": "string",
-                "description": "The email address of the user being invited.",
-                "format": "email"
-            },
-            "invitedAt": {
-                "type": "string",
-                "description": "The timestamp when the invitation was sent.",
-                "format": "date-time"
-            }
+    "MonitoredHazard": {
+      "title": "Monitored Hazard",
+      "type": "object",
+      "description": "A road restriction being actively monitored via geofencing.",
+      "properties": {
+        "hazardId": { "type": "string" },
+        "type": { "type": "string", "enum": ["height", "width", "both"] },
+        "value": { "type": "string" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
         },
-        "required": ["email", "invitedAt"]
+        "description": { "type": "string" },
+        "radius": { "type": "number", "description": "Radius in meters for the geofence." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["hazardId", "type", "value", "location", "radius", "createdAt"]
     },
-    "NetworkUpdate": {
-        "title": "Network Update",
-        "type": "object",
-        "description": "Represents a network status update to be displayed on the homepage.",
-        "properties": {
-            "title": {
-                "type": "string",
-                "description": "The title of the update."
-            },
-            "details": {
-                "type": "string",
-                "description": "The full text content of the update."
-            },
-            "priority": {
-                "type": "number",
-                "description": "A number to control the order of updates. Lower numbers are shown first.",
-                "default": 0
-            },
-            "isVisible": {
-                "type": "boolean",
-                "description": "Whether the update is currently visible on the homepage.",
-                "default": true
-            },
-            "createdAt": {
-                "type": "string",
-                "format": "date-time",
-                "description": "The timestamp when the update was created."
-            }
-        },
-        "required": ["title", "details", "priority", "isVisible", "createdAt"]
+    "ActiveAlert": {
+      "title": "Active Alert",
+      "type": "object",
+      "description": "An active breach of a geofence by a vehicle.",
+      "properties": {
+        "busId": { "type": "string" },
+        "fleetNumber": { "type": "string" },
+        "service": { "type": "string" },
+        "hazardId": { "type": "string" },
+        "hazardValue": { "type": "string" },
+        "hazardDescription": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["busId", "fleetNumber", "service", "hazardId", "hazardValue", "timestamp"]
     }
   },
   "auth": {
@@ -103,15 +60,15 @@
   "firestore": {
     "/userProfiles/{userId}": {
       "schema": { "$ref": "#/entities/UserProfile" },
-      "description": "Stores individual user profiles. The document ID (`userId`) MUST be the user's Firebase Authentication UID."
+      "description": "Stores individual user profiles."
     },
-    "/invitations/{invitationId}": {
-        "schema": { "$ref": "#/entities/Invitation" },
-        "description": "Stores pending invitations sent to new users. These are deleted upon successful account creation."
+    "/monitoredHazards/{hazardId}": {
+      "schema": { "$ref": "#/entities/MonitoredHazard" },
+      "description": "Active geofences for road hazards."
     },
-    "/networkUpdates/{updateId}": {
-        "schema": { "$ref": "#/entities/NetworkUpdate" },
-        "description": "Stores network-wide updates and announcements for display on the homepage."
+    "/activeAlerts/{alertId}": {
+      "schema": { "$ref": "#/entities/ActiveAlert" },
+      "description": "Live alerts for geofence breaches."
     }
   }
 }

@@ -1,3 +1,4 @@
+
 import { Timestamp } from 'firebase/firestore';
 
 export interface LatLng {
@@ -14,29 +15,25 @@ export interface Bus {
   position?: LatLng;
   bearing?: number;
   journeyRef?: string;
-  delay?: number; // Delay in minutes, for internal logic/styling
-  status: string; // The display text for status: "On Time", "5 min late", "Unknown"
+  delay?: number; 
+  status: string; 
   operator: 'GNW' | 'MET' | 'VB' | 'SC' | 'FB' | 'DB';
 }
 
-export interface MetrolinkStop {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
-  lines: string[];
-}
-
-export interface MetrolinkLine {
-  id: string;
-  name: string;
-  color: string;
-  path: string[]; // Array of stop IDs
-}
-
 export interface MetrolinkData {
-  stops: MetrolinkStop[];
-  lines: MetrolinkLine[];
+  stops: {
+    id: string;
+    name: string;
+    lat: number;
+    lng: number;
+    lines: string[];
+  }[];
+  lines: {
+    id: string;
+    name: string;
+    color: string;
+    path: string[];
+  }[];
 }
 
 export interface JourneyPlan {
@@ -73,4 +70,20 @@ export interface Hazard {
   value: string;
   location: LatLng;
   description: string;
+}
+
+export interface MonitoredHazard extends Hazard {
+  radius: number;
+  createdAt: Timestamp;
+}
+
+export interface ActiveAlert {
+  id: string;
+  busId: string;
+  fleetNumber: string;
+  service: string;
+  hazardId: string;
+  hazardValue: string;
+  hazardDescription: string;
+  timestamp: Timestamp;
 }

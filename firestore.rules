@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -10,33 +11,31 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk';
     }
 
-    // Direct check for roles without nested functions to prevent recursion
     function getUserData() {
       return get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data;
     }
 
+    function isAdmin() {
+      return isSuperAdmin() || (isSignedIn() && getUserData().isAdmin == true);
+    }
+
     match /userProfiles/{userId} {
-      allow get: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || getUserData().isAdmin == true);
-      allow list: if isSignedIn() && (isSuperAdmin() || getUserData().isAdmin == true);
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isSignedIn() && isAdmin();
       allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || getUserData().isAdmin == true);
-      allow delete: if isSignedIn() && (isSuperAdmin() || getUserData().isAdmin == true);
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isSignedIn() && isAdmin();
     }
 
-    match /invitations/{invitationId} {
-      allow read, write: if isSignedIn() && (isSuperAdmin() || getUserData().isAdmin == true);
-    }
-
-    match /networkUpdates/{updateId} {
-      // Everyone who is signed in can read network updates.
+    match /monitoredHazards/{hazardId} {
       allow read: if isSignedIn();
-      
-      // Admins and content creators can modify them.
-      allow write: if isSignedIn() && (
-        isSuperAdmin() || 
-        getUserData().isAdmin == true ||
-        getUserData().isContentCreator == true
-      );
+      allow write: if isSignedIn() && isAdmin();
+    }
+
+    match /activeAlerts/{alertId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn(); // Monitor component creates alerts
+      allow delete: if isSignedIn() && isAdmin(); // Admins acknowledge/dismiss
     }
 
     match /{path=**} {

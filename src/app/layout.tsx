@@ -1,8 +1,11 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase';
 import ClientLayout from '@/components/ClientLayout';
+import { AlertMonitor } from '@/components/AlertMonitor';
+import { GlobalAlertOverlay } from '@/components/GlobalAlertOverlay';
 
 export const metadata: Metadata = {
   title: 'OCC App',
@@ -26,6 +29,8 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
+          <AlertMonitor />
+          <GlobalAlertOverlay />
           <ClientLayout>{children}</ClientLayout>
         </FirebaseClientProvider>
         <Toaster />
