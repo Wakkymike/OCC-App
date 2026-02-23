@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -28,22 +27,25 @@ export function AlertMonitor() {
   const { buses } = useBusTracker();
   const firestore = useFirestore();
   
+  // Fetch all active geofence monitors
   const hazardsRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
   const { data: monitoredHazards } = useCollection<MonitoredHazard>(hazardsRef);
   
-  const lastCheckRef = useRef<Record<string, number>>({});
+  // Local cache to throttle repeated alerts for the same bus/monitor pair (5 minute cooldown)
+  const lastAlertTimeRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!user || !monitoredHazards || !buses || buses.length === 0) return;
 
+    // We only monitor Go North West vehicles for road restriction breaches
     const gnwBuses = buses.filter(b => b.operator === 'GNW' && b.position);
     
     gnwBuses.forEach(async (bus) => {
       const busId = `${bus.fleetNumber}-${bus.service}`;
       
-      for (const hazard of monitoredHazards) {
-        // Use custom geofence center if provided, otherwise fallback to hazard location
-        const center = hazard.geofenceCenter || hazard.location;
+      for (const monitor of monitoredHazards) {
+        // A monitor might be relocated, so we respect the custom center if set
+        const center = monitor.geofenceCenter || monitor.location;
         const distance = getDistanceInMeters(
           bus.position!.lat,
           bus.position!.lng,
@@ -51,25 +53,36 @@ export function AlertMonitor() {
           center.lng
         );
 
-        if (distance <= hazard.radius) {
-          const alertKey = `${busId}-${hazard.id}`;
+        // If the bus is within the defined radius of this specific monitor
+        if (distance <= monitor.radius) {
+          const alertKey = `${busId}-${monitor.id}`;
           const now = Date.now();
           
-          if (!lastCheckRef.current[alertKey] || now - lastCheckRef.current[alertKey] > 300000) {
-            lastCheckRef.current[alertKey] = now;
+          // Throttling: only check the DB if we haven't alerted for this pair in the last 5 minutes
+          if (!lastAlertTimeRef.current[alertKey] || now - lastAlertTimeRef.current[alertKey] > 300000) {
+            lastAlertTimeRef.current[alertKey] = now;
             
             const alertsRef = collection(firestore, 'activeAlerts');
-            const q = query(alertsRef, where("busId", "==", busId), where("hazardId", "==", hazard.id));
+            
+            // Check if there is an existing UNRESOLVED alert for this specific bus and monitor
+            const q = query(
+              alertsRef, 
+              where("busId", "==", busId), 
+              where("monitorId", "==", monitor.id)
+            );
+            
             const existing = await getDocs(q);
             
             if (existing.empty) {
+              // Create a new active alert record
               addDoc(alertsRef, {
                 busId,
                 fleetNumber: bus.fleetNumber,
                 service: bus.service,
-                hazardId: hazard.id,
-                hazardValue: hazard.value,
-                hazardDescription: hazard.description,
+                hazardId: monitor.hazardId, // Reference to original OSM hazard
+                monitorId: monitor.id,      // Reference to this specific geofence document
+                hazardValue: monitor.value,
+                hazardDescription: monitor.description,
                 timestamp: serverTimestamp(),
               });
             }
