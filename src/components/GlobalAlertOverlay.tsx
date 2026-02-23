@@ -1,60 +1,99 @@
-
 'use client';
 
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, deleteDoc, doc } from 'firebase/firestore';
 import type { ActiveAlert } from '@/lib/types';
-import { AlertTriangle, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, CheckCircle2, Bus as BusIcon, MapPin, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
+/**
+ * A global, high-visibility overlay that triggers when a geofence breach is detected.
+ * It is rendered in the root layout to ensure it covers any active page.
+ */
 export function GlobalAlertOverlay() {
   const firestore = useFirestore();
   const { user } = useUser();
   
-  // Only query alerts if the user is authenticated
+  // Listen for active alerts globally
   const alertsRef = useMemoFirebase(() => user ? collection(firestore, 'activeAlerts') : null, [firestore, user]);
   const { data: alerts } = useCollection<ActiveAlert>(alertsRef);
   
+  // Only show if user is authenticated and there are active alerts in the system
   if (!user || !alerts || alerts.length === 0) return null;
 
   const handleDismiss = (alertId: string) => {
-    // Any logged-in user can now dismiss alerts
+    // Dismissing an alert removes it globally for all users.
+    // The event remains preserved in the Alert History log.
     deleteDoc(doc(firestore, 'activeAlerts', alertId));
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/80 flex flex-col items-center justify-center p-4 overflow-y-auto gap-6">
-      <div className="flex items-center gap-3 text-destructive animate-bounce-zoom">
-        <ShieldAlert className="h-16 w-16" />
-        <h1 className="text-4xl font-black uppercase tracking-tighter">Geofence Breach Detected</h1>
-      </div>
-      
-      <div className="w-full max-w-2xl space-y-4">
-        {alerts.map((alert) => (
-          <Card key={alert.id} className="border-4 border-destructive bg-destructive/5 text-destructive-foreground">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-6 w-6 text-destructive" />
-                Bus {alert.fleetNumber} (Service {alert.service})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p className="text-xl font-bold">REASON: {alert.hazardValue} Restriction Breach</p>
-              <p className="opacity-80">LOCATION: {alert.hazardDescription}</p>
-              <p className="text-xs opacity-50">TIME: {alert.timestamp?.toDate().toLocaleString()}</p>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                onClick={() => handleDismiss(alert.id)}
-                className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                <CheckCircle2 className="mr-2 h-5 w-5" />
-                Acknowledge & Dismiss Alert
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
+    <div className="fixed inset-0 z-[99999] bg-black/90 flex flex-col items-center justify-center p-4 overflow-y-auto backdrop-blur-sm">
+      <div className="w-full max-w-2xl space-y-8 py-10">
+        <div className="flex flex-col items-center text-center gap-4 text-destructive animate-pulse">
+          <ShieldAlert className="h-24 w-24" />
+          <h1 className="text-5xl font-extrabold uppercase tracking-tight text-white drop-shadow-lg">
+            Geofence Breach
+          </h1>
+          <p className="text-destructive font-black text-xl bg-white px-4 py-1 rounded">
+            ACTION REQUIRED
+          </p>
+        </div>
+        
+        <div className="space-y-6">
+          {alerts.map((alert) => (
+            <Card key={alert.id} className="border-4 border-destructive bg-card shadow-[0_0_50px_rgba(239,68,68,0.3)] overflow-hidden">
+              <CardHeader className="bg-destructive/10 border-b border-destructive/20">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BusIcon className="h-7 w-7 text-destructive" />
+                    <span className="text-3xl font-bold">Bus {alert.fleetNumber}</span>
+                  </div>
+                  <Badge variant="destructive" className="text-lg px-4 py-1 font-black">
+                    Service {alert.service}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-8 space-y-6">
+                <div className="flex items-start gap-4">
+                  <div className="bg-destructive/10 p-3 rounded-full">
+                    <AlertTriangle className="h-10 w-10 text-destructive shrink-0" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-3xl font-black uppercase text-destructive tracking-tighter leading-none">
+                      {alert.hazardValue} RESTRICTION
+                    </p>
+                    <p className="text-xl font-bold text-foreground/80">
+                      {alert.hazardDescription}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 pt-6 border-t border-muted text-sm font-medium">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <MapPin className="h-4 w-4" />
+                    <span>Zone Monitoring ID: {alert.monitorId.substring(0, 8)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground justify-end">
+                    <Clock className="h-4 w-4" />
+                    <span>{alert.timestamp?.toDate().toLocaleTimeString()}</span>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="bg-muted/30 p-4 border-t">
+                <Button 
+                  onClick={() => handleDismiss(alert.id)}
+                  className="w-full h-16 text-2xl font-black bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg"
+                >
+                  <CheckCircle2 className="mr-3 h-8 w-8" />
+                  ACKNOWLEDGE & DISMISS
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );

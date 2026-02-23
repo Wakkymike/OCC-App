@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -28,24 +27,26 @@ export function AlertMonitor() {
   const { buses } = useBusTracker();
   const firestore = useFirestore();
   
-  // Fetch all active geofence monitors
+  // Fetch all active geofence monitors - accessible to all logged in users
   const hazardsRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
   const { data: monitoredHazards } = useCollection<MonitoredHazard>(hazardsRef);
   
-  // Local cache to throttle repeated alerts for the same bus/monitor pair (5 minute cooldown)
-  const lastAlertTimeRef = useRef<Record<string, number>>({});
+  // We use a ref to track which bus-monitor pairs we are currently processing 
+  // to avoid race conditions or double-triggering within the same polling cycle.
+  const processingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    // The monitoring happens on the client of every logged-in staff member.
     if (!user || !monitoredHazards || !buses || buses.length === 0) return;
 
     // We only monitor Go North West vehicles for road restriction breaches
     const gnwBuses = buses.filter(b => b.operator === 'GNW' && b.position);
     
     gnwBuses.forEach(async (bus) => {
+      // Use fleet number as the primary unique identifier for the vehicle
       const busId = `${bus.fleetNumber}-${bus.service}`;
       
       for (const monitor of monitoredHazards) {
-        // A monitor might be relocated, so we respect the custom center if set
         const center = monitor.geofenceCenter || monitor.location;
         const distance = getDistanceInMeters(
           bus.position!.lat,
@@ -54,19 +55,20 @@ export function AlertMonitor() {
           center.lng
         );
 
-        // If the bus is within the defined radius of this specific monitor
+        // If the bus is within the radius of this monitor
         if (distance <= monitor.radius) {
           const alertKey = `${busId}-${monitor.id}`;
-          const now = Date.now();
           
-          // Throttling: only check the DB if we haven't alerted for this pair in the last 5 minutes
-          if (!lastAlertTimeRef.current[alertKey] || now - lastAlertTimeRef.current[alertKey] > 300000) {
-            lastAlertTimeRef.current[alertKey] = now;
-            
+          // If we're already checking or creating this specific alert, skip
+          if (processingRef.current.has(alertKey)) continue;
+          
+          processingRef.current.add(alertKey);
+          
+          try {
             const alertsRef = collection(firestore, 'activeAlerts');
             const historyRef = collection(firestore, 'alertHistory');
             
-            // Check if there is an existing UNRESOLVED alert for this specific bus and monitor
+            // Check if there is currently an UNRESOLVED alert for this specific bus and monitor
             const q = query(
               alertsRef, 
               where("busId", "==", busId), 
@@ -75,24 +77,30 @@ export function AlertMonitor() {
             
             const existing = await getDocs(q);
             
+            // If no active alert exists, create one
             if (existing.empty) {
               const alertData = {
                 busId,
                 fleetNumber: bus.fleetNumber,
                 service: bus.service,
-                hazardId: monitor.hazardId, // Reference to original OSM hazard
-                monitorId: monitor.id,      // Reference to this specific geofence document
+                hazardId: monitor.hazardId, 
+                monitorId: monitor.id,      
                 hazardValue: monitor.value,
                 hazardDescription: monitor.description,
                 timestamp: serverTimestamp(),
               };
 
-              // Create a new active alert record (ephemeral)
+              // Create ephemeral alert for real-time display
               addDoc(alertsRef, alertData);
 
-              // Create a persistent log record (eternal)
+              // Create persistent log for historical auditing
               addDoc(historyRef, alertData);
             }
+          } catch (error) {
+            console.error("Alert generation failed:", error);
+          } finally {
+            // Remove from processing set after async operations complete
+            processingRef.current.delete(alertKey);
           }
         }
       }
