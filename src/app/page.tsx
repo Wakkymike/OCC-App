@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Map, Radio, Shield, Route, Loader2 } from 'lucide-react';
+import { Map, Radio, Shield, Route, Loader2, ShieldAlert } from 'lucide-react';
 import UserMenu from '@/components/auth/UserMenu';
 import TickerTape from '@/components/TickerTape';
 import BreakingNewsTicker from '@/components/BreakingNewsTicker';
@@ -49,6 +49,12 @@ export default function HomePage() {
                         <Link href="/map">
                         <Map className="mr-2 h-5 w-5" />
                         Live Bus Map
+                        </Link>
+                    </Button>
+                    <Button asChild size="lg" variant="destructive" className="bg-destructive hover:bg-destructive/90 animate-pulse">
+                        <Link href="/rra">
+                        <ShieldAlert className="mr-2 h-5 w-5" />
+                        RRA Dashboard
                         </Link>
                     </Button>
                     <Button asChild size="lg">
