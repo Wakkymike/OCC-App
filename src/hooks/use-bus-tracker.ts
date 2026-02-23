@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Bus } from '@/lib/types';
 
-const FETCH_INTERVAL = 10000; // Increased to 10 seconds for stability
+const FETCH_INTERVAL = 5000; // Reduced to 5 seconds for more responsive geofence triggering
 
 export function useBusTracker() {
   const [buses, setBuses] = useState<Bus[]>([]);

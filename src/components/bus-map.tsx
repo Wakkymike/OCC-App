@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard } from '@/lib/types';
@@ -39,7 +39,6 @@ interface BusMapProps {
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
 const lastJourneyRefs = ['8001', '8002', '8301', '8302', '8601', '8602'];
 
-// Helper for generating circle geometry for Mapbox GeoJSON
 function createGeoJSONCircle(center: LatLng, radiusInMeters: number) {
   const points = 64;
   const coords = { latitude: center.lat, longitude: center.lng };
@@ -97,7 +96,6 @@ export default function BusMap({
   const { data: userProfile } = useDoc<any>(userProfileRef);
   const isAdmin = userProfile?.isAdmin || user?.email === 'michael.dodsworth@gonorthwest.co.uk';
 
-  // Core Map Initialization
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
@@ -116,21 +114,13 @@ export default function BusMap({
     map.on('load', () => setMapLoaded(true));
     map.on('style.load', () => setStyleRevision(prev => prev + 1));
     
-    map.on('click', (e) => {
-      if (manualGeofenceMode) {
-          handleAddManualGeofence(e.lngLat);
-          return;
-      }
-      setSelectedBusId(null);
-    });
-
     return () => {
       map.remove();
       mapRef.current = null;
     };
   }, []);
 
-  const handleAddManualGeofence = (lngLat: mapboxgl.LngLat) => {
+  const handleAddManualGeofence = useCallback((lngLat: mapboxgl.LngLat) => {
     if (!isAdmin || !mapRef.current) return;
     
     const popupContent = document.createElement('div');
@@ -175,7 +165,10 @@ export default function BusMap({
         const description = (popupContent.querySelector('.manual-desc') as HTMLInputElement).value;
         const radius = parseInt((popupContent.querySelector('.manual-radius') as HTMLInputElement).value);
         
-        if (!description) return toast({ variant: 'destructive', title: 'Missing Description' });
+        if (!description) {
+            toast({ variant: 'destructive', title: 'Missing Description' });
+            return;
+        }
 
         try {
             await addDoc(collection(firestore, 'monitoredHazards'), {
@@ -185,9 +178,29 @@ export default function BusMap({
             toast({ title: 'Manual Geofence Added' });
             popup.remove();
             if (setManualGeofenceMode) setManualGeofenceMode(false);
-        } catch (e) {}
+        } catch (e) {
+            console.error("Failed to add manual geofence", e);
+        }
     };
-  };
+  }, [isAdmin, firestore, toast, setManualGeofenceMode]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const handleClick = (e: mapboxgl.MapMouseEvent) => {
+      if (manualGeofenceMode) {
+        handleAddManualGeofence(e.lngLat);
+      } else {
+        setSelectedBusId(null);
+      }
+    };
+
+    map.on('click', handleClick);
+    return () => {
+      map.off('click', handleClick);
+    };
+  }, [manualGeofenceMode, mapLoaded, setSelectedBusId, handleAddManualGeofence]);
 
   const handleAddGeofence = (hazard: Hazard, radius: number) => {
     if (!isAdmin) return;
@@ -204,7 +217,6 @@ export default function BusMap({
     toast({ title: 'Geofence Removed' });
   };
 
-  // Road Restrictions (Hazards) Layer
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded || !map.getCanvasContainer()) return;
@@ -274,7 +286,6 @@ export default function BusMap({
       });
     }
 
-    // Manual Geofences
     if (monitoredHazards && showGeofences) {
         monitoredHazards.filter(m => m.type === 'manual').forEach(m => {
             const el = document.createElement('div');
@@ -290,7 +301,6 @@ export default function BusMap({
     }
   }, [hazards, showHazards, showGeofences, mapLoaded, styleRevision, monitoredHazards, isAdmin]);
 
-  // Geofence Zones (Circles) Layer
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
@@ -328,7 +338,6 @@ export default function BusMap({
     setupLayer();
   }, [monitoredHazards, showGeofences, mapLoaded, styleRevision]);
 
-  // Bus Markers Layer
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded || !map.getCanvasContainer()) return;
@@ -386,16 +395,14 @@ export default function BusMap({
       if (flag) {
         const dirLabel = bus.direction?.toLowerCase() === 'inbound' ? '[I]' : '[O]';
         const isSpecial = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
-        
-        // Exact format: Fleet number | service | [I/O] destination | Board: board number
         flag.innerText = `${bus.fleetNumber} | ${bus.service} | ${dirLabel} ${bus.destination} | Board: ${bus.runningBoard}`;
         flag.className = `bus-flag ${isSpecial ? 'blinking-rb' : ''}`;
       }
 
       if (busBody) {
-        let color = '#ef4444'; // Other (Red)
-        if (bus.operator === 'GNW') color = '#FFC107'; // GNW (Yellow)
-        if (markerId === selectedBusId) color = '#00FFFF'; // Selection (Cyan)
+        let color = '#ef4444';
+        if (bus.operator === 'GNW') color = '#FFC107';
+        if (markerId === selectedBusId) color = '#00FFFF';
         busBody.setAttribute('fill', color);
       }
     });
@@ -404,7 +411,7 @@ export default function BusMap({
       markersRef.current[id].remove();
       delete markersRef.current[id];
     });
-  }, [buses, selectedBusId, mapLoaded, styleRevision]);
+  }, [buses, selectedBusId, mapLoaded, styleRevision, setSelectedBusId]);
 
   return (
     <div className="absolute inset-0 w-full h-full bg-muted overflow-hidden">
