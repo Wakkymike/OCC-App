@@ -116,7 +116,7 @@ export default function BusMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !map.isStyleLoaded() || !map.getContainer()) return;
 
     Object.values(hazardsMarkersRef.current).forEach(m => m.remove());
     hazardsMarkersRef.current = {};
@@ -185,7 +185,7 @@ export default function BusMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !map.isStyleLoaded() || !map.getContainer()) return;
 
     const currentMarkerIds = new Set(Object.keys(markersRef.current));
     buses.forEach((bus) => {
@@ -223,7 +223,6 @@ export default function BusMap({
           markersRef.current[markerId] = marker;
         } catch (e) {
           console.error("Failed to add bus marker", e);
-          return;
         }
       } else {
         marker.setLngLat([bus.position.lng, bus.position.lat]);
@@ -257,7 +256,7 @@ export default function BusMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !map.isStyleLoaded() || !map.getContainer()) return;
 
     Object.values(roadworksMarkersRef.current).forEach(m => m.remove());
     roadworksMarkersRef.current = {};
