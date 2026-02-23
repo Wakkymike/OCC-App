@@ -57,9 +57,10 @@
         "monitorId": { "type": "string", "description": "The ID of the specific geofence monitor triggered." },
         "hazardValue": { "type": "string" },
         "hazardDescription": { "type": "string" },
+        "isAcknowledged": { "type": "boolean", "default": false, "description": "Whether the global overlay has been dismissed." },
         "timestamp": { "type": "string", "format": "date-time" }
       },
-      "required": ["busId", "fleetNumber", "service", "hazardId", "hazardValue", "timestamp"]
+      "required": ["busId", "fleetNumber", "service", "hazardId", "monitorId", "hazardValue", "timestamp", "isAcknowledged"]
     },
     "AlertHistory": {
       "title": "Alert History",

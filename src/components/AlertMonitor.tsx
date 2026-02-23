@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -68,7 +69,7 @@ export function AlertMonitor() {
             const alertsRef = collection(firestore, 'activeAlerts');
             const historyRef = collection(firestore, 'alertHistory');
             
-            // Check if there is currently an UNRESOLVED alert for this specific bus and monitor
+            // Check if there is currently an alert for this specific bus and monitor
             const q = query(
               alertsRef, 
               where("busId", "==", busId), 
@@ -87,6 +88,7 @@ export function AlertMonitor() {
                 monitorId: monitor.id,      
                 hazardValue: monitor.value,
                 hazardDescription: monitor.description,
+                isAcknowledged: false, // Alerts start as unacknowledged
                 timestamp: serverTimestamp(),
               };
 

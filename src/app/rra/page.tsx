@@ -4,20 +4,32 @@
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, deleteDoc, doc, query, orderBy, limit } from 'firebase/firestore';
 import type { ActiveAlert, AlertHistory } from '@/lib/types';
-import { AlertTriangle, ShieldAlert, CheckCircle2, Home, History, Bus as BusIcon, Clock, MapPin, ListFilter } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, CheckCircle2, Home, History, Bus as BusIcon, Clock, MapPin, ListFilter, CheckCircle } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMemo } from 'react';
 
 export default function RRAListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   
   const alertsRef = useMemoFirebase(() => user ? collection(firestore, 'activeAlerts') : null, [firestore, user]);
-  const { data: alerts, isLoading: isAlertsLoading } = useCollection<ActiveAlert>(alertsRef);
+  const { data: allAlerts, isLoading: isAlertsLoading } = useCollection<ActiveAlert>(alertsRef);
+
+  // Sort alerts: unacknowledged first, then by timestamp
+  const alerts = useMemo(() => {
+    if (!allAlerts) return null;
+    return [...allAlerts].sort((a, b) => {
+        if (a.isAcknowledged === b.isAcknowledged) {
+            return b.timestamp?.seconds - a.timestamp?.seconds;
+        }
+        return a.isAcknowledged ? 1 : -1;
+    });
+  }, [allAlerts]);
 
   const historyRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -25,8 +37,9 @@ export default function RRAListPage() {
   }, [firestore, user]);
   const { data: history, isLoading: isHistoryLoading } = useCollection<AlertHistory>(historyRef);
 
-  const handleDismiss = async (alertId: string) => {
-    // Any logged-in user can now dismiss alerts from the system
+  const handleClearAlert = async (alertId: string) => {
+    // This is the final resolution of an alert. 
+    // Any logged-in user can clear it after verifying the incident.
     deleteDoc(doc(firestore, 'activeAlerts', alertId));
   };
 
@@ -53,9 +66,9 @@ export default function RRAListPage() {
             <TabsTrigger value="active" className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
               Active Breaches
-              {alerts && alerts.length > 0 && (
+              {alerts && alerts.filter(a => !a.isAcknowledged).length > 0 && (
                 <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px]">
-                  {alerts.length}
+                  {alerts.filter(a => !a.isAcknowledged).length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -69,7 +82,7 @@ export default function RRAListPage() {
             <Card className="border-destructive/20 bg-destructive/5">
               <CardHeader>
                 <CardTitle>Active Breaches</CardTitle>
-                <CardDescription>Live geofence triggers requiring immediate attention.</CardDescription>
+                <CardDescription>Live geofence triggers. Acknowledged items remain here until cleared.</CardDescription>
               </CardHeader>
               <CardContent>
                 {isAlertsLoading ? (
@@ -85,6 +98,7 @@ export default function RRAListPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Status</TableHead>
                         <TableHead>Bus Detail</TableHead>
                         <TableHead>Restriction</TableHead>
                         <TableHead>Location</TableHead>
@@ -94,7 +108,18 @@ export default function RRAListPage() {
                     </TableHeader>
                     <TableBody>
                       {alerts.map((alert) => (
-                        <TableRow key={alert.id} className="group hover:bg-destructive/10">
+                        <TableRow key={alert.id} className={`group hover:bg-destructive/10 ${alert.isAcknowledged ? 'opacity-70' : ''}`}>
+                          <TableCell>
+                            {alert.isAcknowledged ? (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                                    ACKNOWLEDGED
+                                </Badge>
+                            ) : (
+                                <Badge variant="destructive" className="animate-pulse">
+                                    NEW ALERT
+                                </Badge>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <div className="flex flex-col">
                               <span className="font-bold flex items-center gap-1">
@@ -121,11 +146,15 @@ export default function RRAListPage() {
                           <TableCell className="text-right">
                             <Button 
                               size="sm" 
-                              variant="destructive" 
-                              onClick={() => handleDismiss(alert.id)}
-                              className="h-8"
+                              variant={alert.isAcknowledged ? "outline" : "destructive"}
+                              onClick={() => handleClearAlert(alert.id)}
+                              className="h-8 font-bold"
                             >
-                              Dismiss
+                              {alert.isAcknowledged ? (
+                                  <>
+                                    <CheckCircle className="mr-2 h-4 w-4" /> Clear & Resolve
+                                  </>
+                              ) : "Resolve Now"}
                             </Button>
                           </TableCell>
                         </TableRow>

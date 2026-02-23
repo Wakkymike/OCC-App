@@ -1,16 +1,18 @@
+
 'use client';
 
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, deleteDoc, doc } from 'firebase/firestore';
+import { collection, doc, updateDoc } from 'firebase/firestore';
 import type { ActiveAlert } from '@/lib/types';
 import { AlertTriangle, ShieldAlert, CheckCircle2, Bus as BusIcon, MapPin, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useMemo } from 'react';
 
 /**
  * A global, high-visibility overlay that triggers when a geofence breach is detected.
- * It is rendered in the root layout to ensure it covers any active page.
+ * It only shows alerts that have not yet been acknowledged.
  */
 export function GlobalAlertOverlay() {
   const firestore = useFirestore();
@@ -18,15 +20,21 @@ export function GlobalAlertOverlay() {
   
   // Listen for active alerts globally
   const alertsRef = useMemoFirebase(() => user ? collection(firestore, 'activeAlerts') : null, [firestore, user]);
-  const { data: alerts } = useCollection<ActiveAlert>(alertsRef);
+  const { data: allAlerts } = useCollection<ActiveAlert>(alertsRef);
   
-  // Only show if user is authenticated and there are active alerts in the system
+  // Filter for alerts that haven't been acknowledged yet
+  const alerts = useMemo(() => {
+    if (!allAlerts) return [];
+    return allAlerts.filter(alert => !alert.isAcknowledged);
+  }, [allAlerts]);
+
+  // Only show if user is authenticated and there are unacknowledged alerts
   if (!user || !alerts || alerts.length === 0) return null;
 
-  const handleDismiss = (alertId: string) => {
-    // Dismissing an alert removes it globally for all users.
-    // The event remains preserved in the Alert History log.
-    deleteDoc(doc(firestore, 'activeAlerts', alertId));
+  const handleAcknowledge = (alertId: string) => {
+    // Acknowledging an alert hides the global overlay but keeps it in the active list
+    // for validation on the RRA Dashboard.
+    updateDoc(doc(firestore, 'activeAlerts', alertId), { isAcknowledged: true });
   };
 
   return (
@@ -84,7 +92,7 @@ export function GlobalAlertOverlay() {
               </CardContent>
               <CardFooter className="bg-muted/30 p-4 border-t">
                 <Button 
-                  onClick={() => handleDismiss(alert.id)}
+                  onClick={() => handleAcknowledge(alert.id)}
                   className="w-full h-16 text-2xl font-black bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg"
                 >
                   <CheckCircle2 className="mr-3 h-8 w-8" />

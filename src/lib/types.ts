@@ -93,6 +93,7 @@ export interface ActiveAlert {
   monitorId: string;
   hazardValue: string;
   hazardDescription: string;
+  isAcknowledged: boolean;
   timestamp: Timestamp;
 }
 
