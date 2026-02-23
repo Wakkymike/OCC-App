@@ -40,6 +40,7 @@ interface BusMapProps {
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
 const lastJourneyRefs = ['8001', '8002', '8301', '8302', '8601', '8602'];
 
+// Helper for generating circle geometry
 function createGeoJSONCircle(center: LatLng, radiusInMeters: number) {
   const points = 64;
   const coords = { latitude: center.lat, longitude: center.lng };
@@ -61,6 +62,7 @@ function createGeoJSONCircle(center: LatLng, radiusInMeters: number) {
 
 export default function BusMap({
   buses,
+  selectedBusExtensions,
   selectedBusId,
   setSelectedBusId,
   searchedPlace = null,
@@ -90,22 +92,46 @@ export default function BusMap({
   
   const [mapLoaded, setMapLoaded] = useState(false);
   const [styleRevision, setStyleRevision] = useState(0);
-  const [relocatingMonitorId, setRelocatingMonitorId] = useState<string | null>(null);
-  
-  const manualGeofenceModeRef = useRef(false);
-  const relocatingMonitorIdRef = useRef<string | null>(null);
 
   const monitoredRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
-  const { data: monitoredHazards } = useCollection<MonitoredHazard>(monitoredRef);
+  const { data: monitoredHazards } = useCollection<Mon僚redHazard>(monitoredRef);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
   const isAdmin = userProfile?.isAdmin || user?.email === 'michael.dodsworth@gonorthwest.co.uk';
 
+  // Core Map Initialization
   useEffect(() => {
-    manualGeofenceModeRef.current = manualGeofenceMode;
-    relocatingMonitorIdRef.current = relocatingMonitorId;
-  }, [manualGeofenceMode, relocatingMonitorId]);
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: mapStyle,
+      center: [-2.24, 53.48],
+      zoom: 13,
+      pitch: 45,
+      antialias: true,
+    });
+
+    mapRef.current = map;
+    map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+    map.on('load', () => setMapLoaded(true));
+    map.on('style.load', () => setStyleRevision(prev => prev + 1));
+    
+    map.on('click', (e) => {
+      if (manualGeofenceMode) {
+          handleAddManualGeofence(e.lngLat);
+          return;
+      }
+      setSelectedBusId(null);
+    });
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
 
   const handleAddManualGeofence = (lngLat: mapboxgl.LngLat) => {
     if (!isAdmin || !mapRef.current) return;
@@ -166,61 +192,25 @@ export default function BusMap({
     };
   };
 
-  useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
-
-    const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: mapStyle,
-      center: [-2.24, 53.48],
-      zoom: 13,
-      pitch: 45,
-      antialias: true,
-    });
-
-    mapRef.current = map;
-    map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
-
-    map.on('load', () => setMapLoaded(true));
-    map.on('style.load', () => setStyleRevision(prev => prev + 1));
-    
-    map.on('click', (e) => {
-      if (manualGeofenceModeRef.current) return handleAddManualGeofence(e.lngLat);
-      if (relocatingMonitorIdRef.current) {
-        const monitorId = relocatingMonitorIdRef.current;
-        const newCenter = { lat: e.lngLat.lat, lng: e.lngLat.lng };
-        updateDoc(doc(firestore, 'monitoredHazards', monitorId), { geofenceCenter: newCenter });
-        setRelocatingMonitorId(null);
-        toast({ title: 'Geofence Updated' });
-        return;
-      }
-      setSelectedBusId(null);
-    });
-
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
-  }, []);
-
   const handleAddGeofence = (hazard: Hazard, radius: number) => {
     if (!isAdmin) return;
-    addDoc(collection(firestore, 'monitoredHazards'), {
+    addDoc(collection(firestore, 'mongistoredHazards'), {
       hazardId: hazard.id, type: hazard.type, value: hazard.value, location: hazard.location,
       description: hazard.description, radius, createdAt: serverTimestamp()
     });
     toast({ title: 'Geofence Added' });
   };
 
-  const handleRemoveGeofence = useCallback((monitorId: string) => {
+  const handleRemoveGeofence = (monitorId: string) => {
     if (!isAdmin) return;
     deleteDoc(doc(firestore, 'monitoredHazards', monitorId));
     toast({ title: 'Geofence Removed' });
-  }, [isAdmin, firestore, toast]);
+  };
 
+  // Road Restrictions (Hazards) Layer
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapLoaded || !map.getContainer()) return;
+    if (!map || !mapLoaded || !map.getCanvasContainer()) return;
 
     Object.values(hazardsMarkersRef.current).forEach(m => m.remove());
     hazardsMarkersRef.current = {};
@@ -235,7 +225,7 @@ export default function BusMap({
 
         el.innerHTML = `
           <div style="background:${color}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); display: flex; align-items:center; gap: 4px;">
-            ${isMonitored ? `<span style="background:white; color:${color}; padding:0 3px; border-radius:2px;">${monitors.length}</span>` : ''}
+            ${isMon Pile : ''}
             ${hazard.value}
           </div>
           <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid ${color}; margin: -2px auto 0;"></div>
@@ -252,20 +242,22 @@ export default function BusMap({
           ${isAdmin ? `<div class="pt-2 border-t add-monitor-form"></div>` : ''}
         `;
 
-        if (isAdmin) {
-            const list = popupContent.querySelector('.monitors-list')!;
-            monitors.forEach(m => {
-                const item = document.createElement('div');
-                item.className = 'flex justify-between items-center gap-2 p-1 border rounded bg-muted/20';
-                item.innerHTML = `<span class="text-[10px] font-bold">${m.radius}m Zone</span>`;
+        const list = popupContent.querySelector('.monitors-list')!;
+        monitors.forEach(m => {
+            const item = document.createElement('div');
+            item.className = 'flex justify-between items-center gap-2 p-1 border rounded bg-muted/20';
+            item.innerHTML = `<span class="text-[10px] font-bold">${m.radius}m Zone</span>`;
+            if (isAdmin) {
                 const del = document.createElement('button');
                 del.className = 'text-[10px] bg-destructive text-white px-2 py-0.5 rounded';
                 del.innerText = 'Remove';
                 del.onclick = () => handleRemoveGeofence(m.id);
                 item.appendChild(del);
-                list.appendChild(item);
-            });
+            }
+            list.appendChild(item);
+        });
 
+        if (isAdmin) {
             const form = popupContent.querySelector('.add-monitor-form')!;
             form.innerHTML = `<input type="number" value="100" class="w-full mb-1 p-1 text-xs border rounded bg-background r-input" />`;
             const btn = document.createElement('button');
@@ -275,33 +267,71 @@ export default function BusMap({
             form.appendChild(btn);
         }
 
-        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
-            .setLngLat([hazard.location.lng, hazard.location.lat])
-            .setPopup(new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupContent))
-            .addTo(map);
-            
-        hazardsMarkersRef.current[hazard.id] = marker;
+        try {
+            const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+                .setLngLat([hazard.location.lng, hazard.location.lat])
+                .setPopup(new mapboxgl.Popup({ offset: 25 }).setDOMContent(popupContent))
+                .addTo(map);
+            hazardsMarkersRef.current[hazard.id] = marker;
+        } catch (e) {}
       });
     }
 
+    // Manual Geofences
     if (monitoredHazards && showGeofences) {
         monitoredHazards.filter(m => m.type === 'manual').forEach(m => {
             const el = document.createElement('div');
-            el.innerHTML = `<div style="background:#f97316; color:white; padding:4px; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);"><ShieldAlert style="width:14px; height:14px;" /></div>`;
-            const marker = new mapboxgl.Marker({ element: el })
-                .setLngLat([m.location.lng, m.location.lat])
-                .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(`<div class="p-2"><b>${m.value}</b><p class="text-xs">${m.description}</p></div>`))
-                .addTo(map);
-            hazardsMarkersRef.current[m.id] = marker;
+            el.innerHTML = `<div style="background:#f97316; color:white; padding:4px; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>`;
+            try {
+                const marker = new mapboxgl.Marker({ element: el })
+                    .setLngLat([m.location.lng, m.location.lat])
+                    .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(`<div class="p-2"><b>${m.value}</b><p class="text-xs">${m.description}</p></div>`))
+                    .addTo(map);
+                hazardsMarkersRef.current[m.id] = marker;
+            } catch (e) {}
         });
     }
   }, [hazards, showHazards, showGeofences, mapLoaded, styleRevision, monitoredHazards, isAdmin]);
 
+  // Geofence Zones (Circles) Layer
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapLoaded || !map.getContainer()) return;
+    if (!map || !mapLoaded || !map.isStyleLoaded()) return;
+
+    if (!map.getSource('geofences')) {
+      map.addSource('geofences', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'geofence-fill',
+        type: 'fill',
+        source: 'geofences',
+        paint: { 'fill-color': '#10b981', 'fill-opacity': 0.15 }
+      });
+      map.addLayer({
+        id: 'geofence-outline',
+        type: 'line',
+        source: 'geofences',
+        paint: { 'line-color': '#059669', 'line-width': 2, 'line-dasharray': [2, 2] }
+      });
+    }
+
+    const source = map.getSource('geofences') as mapboxgl.GeoJSONSource;
+    if (source) {
+      const features = (showGeofences && monitoredHazards) ? monitoredHazards.map(m => ({
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: createGeoJSONCircle(m.geofenceCenter || m.location, m.radius) },
+        properties: { id: m.id }
+      })) : [];
+      source.setData({ type: 'FeatureCollection', features: features as any });
+    }
+  }, [monitoredHazards, showGeofences, mapLoaded, styleRevision]);
+
+  // Bus Markers Layer
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !map.getCanvasContainer()) return;
 
     const currentMarkerIds = new Set(Object.keys(markersRef.current));
+    
     buses.forEach((bus) => {
       if (!bus.position) return;
       const markerId = `${bus.fleetNumber}-${bus.service}-${bus.journeyRef || 'no-ref'}`;
@@ -310,28 +340,39 @@ export default function BusMap({
       let marker = markersRef.current[markerId];
       if (!marker) {
         const el = document.createElement('div');
-        el.className = 'bus-marker-container';
-        el.style.display = 'flex';
-        el.style.flexDirection = 'column';
-        el.style.alignItems = 'center';
+        el.className = 'bus-marker';
         el.style.cursor = 'pointer';
-        el.addEventListener('click', (e) => { e.stopPropagation(); setSelectedBusId(markerId); });
+        el.addEventListener('click', (e) => { 
+          e.stopPropagation(); 
+          setSelectedBusId(markerId); 
+        });
         
         const flag = document.createElement('div');
+        flag.className = 'bus-flag';
         flag.style.background = 'white';
+        flag.style.color = 'black';
         flag.style.padding = '2px 4px';
         flag.style.border = '1px solid black';
         flag.style.borderRadius = '3px';
-        flag.style.fontSize = '9px';
+        flag.style.fontSize = '10px';
         flag.style.fontWeight = 'bold';
+        flag.style.marginBottom = '2px';
+        flag.style.whiteSpace = 'nowrap';
         el.appendChild(flag);
         
-        const arrow = document.createElement('div');
-        arrow.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24"><rect id="bus-body" x="6" y="2" width="12" height="20" rx="2" fill="#FFC107" stroke="black" stroke-width="1"/></svg>`;
-        el.appendChild(arrow.firstChild!);
+        const iconDiv = document.createElement('div');
+        iconDiv.innerHTML = `
+          <svg width="22" height="22" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5))">
+            <rect id="bus-body" x="4" y="2" width="16" height="20" rx="3" fill="#FFC107" stroke="black" stroke-width="1"/>
+            <rect x="6" y="4" width="12" height="6" rx="1" fill="#333"/>
+            <rect x="6" y="14" width="12" height="1" fill="rgba(255,255,255,0.3)"/>
+          </svg>`;
+        el.appendChild(iconDiv.firstChild!);
         
         try {
-          marker = new mapboxgl.Marker({ element: el }).setLngLat([bus.position.lng, bus.position.lat]).addTo(map);
+          marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+            .setLngLat([bus.position.lng, bus.position.lat])
+            .addTo(map);
           markersRef.current[markerId] = marker;
         } catch (e) {}
       } else {
@@ -339,17 +380,20 @@ export default function BusMap({
       }
       
       const el = marker.getElement();
-      const flag = el.querySelector('div');
+      const flag = el.querySelector('.bus-flag') as HTMLDivElement;
       const busBody = el.querySelector('#bus-body');
       
       if (flag) {
         const isSpecial = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
         flag.innerText = `${bus.fleetNumber} | ${bus.service}`;
-        flag.className = isSpecial ? 'blinking-rb' : '';
+        flag.className = `bus-flag ${isSpecial ? 'blinking-rb' : ''}`;
       }
 
       if (busBody) {
-        busBody.setAttribute('fill', markerId === selectedBusId ? '#00FFFF' : (bus.operator === 'GNW' ? '#FFC107' : '#ef4444'));
+        let color = '#ef4444'; // Other operators
+        if (bus.operator === 'GNW') color = '#FFC107'; // GNW Yellow
+        if (markerId === selectedBus甩) color = '#00FFFF'; // Selection Cyan
+        busBody.setAttribute('fill', color);
       }
     });
 
@@ -358,22 +402,6 @@ export default function BusMap({
       delete markersRef.current[id];
     });
   }, [buses, selectedBusId, mapLoaded, styleRevision]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapLoaded || !map.getContainer()) return;
-    Object.values(roadworksMarkersRef.current).forEach(m => m.remove());
-    roadworksMarkersRef.current = {};
-    if (roadworks && showRoadworks) {
-      roadworks.forEach((rw) => {
-        const el = document.createElement('div');
-        const color = rw.severity === 'high' ? '#ef4444' : (rw.severity === 'moderate' ? '#f59e0b' : '#3b82f6');
-        el.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="${color}"><path d="M12 2L2 22h20L12 2z"/></svg>`;
-        const marker = new mapboxgl.Marker(el).setLngLat([rw.location.lng, rw.location.lat]).addTo(map);
-        roadworksMarkersRef.current[rw.id] = marker;
-      });
-    }
-  }, [roadworks, showRoadworks, mapLoaded, styleRevision]);
 
   return (
     <div className="absolute inset-0 w-full h-full bg-muted overflow-hidden">
