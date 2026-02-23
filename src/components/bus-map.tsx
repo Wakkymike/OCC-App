@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -146,7 +147,7 @@ export default function BusMap({
             </div>
             <div>
                 <label class="text-[10px] font-bold block mb-1">Radius (meters):</label>
-                <input type="number" value="100" class="w-full p-2 text-xs border rounded bg-background manual-radius" />
+                <input type="number" value="150" class="w-full p-2 text-xs border rounded bg-background manual-radius" />
             </div>
             <button class="w-full py-2 px-3 text-xs font-bold rounded bg-primary text-primary-foreground save-manual-btn">
                 Create Geofence
@@ -221,6 +222,7 @@ export default function BusMap({
     const map = mapRef.current;
     if (!map || !mapLoaded || !map.getCanvasContainer()) return;
 
+    // Standard Mapbox cleanup and re-rendering for hazards
     Object.values(hazardsMarkersRef.current).forEach(m => m.remove());
     hazardsMarkersRef.current = {};
 
@@ -268,7 +270,7 @@ export default function BusMap({
 
         if (isAdmin) {
             const form = popupContent.querySelector('.add-monitor-form')!;
-            form.innerHTML = `<input type="number" value="100" class="w-full mb-1 p-1 text-xs border rounded bg-background r-input" />`;
+            form.innerHTML = `<input type="number" value="150" class="w-full mb-1 p-1 text-xs border rounded bg-background r-input" />`;
             const btn = document.createElement('button');
             btn.className = 'w-full py-1 text-xs font-bold rounded bg-primary text-primary-foreground';
             btn.innerText = 'Add Geofence';

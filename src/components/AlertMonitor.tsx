@@ -4,12 +4,15 @@
 import { useEffect, useRef } from 'react';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { MonitoredHazard, ActiveAlert } from '@/lib/types';
 
-// Haversine formula to calculate distance in meters
+/**
+ * Haversine formula to calculate the great-circle distance between two points 
+ * on a sphere given their longitudes and latitudes.
+ */
 function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371e3; // metres
+  const R = 6371e3; // Earth's radius in metres
   const φ1 = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
   const Δφ = ((lat2 - lat1) * Math.PI) / 180;
@@ -23,31 +26,38 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
   return R * c;
 }
 
+/**
+ * Background component that monitors live bus positions against active geofences.
+ * Triggers alerts when a Go North West vehicle enters a restricted zone.
+ */
 export function AlertMonitor() {
   const { user } = useUser();
   const { buses } = useBusTracker();
   const firestore = useFirestore();
   
-  // 1. Fetch all active geofence monitors
+  // Fetch all active geofence monitors
   const hazardsRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
   const { data: monitoredHazards } = useCollection<MonitoredHazard>(hazardsRef);
   
-  // 2. Fetch current active alerts to check for duplicates locally
+  // Fetch currently active alerts to prevent duplicate triggers
   const activeAlertsRef = useMemoFirebase(() => user ? collection(firestore, 'activeAlerts') : null, [firestore, user]);
   const { data: activeAlerts } = useCollection<ActiveAlert>(activeAlertsRef);
 
-  // Use a ref to prevent overlapping write operations
+  // Use a ref to prevent overlapping write operations for the same event
   const isWritingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    // We need the user, monitors, buses, and current alerts to make a decision
+    // Evaluation requires authenticated user, active monitors, and live bus data
     if (!user || !monitoredHazards || !buses || !activeAlerts || buses.length === 0) return;
 
-    // Filter for GNW buses with valid positions
+    // Focus exclusively on GNW vehicles with valid GPS coordinates
     const gnwBuses = buses.filter(b => b.operator === 'GNW' && b.position);
     
     gnwBuses.forEach((bus) => {
-      const busId = `${bus.fleetNumber}-${bus.service}`;
+      // Standardize the Bus ID by removing whitespace for reliable matching
+      const fleet = String(bus.fleetNumber).replace(/\s+/g, '').toUpperCase();
+      const svc = String(bus.service).replace(/\s+/g, '').toUpperCase();
+      const busId = `${fleet}-${svc}`;
       
       for (const monitor of monitoredHazards) {
         const center = monitor.geofenceCenter || monitor.location;
@@ -58,17 +68,20 @@ export function AlertMonitor() {
           center.lng
         );
 
-        // If the bus is within the radius
-        if (distance <= monitor.radius) {
+        // Breach detected if bus is within radius (plus 5m buffer for GPS jitter)
+        if (distance <= (monitor.radius + 5)) {
           const alertKey = `${busId}-${monitor.id}`;
           
-          // Check if we are already in the process of creating this alert
+          // Skip if a write operation for this specific breach is already in progress
           if (isWritingRef.current.has(alertKey)) continue;
 
-          // Check if an alert already exists in our local (synced) list
-          const existingAlert = activeAlerts.find(a => a.busId === busId && a.monitorId === monitor.id);
+          // Check if an alert for this bus in this zone already exists in the active list
+          const existingAlert = activeAlerts.find(a => 
+            (a.busId === busId || a.fleetNumber === bus.fleetNumber) && 
+            a.monitorId === monitor.id
+          );
           
-          // If no active alert exists, create one
+          // Trigger new alert if none currently exists for this breach
           if (!existingAlert) {
             isWritingRef.current.add(alertKey);
             
@@ -84,20 +97,20 @@ export function AlertMonitor() {
               timestamp: serverTimestamp(),
             };
 
-            // Write both ephemeral and persistent records
             const alertsRef = collection(firestore, 'activeAlerts');
             const historyRef = collection(firestore, 'alertHistory');
 
+            // Record the breach in both the live monitoring collection and the persistent audit log
             Promise.all([
                 addDoc(alertsRef, alertData),
                 addDoc(historyRef, alertData)
             ]).catch(err => {
-                console.error("Failed to create alert documents:", err);
+                console.error("Critical: Failed to record geofence breach:", err);
             }).finally(() => {
-                // Keep the key in the set for a moment to allow Firestore to sync the local collection
+                // Lock out re-triggering for 10 seconds to allow Firestore state to synchronize
                 setTimeout(() => {
                     isWritingRef.current.delete(alertKey);
-                }, 2000);
+                }, 10000);
             });
           }
         }
