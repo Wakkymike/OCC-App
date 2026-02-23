@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -348,23 +347,17 @@ export default function BusMap({
         
         const flag = document.createElement('div');
         flag.className = 'bus-flag';
-        flag.style.background = 'white';
-        flag.style.color = 'black';
-        flag.style.padding = '2px 4px';
-        flag.style.border = '1px solid black';
-        flag.style.borderRadius = '3px';
-        flag.style.fontSize = '10px';
-        flag.style.fontWeight = 'bold';
-        flag.style.marginBottom = '2px';
-        flag.style.whiteSpace = 'nowrap';
         el.appendChild(flag);
         
         const iconDiv = document.createElement('div');
         iconDiv.innerHTML = `
-          <svg width="22" height="22" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5))">
-            <rect id="bus-body" x="4" y="2" width="16" height="20" rx="3" fill="#FFC107" stroke="black" stroke-width="1"/>
+          <svg width="24" height="24" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5))">
+            <rect id="bus-body" x="4" y="2" width="16" height="20" rx="3" fill="#FFC107" stroke="black" stroke-width="1.5"/>
             <rect x="6" y="4" width="12" height="6" rx="1" fill="#333"/>
             <rect x="6" y="14" width="12" height="1" fill="rgba(255,255,255,0.3)"/>
+            <line x1="8" y1="2" x2="8" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
+            <line x1="12" y1="2" x2="12" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
+            <line x1="16" y1="2" x2="16" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
           </svg>`;
         el.appendChild(iconDiv.firstChild!);
         
@@ -383,15 +376,18 @@ export default function BusMap({
       const busBody = el.querySelector('#bus-body');
       
       if (flag) {
+        const dir = bus.direction?.toLowerCase() === 'inbound' ? '[I]' : '[O]';
         const isSpecial = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
-        flag.innerText = `${bus.fleetNumber} | ${bus.service}`;
+        
+        // Detailed flag content
+        flag.innerText = `${bus.fleetNumber} | ${bus.service} | ${dir} ${bus.destination} | ${bus.runningBoard}`;
         flag.className = `bus-flag ${isSpecial ? 'blinking-rb' : ''}`;
       }
 
       if (busBody) {
-        let color = '#ef4444'; // Other operators
-        if (bus.operator === 'GNW') color = '#FFC107'; // GNW Yellow
-        if (markerId === selectedBusId) color = '#00FFFF'; // Selection Cyan
+        let color = '#ef4444'; // Other operators (Red)
+        if (bus.operator === 'GNW') color = '#FFC107'; // GNW (Yellow)
+        if (markerId === selectedBusId) color = '#00FFFF'; // Selection (Cyan)
         busBody.setAttribute('fill', color);
       }
     });
