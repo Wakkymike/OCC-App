@@ -114,10 +114,15 @@ export default function BusMap({
     }, { merge: true });
   };
 
+  /**
+   * Effect for Hazard (Restriction) Markers
+   */
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !map.getContainer()) return;
+    // CRITICAL: Ensure map container exists before adding markers to prevent 'appendChild' TypeError
+    if (!map || !map.isStyleLoaded() || !map.getContainer() || !map.getCanvasContainer()) return;
 
+    // Clear existing hazard markers
     Object.values(hazardsMarkersRef.current).forEach(m => m.remove());
     hazardsMarkersRef.current = {};
 
@@ -146,7 +151,7 @@ export default function BusMap({
           <div class="space-y-1">
             <h3 class="font-bold text-sm uppercase text-muted-foreground">${hazard.type} Restriction</h3>
             <p class="text-xl font-black">${hazard.value}</p>
-            <p class="text-xs opacity-70">${hazard.description}</p>
+            ${hazard.description ? `<p class="text-xs opacity-70">${hazard.description}</p>` : ''}
           </div>
           <div class="pt-2 border-t geofence-control"></div>
         `;
@@ -183,9 +188,12 @@ export default function BusMap({
     }
   }, [hazards, showHazards, styleRevision, monitoredHazards, isAdmin]);
 
+  /**
+   * Effect for Bus Markers
+   */
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !map.getContainer()) return;
+    if (!map || !map.isStyleLoaded() || !map.getContainer() || !map.getCanvasContainer()) return;
 
     const currentMarkerIds = new Set(Object.keys(markersRef.current));
     buses.forEach((bus) => {
@@ -254,9 +262,12 @@ export default function BusMap({
     });
   }, [buses, selectedBusId, styleRevision]);
 
+  /**
+   * Effect for Roadwork Markers
+   */
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !map.getContainer()) return;
+    if (!map || !map.isStyleLoaded() || !map.getContainer() || !map.getCanvasContainer()) return;
 
     Object.values(roadworksMarkersRef.current).forEach(m => m.remove());
     roadworksMarkersRef.current = {};
