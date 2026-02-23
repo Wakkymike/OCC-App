@@ -20,11 +20,11 @@
     "MonitoredHazard": {
       "title": "Monitored Hazard",
       "type": "object",
-      "description": "A geofence monitor associated with a road restriction.",
+      "description": "A geofence monitor associated with a road restriction or manual marker.",
       "properties": {
-        "hazardId": { "type": "string", "description": "The ID of the source hazard." },
-        "type": { "type": "string", "enum": ["height", "width", "both"] },
-        "value": { "type": "string" },
+        "hazardId": { "type": "string", "description": "The ID of the source hazard or 'manual'." },
+        "type": { "type": "string", "enum": ["height", "width", "both", "manual"] },
+        "value": { "type": "string", "description": "The restriction value or manual category." },
         "location": {
           "type": "object",
           "properties": {

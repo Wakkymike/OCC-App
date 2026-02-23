@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -9,7 +10,7 @@ import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard } from '
 import SearchBar from '@/components/search-bar';
 import LocationSearchBar from '@/components/location-search-bar';
 import mapboxgl from 'mapbox-gl';
-import { Home, Layers3, Radio } from 'lucide-react';
+import { Home, Layers3, Radio, ShieldPlus } from 'lucide-react';
 import { buttonVariants, Button } from '@/components/ui/button';
 import Link from 'next/link';
 import MapControls from '@/components/map-controls';
@@ -20,6 +21,7 @@ import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
 import { useSearchParams } from 'next/navigation';
 import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
+import { cn } from '@/lib/utils';
 
 
 export default function Page() {
@@ -63,6 +65,9 @@ export default function Page() {
   const [showRoadworks, setShowRoadworks] = useState(true);
   const [showHazards, setShowHazards] = useState(true);
   const [showGeofences, setShowGeofences] = useState(true);
+  
+  const [manualGeofenceMode, setManualGeofenceMode] = useState(false);
+  
   const { toast } = useToast();
 
   const [metrolinkData, setMetrolinkData] = useState<MetrolinkData | null>(null);
@@ -386,6 +391,14 @@ export default function Page() {
     toast({ title: 'Export Successful', description: `Route downloaded.` });
   };
   
+  const toggleManualGeofence = () => {
+    const newState = !manualGeofenceMode;
+    setManualGeofenceMode(newState);
+    if (newState) {
+        toast({ title: 'Manual Geofence Mode', description: 'Click anywhere on the map to add a monitoring zone.' });
+    }
+  };
+
   return (
     <div className="h-screen w-screen relative">
       <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
@@ -397,14 +410,25 @@ export default function Page() {
           <Home className="h-5 w-5" />
         </Link>
         {userProfile?.isAdmin && (
-         <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsRecorderOpen(true)}
-            aria-label="Open Route Recorder"
-          >
-            <Radio className="h-5 w-5" />
-         </Button>
+         <div className="flex gap-2">
+            <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsRecorderOpen(true)}
+                aria-label="Open Route Recorder"
+            >
+                <Radio className="h-5 w-5" />
+            </Button>
+            <Button
+                variant={manualGeofenceMode ? "destructive" : "outline"}
+                size="icon"
+                onClick={toggleManualGeofence}
+                aria-label="Add Manual Geofence"
+                className={cn(manualGeofenceMode && "animate-pulse")}
+            >
+                <ShieldPlus className="h-5 w-5" />
+            </Button>
+         </div>
         )}
       </div>
       <div className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-center items-start gap-4">
@@ -475,6 +499,8 @@ export default function Page() {
         hazards={hazards}
         showHazards={showHazards}
         showGeofences={showGeofences}
+        manualGeofenceMode={manualGeofenceMode}
+        setManualGeofenceMode={setManualGeofenceMode}
       />
       <RouteRecorderDialog
         isOpen={isRecorderOpen}

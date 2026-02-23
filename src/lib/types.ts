@@ -1,3 +1,4 @@
+
 import { Timestamp } from 'firebase/firestore';
 
 export interface LatLng {
@@ -65,7 +66,7 @@ export interface NetworkUpdate {
 
 export interface Hazard {
   id: string;
-  type: 'height' | 'width' | 'both';
+  type: 'height' | 'width' | 'both' | 'manual';
   value: string;
   location: LatLng;
   description: string;
@@ -73,8 +74,8 @@ export interface Hazard {
 
 export interface MonitoredHazard {
   id: string; // Firestore Document ID
-  hazardId: string; // The original hazard ID from OSM
-  type: 'height' | 'width' | 'both';
+  hazardId: string; // The original hazard ID from OSM or 'manual'
+  type: 'height' | 'width' | 'both' | 'manual';
   value: string;
   location: LatLng;
   geofenceCenter?: LatLng;

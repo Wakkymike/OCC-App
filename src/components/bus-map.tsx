@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -6,7 +7,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard } from '@/lib/types';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
 import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
-import { Loader2, ShieldAlert, Navigation, Trash2, Plus, Info } from 'lucide-react';
+import { Loader2, ShieldAlert, Navigation, Trash2, Plus, Info, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
@@ -32,6 +33,8 @@ interface BusMapProps {
   hazards: Hazard[] | null;
   showHazards: boolean;
   showGeofences: boolean;
+  manualGeofenceMode?: boolean;
+  setManualGeofenceMode?: (val: boolean) => void;
 }
 
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
@@ -76,6 +79,8 @@ export default function BusMap({
   hazards,
   showHazards,
   showGeofences,
+  manualGeofenceMode = false,
+  setManualGeofenceMode,
 }: BusMapProps) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -90,6 +95,7 @@ export default function BusMap({
   const [styleRevision, setStyleRevision] = useState(0);
   const [relocatingMonitorId, setRelocatingMonitorId] = useState<string | null>(null);
   const relocatingMonitorIdRef = useRef<string | null>(null);
+  const manualGeofenceModeRef = useRef(false);
 
   const monitoredRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
   const { data: monitoredHazards } = useCollection<MonitoredHazard>(monitoredRef);
@@ -100,7 +106,78 @@ export default function BusMap({
 
   useEffect(() => {
     relocatingMonitorIdRef.current = relocatingMonitorId;
-  }, [relocatingMonitorId]);
+    manualGeofenceModeRef.current = manualGeofenceMode;
+  }, [relocatingMonitorId, manualGeofenceMode]);
+
+  const handleAddManualGeofence = (lngLat: mapboxgl.LngLat) => {
+    if (!isAdmin) return;
+    
+    const popupContent = document.createElement('div');
+    popupContent.className = 'p-4 space-y-3 min-w-[260px] text-foreground';
+    popupContent.innerHTML = `
+        <div class="space-y-1">
+            <h3 class="font-bold text-sm uppercase">Add Manual Monitoring Zone</h3>
+            <p class="text-[10px] text-muted-foreground italic">Place custom monitoring anywhere for the GNW network.</p>
+        </div>
+        <div class="space-y-3 pt-2">
+            <div>
+                <label class="text-[10px] font-bold block mb-1">Category:</label>
+                <select class="w-full p-2 text-xs border rounded bg-background manual-category">
+                    <option value="Road Closed">Road Closed</option>
+                    <option value="Weight Limit">Weight Limit</option>
+                    <option value="Unauthorized Access">Unauthorized Access</option>
+                    <option value="Environmental Zone">Environmental Zone</option>
+                    <option value="Incident Area">Incident Area</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-[10px] font-bold block mb-1">Description/Location Name:</label>
+                <input type="text" placeholder="e.g. Deansgate Diversion" class="w-full p-2 text-xs border rounded bg-background manual-desc" />
+            </div>
+            <div>
+                <label class="text-[10px] font-bold block mb-1">Radius (meters):</label>
+                <input type="number" value="100" class="w-full p-2 text-xs border rounded bg-background manual-radius" />
+            </div>
+            <button class="w-full py-2 px-3 text-xs font-bold rounded bg-primary text-primary-foreground save-manual-btn">
+                Create Geofence
+            </button>
+        </div>
+    `;
+
+    const popup = new mapboxgl.Popup({ offset: 10, closeOnClick: false })
+        .setLngLat(lngLat)
+        .setDOMContent(popupContent)
+        .addTo(mapRef.current!);
+
+    const saveBtn = popupContent.querySelector('.save-manual-btn') as HTMLButtonElement;
+    saveBtn.onclick = async () => {
+        const value = (popupContent.querySelector('.manual-category') as HTMLSelectElement).value;
+        const description = (popupContent.querySelector('.manual-desc') as HTMLInputElement).value;
+        const radius = parseInt((popupContent.querySelector('.manual-radius') as HTMLInputElement).value);
+        
+        if (!description) {
+            toast({ variant: 'destructive', title: 'Missing Description' });
+            return;
+        }
+
+        try {
+            await addDoc(collection(firestore, 'monitoredHazards'), {
+                hazardId: 'manual',
+                type: 'manual',
+                value,
+                location: { lat: lngLat.lat, lng: lngLat.lng },
+                description,
+                radius,
+                createdAt: serverTimestamp()
+            });
+            toast({ title: 'Manual Geofence Added', description: 'Monitoring active.' });
+            popup.remove();
+            if (setManualGeofenceMode) setManualGeofenceMode(false);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+  };
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -131,6 +208,11 @@ export default function BusMap({
     map.on('style.load', () => setStyleRevision(prev => prev + 1));
     
     map.on('click', (e) => {
+      if (manualGeofenceModeRef.current) {
+        handleAddManualGeofence(e.lngLat);
+        return;
+      }
+
       if (relocatingMonitorIdRef.current) {
         const monitorId = relocatingMonitorIdRef.current;
         const newCenter = { lat: e.lngLat.lat, lng: e.lngLat.lng };
@@ -152,7 +234,13 @@ export default function BusMap({
         mapRef.current = null;
       }
     };
-  }, [firestore, setSelectedBusId, toast]);
+  }, [firestore, setSelectedBusId, toast, setManualGeofenceMode]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    map.getCanvas().style.cursor = manualGeofenceMode ? 'crosshair' : relocatingMonitorId ? 'crosshair' : '';
+  }, [manualGeofenceMode, relocatingMonitorId, mapLoaded]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -179,7 +267,12 @@ export default function BusMap({
             'visibility': showGeofences ? 'visible' : 'none'
           },
           paint: {
-            'fill-color': '#10b981',
+            'fill-color': [
+                'match',
+                ['get', 'type'],
+                'manual', '#f97316',
+                '#10b981'
+            ],
             'fill-opacity': 0.15
           }
         });
@@ -192,7 +285,12 @@ export default function BusMap({
             'visibility': showGeofences ? 'visible' : 'none'
           },
           paint: {
-            'line-color': '#10b981',
+            'line-color': [
+                'match',
+                ['get', 'type'],
+                'manual', '#f97316',
+                '#10b981'
+            ],
             'line-width': 2,
             'line-dasharray': [2, 2]
           }
@@ -227,7 +325,7 @@ export default function BusMap({
                 type: 'Polygon',
                 coordinates: createGeoJSONCircle(center, h.radius)
             },
-            properties: { id: h.id }
+            properties: { id: h.id, type: h.type }
         };
     }) || [];
 
@@ -264,6 +362,7 @@ export default function BusMap({
     Object.values(hazardsMarkersRef.current).forEach(m => m.remove());
     hazardsMarkersRef.current = {};
 
+    // 1. Process OSM Hazards
     if (hazards && showHazards) {
       hazards.forEach((hazard) => {
         const monitors = monitoredHazards?.filter(m => m.hazardId === hazard.id) || [];
@@ -360,21 +459,59 @@ export default function BusMap({
             addContainer.appendChild(input);
             addContainer.appendChild(btn);
           }
-        } else if (isMonitored) {
-            const listContainer = popupContent.querySelector('.monitors-list');
-            if (listContainer) {
-                listContainer.innerHTML = `
-                    <div class="flex items-center gap-2 text-[10px] text-green-600 font-bold bg-green-50 p-2 rounded">
-                        <ShieldAlert class="h-3 w-3" /> Monitoring Active
-                    </div>
-                `;
-            }
         }
             
         hazardsMarkersRef.current[hazard.id] = marker;
       });
     }
-  }, [hazards, showHazards, mapLoaded, styleRevision, monitoredHazards, isAdmin, relocatingMonitorId, toast, handleRemoveGeofence]);
+
+    // 2. Process Manual Geofences (Plot them as distinct pins)
+    if (monitoredHazards && showGeofences) {
+        monitoredHazards.filter(m => m.type === 'manual').forEach(m => {
+            const el = document.createElement('div');
+            el.className = 'manual-geofence-marker cursor-pointer';
+            el.innerHTML = `
+                <div style="background:#f97316; color:white; padding:4px; border-radius:50%; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); display: flex; align-items:center; justify-content:center;">
+                    <ShieldAlert style="width:14px; height:14px;" />
+                </div>
+            `;
+
+            const popupContent = document.createElement('div');
+            popupContent.className = 'p-3 space-y-2 min-w-[200px] text-foreground';
+            popupContent.innerHTML = `
+                <div class="space-y-1">
+                    <h3 class="font-bold text-[10px] uppercase text-orange-600">Manual Monitor</h3>
+                    <p class="text-sm font-black">${m.value}</p>
+                    <p class="text-xs">${m.description}</p>
+                    <p class="text-[10px] opacity-60">Radius: ${m.radius}m</p>
+                </div>
+                ${isAdmin ? `
+                <div class="pt-2 border-t grid grid-cols-2 gap-2">
+                    <button class="py-1 px-2 text-[10px] font-bold rounded bg-secondary hover:bg-secondary/80 relocate-manual">Relocate</button>
+                    <button class="py-1 px-2 text-[10px] font-bold rounded bg-destructive text-white remove-manual">Remove</button>
+                </div>
+                ` : ''}
+            `;
+
+            const marker = new mapboxgl.Marker({ element: el })
+                .setLngLat([m.location.lng, m.location.lat])
+                .setPopup(new mapboxgl.Popup({ offset: 10 }).setDOMContent(popupContent))
+                .addTo(map);
+
+            if (isAdmin) {
+                (popupContent.querySelector('.relocate-manual') as HTMLButtonElement).onclick = () => {
+                    setRelocatingMonitorId(m.id);
+                    marker.getPopup().remove();
+                    map.getCanvas().style.cursor = 'crosshair';
+                };
+                (popupContent.querySelector('.remove-manual') as HTMLButtonElement).onclick = () => handleRemoveGeofence(m.id);
+            }
+
+            hazardsMarkersRef.current[m.id] = marker;
+        });
+    }
+
+  }, [hazards, showHazards, showGeofences, mapLoaded, styleRevision, monitoredHazards, isAdmin, relocatingMonitorId, toast, handleRemoveGeofence]);
 
   useEffect(() => {
     const map = mapRef.current;
