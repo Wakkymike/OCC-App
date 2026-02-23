@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import BusMap from '@/components/bus-map';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { useRoadworksTracker } from '@/hooks/useRoadworksTracker';
-import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork } from '@/lib/types';
+import { useHazardsTracker } from '@/hooks/useHazardsTracker';
+import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard } from '@/lib/types';
 import SearchBar from '@/components/search-bar';
 import LocationSearchBar from '@/components/location-search-bar';
 import mapboxgl from 'mapbox-gl';
@@ -33,6 +34,8 @@ export default function Page() {
   
   const { buses, error: busError } = useBusTracker();
   const { roadworks, error: roadworksError } = useRoadworksTracker();
+  const { hazards, error: hazardsError } = useHazardsTracker();
+  
   const [displayBuses, setDisplayBuses] = useState<Bus[]>([]);
   const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
   const [searchedPlace, setSearchedPlace] = useState<LatLng | null>(null);
@@ -58,6 +61,7 @@ export default function Page() {
   const [showFirstBus, setShowFirstBus] = useState(false);
   const [showDiamondBus, setShowDiamondBus] = useState(false);
   const [showRoadworks, setShowRoadworks] = useState(true);
+  const [showHazards, setShowHazards] = useState(true);
   const { toast } = useToast();
 
   const [metrolinkData, setMetrolinkData] = useState<MetrolinkData | null>(null);
@@ -420,11 +424,12 @@ export default function Page() {
         <LocationSearchBar onSearch={handleLocationSearch} onClear={handleLocationClear} />
         <SearchBar onSearch={handleBusSearch} onClear={handleBusClear} />
       </div>
-      {(busError || roadworksError) && (
-        <p className="absolute top-24 left-4 z-10 text-destructive bg-card p-2 rounded-lg shadow-md">
-          {busError && <div>{busError}</div>}
-          {roadworksError && <div>{roadworksError}</div>}
-        </p>
+      {(busError || roadworksError || hazardsError) && (
+        <div className="absolute top-24 left-4 z-10 flex flex-col gap-2">
+           {busError && <p className="text-destructive bg-card p-2 rounded-lg shadow-md">{busError}</p>}
+           {roadworksError && <p className="text-destructive bg-card p-2 rounded-lg shadow-md">{roadworksError}</p>}
+           {hazardsError && <p className="text-destructive bg-card p-2 rounded-lg shadow-md">Hazards: {hazardsError}</p>}
+        </div>
       )}
       <div className="absolute bottom-4 right-4 z-10">
         <Popover>
@@ -458,6 +463,8 @@ export default function Page() {
               setShowDiamondBus={setShowDiamondBus}
               showRoadworks={showRoadworks}
               setShowRoadworks={setShowRoadworks}
+              showHazards={showHazards}
+              setShowHazards={setShowHazards}
             />
           </PopoverContent>
         </Popover>
@@ -476,6 +483,8 @@ export default function Page() {
         journeyPlan={journeyPlan}
         roadworks={roadworks}
         showRoadworks={showRoadworks}
+        hazards={hazards}
+        showHazards={showHazards}
       />
       <RouteRecorderDialog
         isOpen={isRecorderOpen}

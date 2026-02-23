@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork } from '@/lib/types';
+import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard } from '@/lib/types';
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
 
@@ -25,6 +25,8 @@ interface BusMapProps {
   journeyPlan: JourneyPlan | null;
   roadworks: Roadwork[] | null;
   showRoadworks: boolean;
+  hazards: Hazard[] | null;
+  showHazards: boolean;
 }
 
 const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
@@ -46,14 +48,15 @@ export default function BusMap({
   journeyPlan,
   roadworks,
   showRoadworks,
+  hazards,
+  showHazards,
 }: BusMapProps) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markersRef = useRef<Record<string, mapboxgl.Marker>>({});
   const roadworksMarkersRef = useRef<Record<string, mapboxgl.Marker>>({});
+  const hazardsMarkersRef = useRef<Record<string, mapboxgl.Marker>>({});
   const placeMarkerRef = useRef<mapboxgl.Marker | null>(null);
-  const journeyStartMarkerRef = useRef<mapboxgl.Marker | null>(null);
-  const journeyEndMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const animationFrameRefs = useRef<Record<string, number>>({});
   const [styleRevision, setStyleRevision] = useState(0);
   const currentStyleRef = useRef(mapStyle);
@@ -97,31 +100,6 @@ export default function BusMap({
                 'layout': { 'visibility': 'none' },
             }, labelLayerId);
         }
-        if (!map.getSource('mapbox-traffic')) {
-            map.addSource('mapbox-traffic', { type: 'vector', url: 'mapbox://mapbox.mapbox-traffic-v1' });
-        }
-        if (!map.getLayer('traffic-layer')) {
-            map.addLayer({
-                id: 'traffic-layer',
-                type: 'line',
-                source: 'mapbox-traffic',
-                'source-layer': 'traffic',
-                paint: {
-                    'line-width': 2,
-                    'line-color': ['case',
-                        ['boolean', ['feature-state', 'hover'], false], '#ff0000',
-                        ['match', ['get', 'congestion'],
-                            'low', '#55c57a',
-                            'moderate', '#f2d40d',
-                            'heavy', '#ff9900',
-                            'severe', '#ff4d4d',
-                            '#000000'
-                        ]
-                    ],
-                },
-                layout: { 'visibility': 'visible' },
-            });
-        }
         if (!map.getLayer('bus-stops')) {
             map.addLayer({
                 id: 'bus-stops',
@@ -147,6 +125,8 @@ export default function BusMap({
       markersRef.current = {};
       Object.values(roadworksMarkersRef.current).forEach(marker => marker.remove());
       roadworksMarkersRef.current = {};
+      Object.values(hazardsMarkersRef.current).forEach(marker => marker.remove());
+      hazardsMarkersRef.current = {};
       setupOptionalLayers(mapRef.current);
       setStyleRevision(rev => rev + 1);
     };
@@ -317,7 +297,6 @@ export default function BusMap({
       const isGnwBus = bus.operator === 'GNW';
       const isSchoolService = isGnwBus && bus.journeyRef ? schoolJourneyRefs.includes(bus.journeyRef) : false;
       const isNightBus = isGnwBus && bus.runningBoard ? nightBusRunningBoards.includes(bus.runningBoard) : false;
-      // Explicitly gate flashing logic by isGnwBus to ensure it only applies to Go North West
       const isFirstJourney = isGnwBus && bus.journeyRef && firstJourneyRefs.includes(bus.journeyRef);
       const isLastJourney = isGnwBus && bus.journeyRef && lastJourneyRefs.includes(bus.journeyRef);
 
@@ -421,6 +400,38 @@ export default function BusMap({
       });
     }
   }, [roadworks, showRoadworks, styleRevision]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    Object.values(hazardsMarkersRef.current).forEach(m => m.remove());
+    hazardsMarkersRef.current = {};
+    if (hazards && showHazards) {
+      hazards.forEach((hazard) => {
+        const el = document.createElement('div');
+        const color = hazard.type === 'height' ? '#e11d48' : hazard.type === 'width' ? '#2563eb' : '#9333ea';
+        el.innerHTML = `
+          <div style="background:${color}; color:white; padding:2px 4px; border-radius:4px; font-size:10px; font-weight:bold; border:1px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);">
+            ${hazard.value}
+          </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block; margin: -2px auto 0;">
+            <path d="M12 2L20 20H4L12 2Z" fill="${color}" stroke="white" stroke-width="2"/>
+          </svg>
+        `.trim();
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([hazard.location.lng, hazard.location.lat])
+          .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+            <div style="padding:4px; color:#333;">
+              <div style="font-weight:bold; margin-bottom:4px;">${hazard.type.toUpperCase()} RESTRICTION</div>
+              <div style="font-size:14px; font-weight:bold; color:${color};">${hazard.value}</div>
+              <div style="font-size:11px; margin-top:4px;">${hazard.description}</div>
+            </div>
+          `))
+          .addTo(map);
+        hazardsMarkersRef.current[hazard.id] = marker;
+      });
+    }
+  }, [hazards, showHazards, styleRevision]);
 
   return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />;
 }

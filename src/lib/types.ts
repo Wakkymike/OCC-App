@@ -66,3 +66,11 @@ export interface NetworkUpdate {
   isVisible: boolean;
   createdAt: Timestamp;
 }
+
+export interface Hazard {
+  id: string;
+  type: 'height' | 'width' | 'both';
+  value: string;
+  location: LatLng;
+  description: string;
+}
