@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -63,7 +62,7 @@ export default function Page() {
   const [showFirstBus, setShowFirstBus] = useState(false);
   const [showDiamondBus, setShowDiamondBus] = useState(false);
   const [showRoadworks, setShowRoadworks] = useState(true);
-  const [showHazards, setShowHazards] = useState(true);
+  const [showHazards, setShowHazards] = useState(false); // Default to off
   const [showGeofences, setShowGeofences] = useState(true);
   
   const [manualGeofenceMode, setManualGeofenceMode] = useState(false);
