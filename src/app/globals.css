@@ -106,11 +106,15 @@
 }
 
 .bus-flag {
-  color:white;
-  border-radius:4px;
-  padding:2px 4px;
-  margin-bottom:2px;
-  white-space:nowrap;
+  color: black;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 .bus-marker svg {

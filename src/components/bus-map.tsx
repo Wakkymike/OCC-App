@@ -353,7 +353,6 @@ export default function BusMap({
         
         const flag = document.createElement('div');
         flag.className = 'bus-flag';
-        flag.style.backgroundColor = 'rgba(30, 30, 30, 0.9)';
         el.appendChild(flag);
         
         const iconContainer = document.createElement('div');
@@ -388,7 +387,7 @@ export default function BusMap({
         const dirLabel = bus.direction?.toLowerCase() === 'inbound' ? '[I]' : '[O]';
         const isSpecial = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
         
-        // Exact format: Fleet number, service number, inbound/outbound [I][O] destination and board number
+        // Exact format: Fleet number | service | [I/O] destination | Board: board number
         flag.innerText = `${bus.fleetNumber} | ${bus.service} | ${dirLabel} ${bus.destination} | Board: ${bus.runningBoard}`;
         flag.className = `bus-flag ${isSpecial ? 'blinking-rb' : ''}`;
       }
