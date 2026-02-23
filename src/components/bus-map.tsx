@@ -332,7 +332,8 @@ export default function BusMap({
     
     buses.forEach((bus) => {
       if (!bus.position) return;
-      const markerId = `${bus.fleetNumber}-${bus.service}-${bus.journeyRef || 'no-ref'}`;
+      // Re-aligning marker ID with construction in page.tsx for selection highlighting
+      const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
       currentMarkerIds.delete(markerId);
       
       let marker = markersRef.current[markerId];
@@ -340,6 +341,7 @@ export default function BusMap({
         const el = document.createElement('div');
         el.className = 'bus-marker';
         el.style.cursor = 'pointer';
+        el.style.pointerEvents = 'auto'; // Ensure click works despite parent CSS
         el.addEventListener('click', (e) => { 
           e.stopPropagation(); 
           setSelectedBusId(markerId); 
@@ -347,11 +349,12 @@ export default function BusMap({
         
         const flag = document.createElement('div');
         flag.className = 'bus-flag';
+        flag.style.backgroundColor = 'rgba(0,0,0,0.85)'; // Ensure high contrast
         el.appendChild(flag);
         
         const iconDiv = document.createElement('div');
         iconDiv.innerHTML = `
-          <svg width="24" height="24" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5))">
+          <svg width="32" height="32" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5))">
             <rect id="bus-body" x="4" y="2" width="16" height="20" rx="3" fill="#FFC107" stroke="black" stroke-width="1.5"/>
             <rect x="6" y="4" width="12" height="6" rx="1" fill="#333"/>
             <rect x="6" y="14" width="12" height="1" fill="rgba(255,255,255,0.3)"/>
@@ -376,11 +379,11 @@ export default function BusMap({
       const busBody = el.querySelector('#bus-body');
       
       if (flag) {
-        const dir = bus.direction?.toLowerCase() === 'inbound' ? '[I]' : '[O]';
+        const dirLabel = bus.direction?.toLowerCase() === 'inbound' ? '[I]' : '[O]';
         const isSpecial = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
         
-        // Detailed flag content
-        flag.innerText = `${bus.fleetNumber} | ${bus.service} | ${dir} ${bus.destination} | ${bus.runningBoard}`;
+        // Exact flag content requested: Fleet number, service number, [I][O], destination, board number
+        flag.innerText = `${bus.fleetNumber} | ${bus.service} | ${dirLabel} ${bus.destination} | ${bus.runningBoard}`;
         flag.className = `bus-flag ${isSpecial ? 'blinking-rb' : ''}`;
       }
 
