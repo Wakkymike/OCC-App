@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard } from '@/lib/types';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
-import { doc, setDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -240,6 +240,13 @@ export default function BusMap({
     toast({ title: 'Geofence Active', description: `Monitoring active for ${hazard.value} restriction.` });
   };
 
+  const handleRemoveGeofence = useCallback((hazardId: string) => {
+    if (!isAdmin) return;
+    const docRef = doc(firestore, 'monitoredHazards', hazardId);
+    deleteDoc(docRef);
+    toast({ title: 'Monitoring Stopped', description: 'Geofence tracking removed for this restriction.' });
+  }, [isAdmin, firestore, toast]);
+
   // Hazard Markers
   useEffect(() => {
     const map = mapRef.current;
@@ -311,7 +318,13 @@ export default function BusMap({
             const btn = document.createElement('button');
             btn.className = `w-full py-2 px-3 text-xs font-bold rounded flex items-center justify-center gap-2 ${isMonitored ? 'bg-destructive text-white' : 'bg-primary text-primary-foreground'}`;
             btn.innerHTML = isMonitored ? 'Stop Monitoring' : 'Start Monitoring';
-            btn.onclick = () => handleSetGeofence(hazard, parseInt(input.value));
+            btn.onclick = () => {
+              if (isMonitored) {
+                handleRemoveGeofence(hazard.id);
+              } else {
+                handleSetGeofence(hazard, parseInt(input.value));
+              }
+            };
             
             control.appendChild(input);
             control.appendChild(btn);
@@ -321,7 +334,7 @@ export default function BusMap({
         hazardsMarkersRef.current[hazard.id] = marker;
       });
     }
-  }, [hazards, showHazards, mapLoaded, styleRevision, monitoredHazards, isAdmin, relocatingHazardId, toast]);
+  }, [hazards, showHazards, mapLoaded, styleRevision, monitoredHazards, isAdmin, relocatingHazardId, toast, handleRemoveGeofence]);
 
   // Bus Markers
   useEffect(() => {
