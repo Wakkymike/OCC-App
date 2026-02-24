@@ -58,7 +58,10 @@
         "hazardValue": { "type": "string" },
         "hazardDescription": { "type": "string" },
         "isAcknowledged": { "type": "boolean", "default": false, "description": "Whether the global overlay has been dismissed." },
-        "timestamp": { "type": "string", "format": "date-time" }
+        "timestamp": { "type": "string", "format": "date-time" },
+        "acknowledgedBy": { "type": "string" },
+        "acknowledgedAt": { "type": "string", "format": "date-time" },
+        "historyDocId": { "type": "string" }
       },
       "required": ["busId", "fleetNumber", "service", "hazardId", "monitorId", "hazardValue", "timestamp", "isAcknowledged"]
     },

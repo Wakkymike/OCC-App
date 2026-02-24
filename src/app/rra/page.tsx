@@ -121,9 +121,14 @@ export default function RRAListPage() {
                         <TableRow key={alert.id} className={`group hover:bg-destructive/10 ${alert.isAcknowledged ? 'opacity-70' : ''}`}>
                           <TableCell>
                             {alert.isAcknowledged ? (
-                                <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
-                                    ACKNOWLEDGED
-                                </Badge>
+                                <div className="flex flex-col gap-1">
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 w-fit">
+                                      ACKNOWLEDGED
+                                  </Badge>
+                                  <span className="text-[10px] text-muted-foreground italic truncate max-w-[100px]" title={`Acknowledged by ${alert.acknowledgedBy}`}>
+                                    by {alert.acknowledgedBy || 'System'}
+                                  </span>
+                                </div>
                             ) : (
                                 <Badge variant="destructive" className="animate-pulse">
                                     NEW ALERT
@@ -206,6 +211,7 @@ export default function RRAListPage() {
                         <TableHead>Bus</TableHead>
                         <TableHead>Restriction</TableHead>
                         <TableHead>Location</TableHead>
+                        <TableHead>Acknowledged By</TableHead>
                         <TableHead>Date & Time</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -225,6 +231,11 @@ export default function RRAListPage() {
                           </TableCell>
                           <TableCell>
                             <span className="text-xs">{log.hazardDescription}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs italic text-muted-foreground">
+                              {log.acknowledgedBy || '--'}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col text-xs text-muted-foreground">

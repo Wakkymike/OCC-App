@@ -95,6 +95,9 @@ export interface ActiveAlert {
   hazardDescription: string;
   isAcknowledged: boolean;
   timestamp: Timestamp;
+  acknowledgedBy?: string;
+  acknowledgedAt?: Timestamp;
+  historyDocId?: string;
 }
 
 export interface AlertHistory {

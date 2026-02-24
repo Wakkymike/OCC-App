@@ -4,7 +4,7 @@
 import { useEffect, useRef } from 'react';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import type { MonitoredHazard, ActiveAlert } from '@/lib/types';
 
 /**
@@ -100,10 +100,14 @@ export function AlertMonitor() {
             const alertsRef = collection(firestore, 'activeAlerts');
             const historyRef = collection(firestore, 'alertHistory');
 
+            // Pre-generate history doc ID to link them
+            const historyDoc = doc(historyRef);
+            const alertDataWithHistory = { ...alertData, historyDocId: historyDoc.id };
+
             // Record the breach in both the live monitoring collection and the persistent audit log
             Promise.all([
-                addDoc(alertsRef, alertData),
-                addDoc(historyRef, alertData)
+                addDoc(alertsRef, alertDataWithHistory),
+                setDoc(historyDoc, alertData)
             ]).catch(err => {
                 console.error("Critical: Failed to record geofence breach:", err);
             }).finally(() => {

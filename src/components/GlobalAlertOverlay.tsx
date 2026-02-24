@@ -2,7 +2,7 @@
 'use client';
 
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, updateDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { ActiveAlert } from '@/lib/types';
 import { AlertTriangle, ShieldAlert, CheckCircle2, Bus as BusIcon, MapPin, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,8 +31,23 @@ export function GlobalAlertOverlay() {
   // Only show if user is authenticated and there are unacknowledged alerts
   if (!user || !alerts || alerts.length === 0) return null;
 
-  const handleAcknowledge = (alertId: string) => {
-    updateDoc(doc(firestore, 'activeAlerts', alertId), { isAcknowledged: true });
+  const handleAcknowledge = (alert: ActiveAlert) => {
+    const ackData = { 
+      isAcknowledged: true,
+      acknowledgedBy: user?.displayName || user?.email || 'Unknown User',
+      acknowledgedAt: serverTimestamp()
+    };
+
+    // Update the active alert
+    updateDoc(doc(firestore, 'activeAlerts', alert.id), ackData);
+
+    // Update the linked history log if it exists
+    if (alert.historyDocId) {
+      updateDoc(doc(firestore, 'alertHistory', alert.historyDocId), {
+        acknowledgedBy: ackData.acknowledgedBy,
+        acknowledgedAt: ackData.acknowledgedAt
+      });
+    }
   };
 
   return (
@@ -90,7 +105,7 @@ export function GlobalAlertOverlay() {
               </CardContent>
               <CardFooter className="bg-muted/30 p-4 border-t">
                 <Button 
-                  onClick={() => handleAcknowledge(alert.id)}
+                  onClick={() => handleAcknowledge(alert)}
                   className="w-full h-16 text-2xl font-black bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg"
                 >
                   <CheckCircle2 className="mr-3 h-8 w-8" />
