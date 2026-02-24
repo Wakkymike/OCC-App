@@ -135,10 +135,11 @@ export default function BusMap({
             <div>
                 <label class="text-[10px] font-bold block mb-1">Category:</label>
                 <select class="w-full p-2 text-xs border rounded bg-background manual-category">
-                    <option value="Road Closed">Road Closed</option>
+                    <option value="Off Route">Off Route</option>
+                    <option value="No Bus Access">No Bus Access</option>
+                    <option value="Height Limit">Height Limit</option>
                     <option value="Weight Limit">Weight Limit</option>
-                    <option value="Unauthorized Access">Unauthorized Access</option>
-                    <option value="Incident Area">Incident Area</option>
+                    <option value="Width Limit">Width Limit</option>
                 </select>
             </div>
             <div>
@@ -147,7 +148,7 @@ export default function BusMap({
             </div>
             <div>
                 <label class="text-[10px] font-bold block mb-1">Radius (meters):</label>
-                <input type="number" value="150" class="w-full p-2 text-xs border rounded bg-background manual-radius" />
+                <input type="number" value="80" class="w-full p-2 text-xs border rounded bg-background manual-radius" />
             </div>
             <button class="w-full py-2 px-3 text-xs font-bold rounded bg-primary text-primary-foreground save-manual-btn">
                 Create Geofence
@@ -164,7 +165,8 @@ export default function BusMap({
     saveBtn.onclick = async () => {
         const value = (popupContent.querySelector('.manual-category') as HTMLSelectElement).value;
         const description = (popupContent.querySelector('.manual-desc') as HTMLInputElement).value;
-        const radius = parseInt((popupContent.querySelector('.manual-radius') as HTMLInputElement).value);
+        const radiusInput = popupContent.querySelector('.manual-radius') as HTMLInputElement;
+        const radius = parseInt(radiusInput.value) || 80;
         
         if (!description) {
             toast({ variant: 'destructive', title: 'Missing Description' });
@@ -173,8 +175,13 @@ export default function BusMap({
 
         try {
             await addDoc(collection(firestore, 'monitoredHazards'), {
-                hazardId: 'manual', type: 'manual', value, location: { lat: lngLat.lat, lng: lngLat.lng },
-                description, radius, createdAt: serverTimestamp()
+                hazardId: 'manual', 
+                type: 'manual', 
+                value, 
+                location: { lat: lngLat.lat, lng: lngLat.lng },
+                description, 
+                radius, 
+                createdAt: serverTimestamp()
             });
             toast({ title: 'Manual Geofence Added' });
             popup.remove();
@@ -270,11 +277,14 @@ export default function BusMap({
 
         if (isAdmin) {
             const form = popupContent.querySelector('.add-monitor-form')!;
-            form.innerHTML = `<input type="number" value="150" class="w-full mb-1 p-1 text-xs border rounded bg-background r-input" />`;
+            form.innerHTML = `<input type="number" value="80" class="w-full mb-1 p-1 text-xs border rounded bg-background r-input" />`;
             const btn = document.createElement('button');
             btn.className = 'w-full py-1 text-xs font-bold rounded bg-primary text-primary-foreground';
             btn.innerText = 'Add Geofence';
-            btn.onclick = () => handleAddGeofence(hazard, parseInt((form.querySelector('.r-input') as HTMLInputElement).value));
+            btn.onclick = () => {
+              const radiusInput = form.querySelector('.r-input') as HTMLInputElement;
+              handleAddGeofence(hazard, parseInt(radiusInput.value) || 80);
+            };
             form.appendChild(btn);
         }
 
