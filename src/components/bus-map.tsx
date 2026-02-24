@@ -414,11 +414,11 @@ export default function BusMap({
         const isSchool = bus.operator === 'GNW' && bus.journeyRef && schoolJourneyRefs.includes(bus.journeyRef);
         const isNight = bus.operator === 'GNW' && bus.runningBoard && nightBusRunningBoards.includes(bus.runningBoard);
         
-        let label = `${bus.fleetNumber} | ${bus.service} | ${dirLabel} ${bus.destination} | Board: ${bus.runningBoard}`;
-        if (isSchool) label += ' [SCHOOL]';
-        if (isNight) label += ' [NIGHT]';
+        let labelHtml = `${bus.fleetNumber} | ${bus.service} | ${dirLabel} ${bus.destination} | Board: ${bus.runningBoard}`;
+        if (isSchool) labelHtml += ' <span style="color: #ef4444; font-weight: bold;">[SCHOOL]</span>';
+        if (isNight) labelHtml += ' <span style="color: #9333ea; font-weight: bold;">[NIGHT]</span>';
         
-        flag.innerText = label;
+        flag.innerHTML = labelHtml;
         flag.className = `bus-flag ${isFirstLast ? 'blinking-rb' : ''}`;
       }
 
