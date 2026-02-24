@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -39,6 +38,8 @@ interface BusMapProps {
 
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
 const lastJourneyRefs = ['8001', '8002', '8301', '8302', '8601', '8602'];
+const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
+const nightBusRunningBoards = ['3691', '3692', '3693', '1091', '1092', '1093', '21091', '21092', '21093', '23691', '23692', '23693', '11091', '11092', '11093', '13691', '13692', '13693'];
 
 function createGeoJSONCircle(center: LatLng, radiusInMeters: number) {
   const points = 64;
@@ -408,9 +409,17 @@ export default function BusMap({
       
       if (flag) {
         const dirLabel = bus.direction?.toLowerCase() === 'inbound' ? '[I]' : '[O]';
-        const isSpecial = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
-        flag.innerText = `${bus.fleetNumber} | ${bus.service} | ${dirLabel} ${bus.destination} | Board: ${bus.runningBoard}`;
-        flag.className = `bus-flag ${isSpecial ? 'blinking-rb' : ''}`;
+        const isFirstLast = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
+        
+        const isSchool = bus.operator === 'GNW' && bus.journeyRef && schoolJourneyRefs.includes(bus.journeyRef);
+        const isNight = bus.operator === 'GNW' && bus.runningBoard && nightBusRunningBoards.includes(bus.runningBoard);
+        
+        let label = `${bus.fleetNumber} | ${bus.service} | ${dirLabel} ${bus.destination} | Board: ${bus.runningBoard}`;
+        if (isSchool) label += ' [SCHOOL]';
+        if (isNight) label += ' [NIGHT]';
+        
+        flag.innerText = label;
+        flag.className = `bus-flag ${isFirstLast ? 'blinking-rb' : ''}`;
       }
 
       if (busBody) {
