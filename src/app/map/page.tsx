@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -253,14 +254,14 @@ export default function Page() {
       if (!recordingBusId) {
         const busToStartTracking = finalDisplayBuses.find(b => b.service === recordingService);
         if (busToStartTracking) {
-          const busId = `${busToStartTracking.fleetNumber}-${busToStartTracking.runningBoard}-${busToStartTracking.service}-${busToStartTracking.direction}-${busToStartTracking.journeyRef || 'no-ref'}`;
+          const busId = `${busToStartTracking.operator}-${busToStartTracking.fleetNumber}`;
           setRecordingBusId(busId);
           setActiveRecordingRoute([]);
           toast({ title: 'Recording Started', description: `Now recording route for bus ${busToStartTracking.fleetNumber} on service ${recordingService}.`});
         }
       } else {
         const trackedBus = finalDisplayBuses.find(b => {
-           const busId = `${b.fleetNumber}-${b.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
+           const busId = `${b.operator}-${b.fleetNumber}`;
            return busId === recordingBusId;
         });
         if (trackedBus && trackedBus.position) {
@@ -275,7 +276,7 @@ export default function Page() {
     }
 
     const busToTrack = selectedBusId ? finalDisplayBuses.find(b => {
-        const busId = `${b.fleetNumber}-${b.runningBoard}-${b.service}-${b.direction}-${b.journeyRef || 'no-ref'}`;
+        const busId = `${b.operator}-${b.fleetNumber}`;
         return busId === selectedBusId;
     }) : undefined;
 
@@ -288,7 +289,7 @@ export default function Page() {
       if (finalDisplayBuses.length === 1) {
         const bus = finalDisplayBuses[0];
         if (bus.position) {
-          const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
+          const busId = `${bus.operator}-${bus.fleetNumber}`;
           setSelectedBusId(busId);
           setMapView({ center: bus.position, zoom: 16 });
         }

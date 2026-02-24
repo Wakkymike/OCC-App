@@ -227,9 +227,8 @@ export default function BusMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapLoaded || !map.getCanvasContainer()) return;
+    if (!map || !mapLoaded) return;
 
-    // Standard Mapbox cleanup and re-rendering for hazards
     Object.values(hazardsMarkersRef.current).forEach(m => m.remove());
     hazardsMarkersRef.current = {};
 
@@ -352,13 +351,14 @@ export default function BusMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapLoaded || !map.getCanvasContainer()) return;
+    if (!map || !mapLoaded) return;
 
     const currentMarkerIds = new Set(Object.keys(markersRef.current));
     
     buses.forEach((bus) => {
       if (!bus.position) return;
-      const markerId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
+      // Use a more stable ID for markers to prevent flickering or disappearing during polling
+      const markerId = `${bus.operator}-${bus.fleetNumber}`;
       currentMarkerIds.delete(markerId);
       
       let marker = markersRef.current[markerId];
@@ -367,6 +367,8 @@ export default function BusMap({
         el.className = 'bus-marker';
         el.style.cursor = 'pointer';
         el.style.pointerEvents = 'auto';
+        el.style.zIndex = '10';
+        
         el.addEventListener('click', (e) => { 
           e.stopPropagation(); 
           setSelectedBusId(markerId); 
@@ -412,16 +414,18 @@ export default function BusMap({
       }
 
       if (busBody) {
-        let color = '#ef4444';
-        if (bus.operator === 'GNW') color = '#FFC107';
-        if (markerId === selectedBusId) color = '#00FFFF';
+        let color = '#ef4444'; // Other operators
+        if (bus.operator === 'GNW') color = '#FFC107'; // GNW Yellow
+        if (markerId === selectedBusId) color = '#00FFFF'; // Highlight Cyan
         busBody.setAttribute('fill', color);
       }
     });
 
     currentMarkerIds.forEach(id => {
-      markersRef.current[id].remove();
-      delete markersRef.current[id];
+      if (markersRef.current[id]) {
+        markersRef.current[id].remove();
+        delete markersRef.current[id];
+      }
     });
   }, [buses, selectedBusId, mapLoaded, styleRevision, setSelectedBusId]);
 
