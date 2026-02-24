@@ -4,6 +4,7 @@ import type { Hazard } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
+// Persistent in-memory cache for the server process
 let cachedHazards: Hazard[] | null = null;
 let lastFetchTime = 0;
 const CACHE_DURATION = 1000 * 60 * 60; // 1 hour caching
@@ -41,7 +42,7 @@ function formatToImperial(val: string | undefined): string | null {
 export async function GET() {
   const now = Date.now();
 
-  // Return cached data if available and fresh
+  // Return cached data if available and fresh (less than 1 hour old)
   if (cachedHazards && (now - lastFetchTime < CACHE_DURATION)) {
     return NextResponse.json({ hazards: cachedHazards, source: 'cache' });
   }
@@ -70,13 +71,22 @@ export async function GET() {
     });
 
     if (!response.ok) {
-      if (response.status === 429 && cachedHazards) {
+      // If the Overpass API is down or timing out (504/502/429), 
+      // return the last known good data if we have it.
+      if (cachedHazards) {
+        console.warn(`Overpass API error ${response.status}. Returning stale cache.`);
         return NextResponse.json({ hazards: cachedHazards, source: 'stale-cache' });
       }
       throw new Error(`Overpass API responded with status: ${response.status}`);
     }
 
     const data = await response.json();
+    
+    // Overpass sometimes returns a 200 with a "remark" field containing an error message
+    if (data.remark && !data.elements && cachedHazards) {
+        return NextResponse.json({ hazards: cachedHazards, source: 'stale-cache-timeout' });
+    }
+
     const elements = data.elements || [];
 
     const hazards: Hazard[] = elements.map((el: any) => {
@@ -119,15 +129,19 @@ export async function GET() {
       };
     }).filter((h: Hazard | null): h is Hazard => h !== null);
 
+    // Update the cache on successful fetch
     cachedHazards = hazards;
     lastFetchTime = now;
 
     return NextResponse.json({ hazards, source: 'live' });
   } catch (error: any) {
     console.error('Error fetching hazards:', error);
+    
+    // Global fallback for any unexpected network errors or timeouts
     if (cachedHazards) {
         return NextResponse.json({ hazards: cachedHazards, source: 'error-fallback' });
     }
+    
     return NextResponse.json(
       { error: `Failed to retrieve road restrictions: ${error.message}` },
       { status: 500 }
