@@ -154,7 +154,7 @@ export default function LiveServicePage() {
                                       <TableCell className={isFirst || isLast ? 'blinking-rb text-white font-bold' : ''}>
                                         {bus.runningBoard}
                                       </TableCell>
-                                      <TableCell className="font-mono text-xs">
+                                      <TableCell>
                                         {bus.journeyRef || '--'}
                                       </TableCell>
                                       <TableCell className="font-medium">
