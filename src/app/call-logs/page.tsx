@@ -328,9 +328,6 @@ export default function CallLogsPage() {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <Badge variant="secondary" className="w-full justify-center py-1 font-bold text-[10px]">
-                            <UserIcon className="h-3 w-3 mr-1" /> EMP: {log.employeeNumber}
-                          </Badge>
                           <div className="grid grid-cols-2 gap-2">
                             <Badge variant="outline" className="justify-center bg-muted/50 text-[9px] font-black truncate" title={log.depot}>
                               DEP: {log.depot}
@@ -344,12 +341,19 @@ export default function CallLogsPage() {
 
                       {/* Middle Column: Operational Info */}
                       <div className="flex-grow space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="space-y-1">
                             <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Fleet Number</Label>
                             <div className="flex items-center gap-2 font-bold text-sm">
                               <Bus className="h-3.5 w-3.5 text-primary" />
                               <span>{log.fleetNumber}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Employee</Label>
+                            <div className="flex items-center gap-2 font-bold text-sm">
+                              <UserIcon className="h-3.5 w-3.5 text-primary" />
+                              <span>{log.employeeNumber}</span>
                             </div>
                           </div>
                           <div className="space-y-1">
