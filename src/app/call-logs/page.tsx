@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -22,6 +21,7 @@ export default function CallLogsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const formRef = useRef<HTMLDivElement>(null);
+  const hasCheckedRetention = useRef(false);
 
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -59,10 +59,13 @@ export default function CallLogsPage() {
   const { data: logs, isLoading } = useCollection<CallLog>(callLogsQuery);
 
   // Auto-retention logic: Purge records older than 5 days
+  // Fixed: Uses a ref to ensure this only runs once per load to prevent infinite delete loops
   useEffect(() => {
-    if (!callLogsRef || !logs || logs.length === 0) return;
+    if (!callLogsRef || !logs || logs.length === 0 || hasCheckedRetention.current) return;
 
+    hasCheckedRetention.current = true;
     const fiveDaysAgo = subDays(new Date(), 5);
+    
     const oldLogs = logs.filter(log => {
       if (!log.createdAt) return false;
       const createdDate = log.createdAt instanceof Timestamp ? log.createdAt.toDate() : new Timestamp(log.createdAt.seconds, log.createdAt.nanoseconds).toDate();
@@ -140,24 +143,28 @@ export default function CallLogsPage() {
   };
 
   const handleDeleteAll = () => {
-    if (!user || !logs || logs.length === 0) return;
+    if (!user || !logs || logs.length === 0 || !callLogsRef) return;
 
-    if (window.confirm('Permanently delete ALL call logs for your account? This action cannot be undone.')) {
-      // Create a stable local snapshot to ensure all currently visible logs are targeted for deletion
-      // Regardless of reactive state updates during the process.
-      const currentLogs = [...logs];
+    if (window.confirm(`Permanently delete all ${logs.length} records? This action cannot be undone.`)) {
+      // Create a stable local snapshot of IDs to ensure clean iteration
+      const idsToDelete = logs.map(l => l.id);
       
-      currentLogs.forEach(log => {
-        // Explicitly construct the path to ensure we target the exact document in the user's private collection
-        const logDocRef = doc(firestore, 'users', user.uid, 'callLogs', log.id);
-        deleteDocumentNonBlocking(logDocRef);
+      idsToDelete.forEach(id => {
+        // Use the collection reference directly for path safety
+        deleteDocumentNonBlocking(doc(callLogsRef, id));
       });
       
       toast({ 
-        title: 'Shift Logs Cleared', 
-        description: `Successfully initiated deletion of ${currentLogs.length} records.` 
+        title: 'Clear Operation Started', 
+        description: `Successfully initiated deletion of ${idsToDelete.length} records.` 
       });
     }
+  };
+
+  const handleDeleteSingle = (logId: string) => {
+    if (!callLogsRef) return;
+    deleteDocumentNonBlocking(doc(callLogsRef, logId));
+    toast({ title: 'Record Deleted' });
   };
 
   return (
@@ -400,12 +407,7 @@ export default function CallLogsPage() {
                           variant="ghost" 
                           size="sm" 
                           className="text-muted-foreground hover:text-destructive self-end font-bold text-xs"
-                          onClick={() => {
-                            if(window.confirm("Delete this record?")) {
-                              const logRef = doc(firestore, 'users', user!.uid, 'callLogs', log.id);
-                              deleteDocumentNonBlocking(logRef);
-                            }
-                          }}
+                          onClick={() => handleDeleteSingle(log.id)}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Delete Entry
