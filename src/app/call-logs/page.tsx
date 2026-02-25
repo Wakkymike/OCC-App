@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, deleteDocumentNonBlocking, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, Timestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus, Hash } from 'lucide-react';
+import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus, Hash, Building2 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { subDays, format } from 'date-fns';
@@ -327,11 +327,14 @@ export default function CallLogsPage() {
                             <span className="text-2xl font-black tabular-nums">{log.callTime}</span>
                           </div>
                         </div>
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-1 gap-2">
-                            <Badge variant="outline" className="justify-center bg-muted/50 text-[9px] font-black truncate" title={log.depot}>
-                              Depot: {log.depot}
-                            </Badge>
+                        
+                        <div className="space-y-1 pt-2 border-t">
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <Building2 className="h-3 w-3" />
+                            <span className="text-[10px] uppercase font-black tracking-widest">Depot</span>
+                          </div>
+                          <div className="text-xl font-black text-foreground truncate leading-none" title={log.depot}>
+                            {log.depot}
                           </div>
                         </div>
                       </div>
