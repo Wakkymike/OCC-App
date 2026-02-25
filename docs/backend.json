@@ -13,7 +13,8 @@
         "isContentCreator": { "type": "boolean", "default": false },
         "isActive": { "type": "boolean", "default": false },
         "passwordChangeRequired": { "type": "boolean", "default": false },
-        "forceSignOut": { "type": "boolean", "default": false }
+        "forceSignOut": { "type": "boolean", "default": false },
+        "icalUrl": { "type": "string", "description": "Link to the user's iCal rota calendar." }
       },
       "required": ["uid", "email", "displayName", "isAdmin", "isContentCreator", "isActive", "passwordChangeRequired", "forceSignOut"]
     },
