@@ -30,6 +30,7 @@ service cloud.firestore {
     }
 
     match /userProfiles/{uid} {
+      // Prioritize Super Admin and Owner checks for reliable profile access
       allow get: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
       allow list: if isSuperAdmin() || isAdmin();
       allow create: if isSignedIn() && request.auth.uid == uid;
@@ -37,8 +38,9 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // Call Logs are strictly owned by the user but accessible by Super Admin for oversight
     match /users/{userId}/callLogs/{callLogId} {
-      allow get, list: if isOwner(userId) || isSuperAdmin();
+      allow read, list: if isOwner(userId) || isSuperAdmin();
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
       allow update: if isOwner(userId) && request.resource.data.userId == resource.data.userId;
       allow delete: if isOwner(userId) || isSuperAdmin();
