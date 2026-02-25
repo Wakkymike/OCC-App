@@ -9,9 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Calendar, Link as LinkIcon, Clock, MapPin, AlertCircle, Save } from 'lucide-react';
-import { format, isAfter, isBefore, addDays, isWithinInterval } from 'date-fns';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Loader2, Calendar as CalendarIcon, Link as LinkIcon, Clock, MapPin, AlertCircle, Save, Coffee } from 'lucide-react';
+import { format, isAfter, isBefore, addDays, isWithinInterval, startOfDay, endOfDay, isSameDay, eachDayOfInterval } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface Shift {
   id: string;
@@ -76,14 +78,23 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
     return shifts.find(s => isAfter(new Date(s.start), now));
   }, [shifts, now]);
 
-  const upcomingShifts = useMemo(() => {
-    const nextWeek = addDays(now, 7);
-    return shifts.filter(s => 
-      isAfter(new Date(s.start), now) && 
-      isBefore(new Date(s.start), nextWeek) &&
-      s.id !== nextShift?.id
-    );
-  }, [shifts, now, nextShift]);
+  // Generate a full month timeline (next 30 days) including rest days
+  const monthTimeline = useMemo(() => {
+    const endRange = addDays(startOfDay(now), 30);
+    const days = eachDayOfInterval({
+      start: startOfDay(now),
+      end: endRange,
+    });
+
+    return days.map(day => {
+      const dayShifts = shifts.filter(s => isSameDay(new Date(s.start), day));
+      return {
+        date: day,
+        shifts: dayShifts,
+        isRestDay: dayShifts.length === 0
+      };
+    });
+  }, [shifts, now]);
 
   return (
     <div className="space-y-8 w-full max-w-4xl mx-auto">
@@ -126,23 +137,23 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
         </Card>
       ) : !userProfile?.icalUrl ? (
         <div className="text-center py-12 border-2 border-dashed rounded-lg text-muted-foreground">
-          <Calendar className="h-12 w-12 mx-auto mb-4 opacity-20" />
+          <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-20" />
           <p>Provide an iCal link above to see your shifts here.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-1 space-y-6">
             <Card className={currentShift ? "border-green-500 bg-green-50/50" : ""}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm uppercase text-muted-foreground font-bold flex items-center justify-between">
-                  Current Shift
-                  {currentShift && <Badge className="bg-green-600">LIVE</Badge>}
+                  Current Status
+                  {currentShift && <Badge className="bg-green-600">ON DUTY</Badge>}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {currentShift ? (
                   <div className="space-y-2">
-                    <h3 className="text-2xl font-black">{currentShift.summary}</h3>
+                    <h3 className="text-xl font-black">{currentShift.summary}</h3>
                     <div className="flex items-center text-sm gap-2">
                       <Clock className="h-4 w-4" />
                       <span>{format(new Date(currentShift.start), 'HH:mm')} - {format(new Date(currentShift.end), 'HH:mm')}</span>
@@ -155,7 +166,10 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
                     )}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground italic">You are currently off duty.</p>
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Coffee className="h-4 w-4" />
+                    <span className="italic">Off Duty</span>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -167,11 +181,11 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
               <CardContent>
                 {nextShift ? (
                   <div className="space-y-2">
-                    <h3 className="text-2xl font-black">{nextShift.summary}</h3>
+                    <h3 className="text-xl font-black">{nextShift.summary}</h3>
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center text-sm font-bold gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>{format(new Date(nextShift.start), 'EEEE, do MMMM')}</span>
+                        <CalendarIcon className="h-4 w-4" />
+                        <span>{format(new Date(nextShift.start), 'EEEE, do MMM')}</span>
                       </div>
                       <div className="flex items-center text-sm gap-2 text-primary">
                         <Clock className="h-4 w-4" />
@@ -180,31 +194,61 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-muted-foreground italic">No upcoming shifts found in calendar.</p>
+                  <p className="text-muted-foreground italic text-sm">No future shifts found.</p>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Upcoming Schedule</CardTitle>
-              <CardDescription>Next 7 days of duty</CardDescription>
+          <Card className="md:col-span-2">
+            <CardHeader className="border-b bg-muted/10">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <span>Monthly Timeline</span>
+                <Badge variant="outline" className="font-normal text-[10px]">NEXT 30 DAYS</Badge>
+              </CardTitle>
+              <CardDescription>Comprehensive list of shifts and rest days.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {upcomingShifts.length > 0 ? upcomingShifts.map(s => (
-                  <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                    <div>
-                      <p className="font-bold text-sm">{s.summary}</p>
-                      <p className="text-xs text-muted-foreground">{format(new Date(s.start), 'EEE d MMM, HH:mm')}</p>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[500px]">
+                <div className="divide-y">
+                  {monthTimeline.map((item, idx) => (
+                    <div 
+                      key={idx} 
+                      className={cn(
+                        "flex items-start gap-4 p-4 transition-colors",
+                        item.isRestDay ? "bg-muted/5 opacity-60" : "hover:bg-muted/30"
+                      )}
+                    >
+                      <div className="w-16 shrink-0 text-center">
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">{format(item.date, 'EEE')}</p>
+                        <p className="text-xl font-black leading-none">{format(item.date, 'd')}</p>
+                        <p className="text-[10px] text-muted-foreground">{format(item.date, 'MMM')}</p>
+                      </div>
+                      
+                      <div className="flex-grow pt-1">
+                        {item.isRestDay ? (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Coffee className="h-3.5 w-3.5" />
+                            <span className="text-sm font-medium italic">Rest Day</span>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {item.shifts.map(s => (
+                              <div key={s.id} className="space-y-1">
+                                <p className="font-bold text-sm leading-tight">{s.summary}</p>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {format(new Date(s.start), 'HH:mm')} - {format(new Date(s.end), 'HH:mm')}</span>
+                                  {s.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {s.location}</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <Badge variant="outline">{format(new Date(s.start), 'EEE')}</Badge>
-                  </div>
-                )) : (
-                  <p className="text-center py-8 text-muted-foreground text-sm">No further shifts scheduled for this week.</p>
-                )}
-              </div>
+                  ))}
+                </div>
+              </ScrollArea>
             </CardContent>
           </Card>
         </div>
