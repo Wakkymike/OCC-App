@@ -46,7 +46,6 @@ import {
   endOfWeek, 
   addMonths, 
   subMonths,
-  subDays,
   addWeeks,
   subWeeks,
   startOfToday
@@ -76,7 +75,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // View state - Normalized to start of period
+  // View state - Strictly normalized to start of period
   const [viewType, setViewType] = useState<'month' | 'week'>('month');
   const [currentDate, setCurrentDate] = useState(() => startOfMonth(new Date()));
 
@@ -139,6 +138,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   }, [today]);
 
   // Generate the timeline based on viewType and currentDate
+  // Always ensures the interval starts exactly at the beginning of the period
   const timelineDays = useMemo(() => {
     let start, end;
     if (viewType === 'month') {
@@ -164,8 +164,10 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const goToPrev = () => {
     setCurrentDate(prev => {
       if (viewType === 'month') {
+        // Jump to the 1st of the previous month
         return startOfMonth(subMonths(prev, 1));
       } else {
+        // Jump to the Monday of the previous week
         return startOfWeek(subWeeks(prev, 1), { weekStartsOn: 1 });
       }
     });
@@ -174,8 +176,10 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const goToNext = () => {
     setCurrentDate(prev => {
       if (viewType === 'month') {
+        // Jump to the 1st of the next month
         return startOfMonth(addMonths(prev, 1));
       } else {
+        // Jump to the Monday of the next week
         return startOfWeek(addWeeks(prev, 1), { weekStartsOn: 1 });
       }
     });
@@ -379,7 +383,11 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-[500px]">
+                {/* 
+                  The key prop ensures that the ScrollArea resets its scroll position 
+                  to the top whenever the view period or type changes. 
+                */}
+                <ScrollArea className="h-[500px]" key={`${viewType}-${currentDate.toISOString()}`}>
                   <div className="divide-y">
                     {timelineDays.map((item, idx) => (
                       <div 
