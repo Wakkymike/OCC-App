@@ -1,139 +1,139 @@
-
 {
   "entities": {
-    "UserProfile": {
-      "title": "UserProfile",
+    "CallLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "CallLog",
       "type": "object",
-      "description": "Represents a user's profile within the application.",
+      "description": "Represents a log entry for a call made by a user, tracking details related to bus operations. These logs are temporary and subject to a 5-day retention policy, after which they are automatically deleted.",
       "properties": {
-        "uid": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "displayName": { "type": "string" },
-        "isAdmin": { "type": "boolean", "default": false },
-        "isContentCreator": { "type": "boolean", "default": false },
-        "isActive": { "type": "boolean", "default": false },
-        "passwordChangeRequired": { "type": "boolean", "default": false },
-        "forceSignOut": { "type": "boolean", "default": false },
-        "icalUrl": { "type": "string", "description": "Link to the user's iCal rota calendar." }
-      },
-      "required": ["uid", "email", "displayName", "isAdmin", "isContentCreator", "isActive", "passwordChangeRequired", "forceSignOut"]
-    },
-    "MonitoredHazard": {
-      "title": "Monitored Hazard",
-      "type": "object",
-      "description": "A geofence monitor associated with a road restriction or manual marker.",
-      "properties": {
-        "hazardId": { "type": "string", "description": "The ID of the source hazard or 'manual'." },
-        "type": { "type": "string", "enum": ["height", "width", "both", "manual"] },
-        "value": { "type": "string", "description": "The restriction value or manual category." },
-        "location": {
-          "type": "object",
-          "properties": {
-            "lat": { "type": "number" },
-            "lng": { "type": "number" }
-          }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the CallLog entity."
         },
-        "geofenceCenter": {
-          "type": "object",
-          "properties": {
-            "lat": { "type": "number" },
-            "lng": { "type": "number" }
-          }
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who created this call log. (Relationship: User 1:N CallLog)"
         },
-        "description": { "type": "string" },
-        "radius": { "type": "number", "description": "Radius in meters for the geofence." },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["hazardId", "type", "value", "location", "radius", "createdAt"]
-    },
-    "ActiveAlert": {
-      "title": "Active Alert",
-      "type": "object",
-      "description": "An active breach of a geofence by a vehicle.",
-      "properties": {
-        "busId": { "type": "string" },
-        "fleetNumber": { "type": "string" },
-        "service": { "type": "string" },
-        "hazardId": { "type": "string" },
-        "monitorId": { "type": "string", "description": "The ID of the specific geofence monitor triggered." },
-        "hazardValue": { "type": "string" },
-        "hazardDescription": { "type": "string" },
-        "isAcknowledged": { "type": "boolean", "default": false, "description": "Whether the global overlay has been dismissed." },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "acknowledgedBy": { "type": "string" },
-        "acknowledgedAt": { "type": "string", "format": "date-time" },
-        "historyDocId": { "type": "string" }
-      },
-      "required": ["busId", "fleetNumber", "service", "hazardId", "monitorId", "hazardValue", "timestamp", "isAcknowledged"]
-    },
-    "AlertHistory": {
-      "title": "Alert History",
-      "type": "object",
-      "description": "A persistent log of geofence breaches for auditing.",
-      "properties": {
-        "busId": { "type": "string" },
-        "fleetNumber": { "type": "string" },
-        "service": { "type": "string" },
-        "hazardId": { "type": "string" },
-        "monitorId": { "type": "string" },
-        "hazardValue": { "type": "string" },
-        "hazardDescription": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "acknowledgedAt": { "type": "string", "format": "date-time" },
-        "acknowledgedBy": { "type": "string" }
-      },
-      "required": ["busId", "fleetNumber", "service", "hazardId", "monitorId", "hazardValue", "timestamp"]
-    },
-    "DriverHoursRecord": {
-      "title": "Driver Hours Record",
-      "type": "object",
-      "description": "A log of a driver's daily driving segments and shift calculations.",
-      "properties": {
-        "driverName": { "type": "string" },
-        "employeeNumber": { "type": "string" },
-        "date": { "type": "string", "format": "date" },
-        "segments": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "start": { "type": "string" },
-              "end": { "type": "string" },
-              "type": { "type": "string", "enum": ["driving", "break"] }
-            }
-          }
+        "callTime": {
+          "type": "string",
+          "description": "The date and time when the call was made.",
+          "format": "date-time"
         },
-        "totalDrivingMinutes": { "type": "number" },
-        "totalShiftMinutes": { "type": "number" },
-        "hasBreach": { "type": "boolean" },
-        "breachTypes": { "type": "array", "items": { "type": "string" } },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
+        "employeeNumber": {
+          "type": "string",
+          "description": "The employee number associated with the call."
+        },
+        "fleetNumber": {
+          "type": "string",
+          "description": "The fleet number of the vehicle involved in the call."
+        },
+        "serviceNumber": {
+          "type": "string",
+          "description": "The service number (route) the vehicle was operating."
+        },
+        "depot": {
+          "type": "string",
+          "description": "The depot associated with the call or vehicle."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The phone number related to the call. This field is expected to be limited to 3 digits by the application."
+        },
+        "timeFrom": {
+          "type": "string",
+          "description": "The start time of an event or period relevant to the call.",
+          "format": "date-time"
+        },
+        "timeTo": {
+          "type": "string",
+          "description": "The end time of an event or period relevant to the call.",
+          "format": "date-time"
+        },
+        "details": {
+          "type": "string",
+          "description": "Detailed notes or description of the call."
+        },
+        "isTeamsRelated": {
+          "type": "boolean",
+          "description": "Indicates if the call is related to Microsoft Teams."
+        },
+        "isTicketerRelated": {
+          "type": "boolean",
+          "description": "Indicates if the call is related to the Ticketer system."
+        },
+        "isEPMRelated": {
+          "type": "boolean",
+          "description": "Indicates if the call is related to EPM (Enterprise Performance Management or similar system)."
+        },
+        "isIRRelated": {
+          "type": "boolean",
+          "description": "Indicates if the call is related to IR (Incident Report or similar)."
+        },
+        "isTSIRelated": {
+          "type": "boolean",
+          "description": "Indicates if the call is related to TSI (Technical Service/Support Incident or similar)."
+        },
+        "isDriverReportRelated": {
+          "type": "boolean",
+          "description": "Indicates if the call is related to a Driver Report."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the call log entry was created, used for implementing the 5-day data retention policy for auto-deletion.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "callTime",
+        "employeeNumber",
+        "fleetNumber",
+        "serviceNumber",
+        "depot",
+        "phoneNumber",
+        "timeFrom",
+        "timeTo",
+        "details",
+        "isTeamsRelated",
+        "isTicketerRelated",
+        "isEPMRelated",
+        "isIRRelated",
+        "isTSIRelated",
+        "isDriverReportRelated",
+        "createdAt"
+      ]
     }
   },
   "auth": {
-    "providers": ["password"]
+    "providers": [
+      "password",
+      "anonymous"
+    ]
   },
   "firestore": {
-    "/userProfiles/{userId}": {
-      "schema": { "$ref": "#/entities/UserProfile" },
-      "description": "Stores individual user profiles."
-    },
-    "/monitoredHazards/{monitorId}": {
-      "schema": { "$ref": "#/entities/MonitoredHazard" },
-      "description": "Collection of active geofence monitors."
-    },
-    "/activeAlerts/{alertId}": {
-      "schema": { "$ref": "#/entities/ActiveAlert" },
-      "description": "Live alerts for geofence breaches."
-    },
-    "/alertHistory/{historyId}": {
-      "schema": { "$ref": "#/entities/AlertHistory" },
-      "description": "Permanent log of all historical geofence breaches."
-    },
-    "/driverHours/{recordId}": {
-      "schema": { "$ref": "#/entities/DriverHoursRecord" },
-      "description": "Daily driving hours logs."
-    }
+    "structure": [
+      {
+        "path": "/users/{userId}/callLogs/{callLogId}",
+        "definition": {
+          "entityName": "CallLog",
+          "schema": {
+            "$ref": "#/backend/entities/CallLog"
+          },
+          "description": "Stores individual call log entries, exclusively owned by the user specified in the path. Each document includes denormalized 'userId' for robust authorization independence and 'createdAt' for retention policy enforcement.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns this call log."
+            },
+            {
+              "name": "callLogId",
+              "description": "The unique identifier for a specific call log entry."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure for Call Logs follows a path-based ownership model to ensure strict data segregation and clear authorization boundaries. CallLog entities will be stored in a subcollection nested under a user's document: `/users/{userId}/callLogs/{callLogId}`. This design prioritizes Authorization Independence by denormalizing the `userId` into both the document path and the `CallLog` document itself. This allows Firestore Security Rules to evaluate ownership directly using `request.auth.uid` against the `{userId}` wildcard in the path or the `userId` field within the document, eliminating the need for `get()` operations on parent documents. This approach simplifies security rules, makes them atomic, and highly debuggable.\n\nThis structure also inherently supports Query-as-Permission (QAPs). When a user requests their call logs from `/users/{request.auth.uid}/callLogs`, the query is automatically scoped to their specific logs, as the `{userId}` wildcard in the path will be matched by the authenticated user's UID (`request.auth.uid`). This means the database query itself acts as the filter, preventing unauthorized data from ever being returned or requiring complex rule logic to filter results after the fact. Each document within the `/callLogs` subcollection will contain its full data, including the `createdAt` timestamp essential for implementing the 5-day auto-deletion policy via a scheduled Firebase Function. The 'delete record' and 'delete all records' functionalities will leverage standard Firestore delete operations, with 'delete all' likely implemented via a Cloud Function for efficiency and to handle large numbers of documents."
   }
 }
