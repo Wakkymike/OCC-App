@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,10 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin } from 'lucide-react';
+import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import { subDays, format } from 'date-fns';
 import type { CallLog } from '@/lib/types';
 
@@ -66,7 +65,7 @@ export default function CallLogsPage() {
     const fiveDaysAgo = subDays(new Date(), 5);
     const oldLogs = logs.filter(log => {
       if (!log.createdAt) return false;
-      const createdDate = log.createdAt instanceof Timestamp ? log.createdAt.toDate() : new Date(log.createdAt);
+      const createdDate = log.createdAt instanceof Timestamp ? log.createdAt.toDate() : new Timestamp(log.createdAt.seconds, log.createdAt.nanoseconds).toDate();
       return createdDate < fiveDaysAgo;
     });
 
@@ -143,17 +142,20 @@ export default function CallLogsPage() {
   const handleDeleteAll = async () => {
     if (!user || !callLogsRef || !logs || logs.length === 0) return;
 
-    if (confirm('Permanently delete all call logs for your current shift session?')) {
-      logs.forEach(log => {
+    if (confirm('Permanently delete ALL call logs for your account? This action cannot be undone.')) {
+      // Create a stable copy of current logs to avoid iteration issues
+      const logsToDelete = [...logs];
+      logsToDelete.forEach(log => {
         deleteDocumentNonBlocking(doc(callLogsRef, log.id));
       });
-      toast({ title: 'Shift Logs Cleared' });
+      toast({ title: 'Shift Logs Cleared', description: `Deleted ${logsToDelete.length} records.` });
     }
   };
 
   return (
     <div className="flex min-h-screen flex-col items-center bg-background p-4 sm:p-8">
       <div className="w-full max-w-6xl space-y-8">
+        {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="p-2 border-primary/20">
@@ -177,6 +179,7 @@ export default function CallLogsPage() {
           </div>
         </div>
 
+        {/* Disclaimer Section */}
         <Card className="border-destructive/30 bg-destructive/5 shadow-none ring-1 ring-destructive/20">
           <CardHeader className="pb-3">
             <CardTitle className="text-xs flex items-center gap-2 text-destructive font-black uppercase tracking-widest">
@@ -191,6 +194,7 @@ export default function CallLogsPage() {
           </CardContent>
         </Card>
 
+        {/* Form Section */}
         {showForm && (
           <div ref={formRef} className="animate-in fade-in slide-in-from-top-4 duration-300">
             <Card className="shadow-lg border-primary/20 bg-muted/5">
@@ -297,6 +301,7 @@ export default function CallLogsPage() {
           </div>
         )}
 
+        {/* History Section */}
         <div className="space-y-6">
           <div className="flex items-center justify-between border-b pb-4">
             <h2 className="text-2xl font-black tracking-tighter uppercase">Recent Operational History</h2>
