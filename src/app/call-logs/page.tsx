@@ -143,32 +143,6 @@ export default function CallLogsPage() {
       .finally(() => setIsSubmitting(false));
   };
 
-  const handleDeleteAll = () => {
-    if (!user || !logs || logs.length === 0 || !callLogsRef) return;
-
-    if (window.confirm(`Permanently delete all ${logs.length} records for your account? This action cannot be undone.`)) {
-      const batch = writeBatch(firestore);
-      
-      // Use the static logs array to add all current user's logs to the batch
-      logs.forEach(log => {
-        const logDocRef = doc(callLogsRef, log.id);
-        batch.delete(logDocRef);
-      });
-      
-      batch.commit().then(() => {
-        toast({ 
-          title: 'Success', 
-          description: `All ${logs.length} records have been cleared.` 
-        });
-      }).catch(async (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: callLogsRef.path,
-          operation: 'delete',
-        }));
-      });
-    }
-  };
-
   const handleDeleteSingle = (logId: string) => {
     if (!callLogsRef) return;
     deleteDocumentNonBlocking(doc(callLogsRef, logId));
@@ -195,9 +169,6 @@ export default function CallLogsPage() {
                 <Plus className="mr-2 h-4 w-4" /> Start New Entry
               </Button>
             )}
-            <Button onClick={handleDeleteAll} variant="destructive" size="sm" disabled={!logs || logs.length === 0}>
-              <Trash2 className="mr-2 h-4 w-4" /> Clear All Logs
-            </Button>
             <Button asChild variant="outline" size="sm">
               <Link href="/"><Home className="mr-2 h-4 w-4" /> Home</Link>
             </Button>
@@ -214,7 +185,7 @@ export default function CallLogsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm font-bold text-destructive/90 leading-relaxed">
-              All staff are required to delete their private logs at the end of each shift. Records are strictly private to your account. Automated purging occurs for records older than 5 days.
+              All staff are required to manage their private logs. Records are strictly private to your account. Automated purging occurs for records older than 5 days.
             </p>
           </CardContent>
         </Card>
