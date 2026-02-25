@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -135,11 +136,12 @@ export default function LiveServicePage() {
                               return filter === 'all' || bus.direction.toLowerCase() === filter;
                             })
                             .map((bus) => {
-                                const busId = `${bus.fleetNumber}-${bus.runningBoard}-${bus.service}-${bus.direction}-${bus.journeyRef || 'no-ref'}`;
+                                // Use physical vehicle identity for row stability
+                                const busId = `${bus.operator}-${bus.fleetNumber}`;
+                                
                                 const isSchool = bus.journeyRef && schoolJourneyRefs.includes(bus.journeyRef);
                                 const isNight = bus.runningBoard && nightBusRunningBoards.includes(bus.runningBoard);
                                 
-                                // Restricted flashing logic EXCLUSIVELY for Go North West
                                 const isGnw = bus.operator === 'GNW';
                                 const isFirst = isGnw && bus.journeyRef && firstJourneyRefs.includes(bus.journeyRef);
                                 const isLast = isGnw && bus.journeyRef && lastJourneyRefs.includes(bus.journeyRef);

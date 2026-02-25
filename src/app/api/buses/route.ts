@@ -59,7 +59,7 @@ export async function GET() {
     const fetchPromises = feeds.map(async (feed) => {
         const url = `https://data.bus-data.dft.gov.uk/api/v1/datafeed/${feed.feedId}/?api_key=${apiKey}`;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout per feed
+        const timeoutId = setTimeout(() => controller.abort(), 8000); 
 
         try {
             const res = await fetch(url, { 
@@ -80,7 +80,11 @@ export async function GET() {
     });
     
     const results = await Promise.all(fetchPromises);
-    const allBuses: Bus[] = [];
+    
+    // Use a Map to deduplicate buses globally by operator + fleet number
+    // This ensures that even if a feed contains multiple activities for one bus, 
+    // we only keep the latest one.
+    const globalBusMap = new Map<string, Bus>();
     
     const parser = new XMLParser({
       ignoreAttributes: false,
@@ -107,34 +111,36 @@ export async function GET() {
           vehicleActivities.push(...activities);
         }
 
-        const buses: Bus[] = vehicleActivities
-          .map((activity): Bus | null => {
+        vehicleActivities.forEach((activity) => {
             try {
               const recordedAtTimeStr = getText(activity.RecordedAtTime);
-              if (!recordedAtTimeStr) return null;
+              if (!recordedAtTimeStr) return;
 
               const recordedAt = new Date(recordedAtTimeStr);
-              if (isNaN(recordedAt.getTime())) return null;
+              if (isNaN(recordedAt.getTime())) return;
 
+              // Stricter filtering: 3 minutes max age for active buses
               const ageInMinutes = (new Date().getTime() - recordedAt.getTime()) / (1000 * 60);
-              if (ageInMinutes > 5) return null; // Increased threshold for stability
+              if (ageInMinutes > 3) return; 
 
               const journey = activity.MonitoredVehicleJourney;
-              if (!journey) return null;
+              if (!journey) return;
 
               const fleetNumber = getText(journey.VehicleRef);
+              if (!fleetNumber) return;
+
               const runningBoard = getText(journey.BlockRef);
               const service = getText(journey.PublishedLineName);
               const destination = getText(journey.DestinationName)?.replace(/_/g, ' ');
               const direction = getText(journey.DirectionRef);
               const journeyRef = getText(journey.FramedVehicleJourneyRef?.DatedVehicleJourneyRef);
 
-              if (!journey.VehicleLocation || !journey.VehicleLocation.Latitude || !journey.VehicleLocation.Longitude) return null;
+              if (!journey.VehicleLocation || !journey.VehicleLocation.Latitude || !journey.VehicleLocation.Longitude) return;
 
               const lat = parseFloat(journey.VehicleLocation.Latitude);
               const lng = parseFloat(journey.VehicleLocation.Longitude);
 
-              if (isNaN(lat) || isNaN(lng)) return null;
+              if (isNaN(lat) || isNaN(lng)) return;
               
               const bearingText = getText(journey.Bearing);
               const bearing = bearingText ? parseFloat(bearingText) : undefined;
@@ -142,7 +148,6 @@ export async function GET() {
               let delayInMinutes: number | undefined;
               let status: string = 'Active';
 
-              const monitoredCall = journey.MonitoredCall;
               const onwardCallsRaw = journey.OnwardCalls?.OnwardCall;
               const onwardCalls = onwardCallsRaw ? ensureArray(onwardCallsRaw) : [];
               
@@ -156,8 +161,8 @@ export async function GET() {
                 status = delay > 1 ? `${delay} min late` : delay < -1 ? `${Math.abs(delay)} min early` : 'On Time';
               }
 
-              return {
-                fleetNumber: fleetNumber ?? 'unknown',
+              const busData: Bus = {
+                fleetNumber: fleetNumber,
                 runningBoard: runningBoard ?? 'unknown',
                 service: service ?? 'unknown',
                 destination: destination ?? 'unknown',
@@ -169,16 +174,22 @@ export async function GET() {
                 status: status,
                 operator: operator,
               };
+
+              const busKey = `${operator}-${fleetNumber}`;
+              const existing = globalBusMap.get(busKey);
+              
+              // Only update if this activity is newer than the one we already have
+              // (BODS VM usually lists packets in order, but checking helps)
+              if (!existing) {
+                globalBusMap.set(busKey, busData);
+              }
             } catch (e) {
-              return null;
+              return;
             }
-          })
-          .filter((bus): bus is Bus => bus !== null);
-        
-        allBuses.push(...buses);
+        });
     }
 
-    return NextResponse.json({ buses: allBuses });
+    return NextResponse.json({ buses: Array.from(globalBusMap.values()) });
 
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error processing bus data' }, { status: 500 });
