@@ -337,7 +337,7 @@ export default function DriversHoursPage() {
                   </span>
                 </div>
                 <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-primary/10 py-4 sm:py-0 sm:px-4">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Continuous Driving</span>
+                  <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Cont. Driving</span>
                   <span className={cn(
                     "text-2xl font-black tabular-nums leading-none",
                     calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'text-destructive' : 'text-foreground'
