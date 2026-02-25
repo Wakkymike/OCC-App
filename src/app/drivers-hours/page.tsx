@@ -10,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee } from 'lucide-react';
+import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 
@@ -47,10 +47,10 @@ export default function DriversHoursPage() {
   const { toast } = useToast();
 
   const historyQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'driverHours'), orderBy('createdAt', 'desc'), limit(10)),
+    query(collection(firestore, 'driverHours'), orderBy('createdAt', 'desc'), limit(50)),
     [firestore]
   );
-  const { data: history } = useCollection<Record>(historyQuery);
+  const { data: history, isLoading: isHistoryLoading } = useCollection<Record>(historyQuery);
 
   const addSegment = () => setSegments([...segments, { start: '', end: '' }]);
   
@@ -138,6 +138,11 @@ export default function DriversHoursPage() {
       return;
     }
 
+    if (segments.some(s => !s.start || !s.end)) {
+        toast({ variant: 'destructive', title: 'Incomplete Entry', description: 'Please fill in all start and end times.' });
+        return;
+    }
+
     setIsSubmitting(true);
     try {
       await addDoc(collection(firestore, 'driverHours'), {
@@ -177,26 +182,29 @@ export default function DriversHoursPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center bg-background p-4 sm:p-8">
-      <div className="w-full max-w-4xl space-y-8">
+      <div className="w-full max-w-5xl space-y-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Clock className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold tracking-tight">Drivers Hours Tracker</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Drivers Hours Tracker</h1>
           </div>
           <Button asChild variant="outline" size="sm">
             <Link href="/"><Home className="mr-2 h-4 w-4" /> Home</Link>
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-2 space-y-6">
-            <Card>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-8">
+            <Card className="shadow-md border-primary/10">
               <CardHeader>
-                <CardTitle>Shift Details</CardTitle>
-                <CardDescription>Enter driving periods. Gaps of 30+ mins count as breaks.</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    New Shift Entry
+                </CardTitle>
+                <CardDescription>Log driving segments. Gaps of 30+ mins count as legal breaks.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="driver-name">Driver Name</Label>
                     <div className="relative">
@@ -204,7 +212,7 @@ export default function DriversHoursPage() {
                       <Input 
                         id="driver-name" 
                         placeholder="John Doe" 
-                        className="pl-9"
+                        className="pl-9 bg-muted/20"
                         value={driverName}
                         onChange={(e) => setDriverName(e.target.value)}
                       />
@@ -217,7 +225,7 @@ export default function DriversHoursPage() {
                       <Input 
                         id="employee-number" 
                         placeholder="12345" 
-                        className="pl-9"
+                        className="pl-9 bg-muted/20"
                         value={employeeNumber}
                         onChange={(e) => setEmployeeNumber(e.target.value)}
                       />
@@ -226,14 +234,15 @@ export default function DriversHoursPage() {
                 </div>
 
                 <div className="space-y-4">
-                  <Label>Driving Segments</Label>
+                  <Label className="text-muted-foreground text-xs uppercase font-bold tracking-wider">Driving Segments</Label>
                   {segments.map((seg, idx) => (
-                    <div key={idx} className="flex items-end gap-3 group">
-                      <div className="grid grid-cols-2 gap-3 flex-grow">
+                    <div key={idx} className="flex items-end gap-3 p-3 rounded-lg bg-muted/10 border border-transparent hover:border-primary/20 transition-colors group">
+                      <div className="grid grid-cols-2 gap-4 flex-grow">
                         <div className="space-y-1">
                           <span className="text-[10px] text-muted-foreground uppercase font-bold">Start Time</span>
                           <Input 
                             type="time" 
+                            className="bg-background"
                             value={seg.start} 
                             onChange={(e) => updateSegment(idx, 'start', e.target.value)}
                           />
@@ -242,6 +251,7 @@ export default function DriversHoursPage() {
                           <span className="text-[10px] text-muted-foreground uppercase font-bold">End Time</span>
                           <Input 
                             type="time" 
+                            className="bg-background"
                             value={seg.end} 
                             onChange={(e) => updateSegment(idx, 'end', e.target.value)}
                           />
@@ -250,7 +260,7 @@ export default function DriversHoursPage() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="text-destructive h-10 w-10"
+                        className="text-destructive hover:bg-destructive/10 h-10 w-10 shrink-0"
                         onClick={() => removeSegment(idx)}
                         disabled={segments.length === 1}
                         title="Delete segment"
@@ -259,62 +269,73 @@ export default function DriversHoursPage() {
                       </Button>
                     </div>
                   ))}
-                  <Button variant="outline" className="w-full border-dashed" onClick={addSegment}>
+                  <Button variant="outline" className="w-full border-dashed py-6 hover:bg-primary/5 hover:border-primary/50 transition-all" onClick={addSegment}>
                     <Plus className="mr-2 h-4 w-4" /> Add Segment
                   </Button>
                 </div>
               </CardContent>
-              <CardFooter className="bg-muted/30 pt-6">
-                <Button className="w-full" onClick={handleSave} disabled={isSubmitting}>
-                  <Save className="mr-2 h-4 w-4" /> Save Record
+              <CardFooter className="bg-muted/30 pt-6 rounded-b-lg">
+                <Button className="w-full h-12 text-lg font-bold" onClick={handleSave} disabled={isSubmitting}>
+                  <Save className="mr-2 h-5 w-5" /> Save Records to Log
                 </Button>
               </CardFooter>
             </Card>
 
-            {history && history.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <History className="h-5 w-5" />
-                    <CardTitle>Recent History</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
+            <Card className="shadow-sm border-muted">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-muted-foreground" />
+                  <CardTitle>Drivers Hours Log</CardTitle>
+                </div>
+                <Badge variant="outline" className="text-[10px] uppercase font-bold">All Users</Badge>
+              </CardHeader>
+              <CardContent>
+                {isHistoryLoading ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
+                        <Clock className="h-8 w-8 animate-pulse" />
+                        <p className="text-sm">Loading records...</p>
+                    </div>
+                ) : history && history.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Date</TableHead>
                         <TableHead>Driver</TableHead>
-                        <TableHead>Driving</TableHead>
+                        <TableHead>Driving Time</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {history.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="text-xs">{record.date}</TableCell>
+                        <TableRow key={record.id} className="group">
+                          <TableCell className="text-[10px] font-mono text-muted-foreground">{record.date}</TableCell>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span className="font-bold text-sm">{record.driverName}</span>
+                              <span className="font-bold text-sm text-foreground">{record.driverName}</span>
                               <span className="text-[10px] text-muted-foreground">ID: {record.employeeNumber}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-sm font-medium">
-                            <div className="flex flex-col">
-                                <span>Total: {formatMins(record.totalDrivingMinutes)}</span>
-                                <span className="text-[10px] text-muted-foreground">Peak Block: {formatMins(record.maxContinuousMins)}</span>
+                          <TableCell>
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-sm font-semibold">{formatMins(record.totalDrivingMinutes)} total</span>
+                                <span className="text-[10px] text-muted-foreground italic">Max block: {formatMins(record.maxContinuousMins)}</span>
                             </div>
                           </TableCell>
                           <TableCell>
                             {record.hasBreach ? (
-                              <Badge variant="destructive">Breach</Badge>
+                              <Badge variant="destructive" className="font-black text-[10px]">BREACH</Badge>
                             ) : (
-                              <Badge variant="secondary" className="bg-green-100 text-green-800">Compliant</Badge>
+                              <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 text-[10px]">COMPLIANT</Badge>
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteRecord(record.id)} className="text-muted-foreground hover:text-destructive">
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleDeleteRecord(record.id)} 
+                                className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </TableCell>
@@ -322,68 +343,73 @@ export default function DriversHoursPage() {
                       ))}
                     </TableBody>
                   </Table>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
+                        <History className="h-10 w-10 opacity-20 mb-2" />
+                        <p className="text-sm font-medium">No driving records found in history.</p>
+                    </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           <div className="space-y-6">
-            <Card className="border-primary/20 bg-primary/5 sticky top-8">
+            <Card className="border-primary/20 bg-primary/5 sticky top-8 shadow-md">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Calculations</CardTitle>
+                    <CardTitle className="text-lg">Real-time Check</CardTitle>
                     {calculations.breaksDetected > 0 && (
-                        <Badge variant="outline" className="bg-white/50 border-primary/20 text-[10px]">
-                            <Coffee className="h-3 w-3 mr-1" /> {calculations.breaksDetected} Breaks
+                        <Badge variant="outline" className="bg-white/80 border-primary/20 text-[10px] font-bold">
+                            <Coffee className="h-3 w-3 mr-1 text-primary" /> {calculations.breaksDetected} BREAKS
                         </Badge>
                     )}
                 </div>
-                <CardDescription>GB Domestic Hours Check</CardDescription>
+                <CardDescription>GB Domestic Hours Compliance</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4">
-                  <div className="flex justify-between items-end border-b pb-2">
-                    <span className="text-sm font-medium">Daily Driving</span>
-                    <span className={`text-2xl font-black ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'text-destructive' : 'text-primary'}`}>
+                  <div className="flex justify-between items-end border-b border-primary/10 pb-2">
+                    <span className="text-xs font-bold uppercase text-muted-foreground">Daily Driving</span>
+                    <span className={`text-2xl font-black tabular-nums ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'text-destructive' : 'text-primary'}`}>
                       {formatMins(calculations.totalDrivingMinutes)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-end border-b pb-2">
-                    <span className="text-sm font-medium">Max Cont. Block</span>
-                    <span className={`text-2xl font-black ${calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'text-destructive' : 'text-foreground'}`}>
+                  <div className="flex justify-between items-end border-b border-primary/10 pb-2">
+                    <span className="text-xs font-bold uppercase text-muted-foreground">Peak Block</span>
+                    <span className={`text-2xl font-black tabular-nums ${calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'text-destructive' : 'text-foreground'}`}>
                       {formatMins(calculations.maxContinuousMins)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-end border-b pb-2">
-                    <span className="text-sm font-medium">Shift Duration</span>
-                    <span className={`text-2xl font-black ${calculations.totalShiftMinutes > LIMIT_SHIFT_MINS ? 'text-destructive' : 'text-foreground'}`}>
+                  <div className="flex justify-between items-end border-b border-primary/10 pb-2">
+                    <span className="text-xs font-bold uppercase text-muted-foreground">Shift Length</span>
+                    <span className={`text-2xl font-black tabular-nums ${calculations.totalShiftMinutes > LIMIT_SHIFT_MINS ? 'text-destructive' : 'text-foreground'}`}>
                       {formatMins(calculations.totalShiftMinutes)}
                     </span>
                   </div>
                 </div>
 
-                <div className="space-y-4 pt-4">
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-bold uppercase">
-                      <span>Until 5.5h Break</span>
-                      <span>{formatMins(Math.max(0, LIMIT_CONTINUOUS_MINS - calculations.maxContinuousMins))} left</span>
+                <div className="space-y-5 pt-4">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
+                      <span>Break Requirement (5.5h)</span>
+                      <span className="text-primary">{formatMins(Math.max(0, LIMIT_CONTINUOUS_MINS - calculations.maxContinuousMins))} LEFT</span>
                     </div>
-                    <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                    <div className="h-3 w-full bg-white/50 rounded-full overflow-hidden border border-primary/5">
                       <div 
-                        className={`h-full transition-all ${calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'bg-destructive' : 'bg-primary'}`}
+                        className={`h-full transition-all duration-500 ${calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'bg-destructive' : 'bg-primary'}`}
                         style={{ width: `${Math.min(100, (calculations.maxContinuousMins / LIMIT_CONTINUOUS_MINS) * 100)}%` }}
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-bold uppercase">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
                       <span>Daily 10h Limit</span>
-                      <span>{formatMins(Math.max(0, LIMIT_DAILY_DRIVING_MINS - calculations.totalDrivingMinutes))} left</span>
+                      <span className="text-orange-600">{formatMins(Math.max(0, LIMIT_DAILY_DRIVING_MINS - calculations.totalDrivingMinutes))} LEFT</span>
                     </div>
-                    <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                    <div className="h-3 w-full bg-white/50 rounded-full overflow-hidden border border-primary/5">
                       <div 
-                        className={`h-full transition-all ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'bg-destructive' : 'bg-orange-500'}`}
+                        className={`h-full transition-all duration-500 ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'bg-destructive' : 'bg-orange-500'}`}
                         style={{ width: `${Math.min(100, (calculations.totalDrivingMinutes / LIMIT_DAILY_DRIVING_MINS) * 100)}%` }}
                       />
                     </div>
@@ -391,11 +417,11 @@ export default function DriversHoursPage() {
                 </div>
 
                 {calculations.breaches.length > 0 && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Regulation Breach Detected</AlertTitle>
+                  <Alert variant="destructive" className="border-4 shadow-lg animate-pulse">
+                    <AlertTriangle className="h-5 w-5" />
+                    <AlertTitle className="font-black text-xs uppercase">Regulation Breach</AlertTitle>
                     <AlertDescription>
-                      <ul className="list-disc list-inside text-[10px] mt-2">
+                      <ul className="list-disc list-inside text-[10px] mt-2 font-bold space-y-1">
                         {calculations.breaches.map((b, i) => <li key={i}>{b}</li>)}
                       </ul>
                     </AlertDescription>
