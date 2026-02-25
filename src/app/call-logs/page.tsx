@@ -17,7 +17,7 @@ import { subDays, format } from 'date-fns';
 import type { CallLog } from '@/lib/types';
 
 export default function CallLogsPage() {
-  const { user } = userUser();
+  const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const formRef = useRef<HTMLDivElement>(null);
