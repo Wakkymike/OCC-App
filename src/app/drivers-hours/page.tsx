@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -11,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText } from 'lucide-react';
+import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText, Info, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -312,91 +311,141 @@ export default function DriversHoursPage() {
             </CardFooter>
           </Card>
 
-          {/* Real-time Compliance Check */}
-          <Card className="border-primary/20 bg-primary/5 shadow-md h-fit">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Real-time Compliance Check</CardTitle>
-                  {calculations.breaksDetected > 0 && (
-                      <Badge variant="outline" className="bg-white/80 border-primary/20 text-[10px] font-bold">
-                          <Coffee className="h-3 w-3 mr-1 text-primary" /> {calculations.breaksDetected} BREAKS (30m+)
-                      </Badge>
-                  )}
-              </div>
-              <CardDescription>GB Domestic Hours Calculations for Current Entry</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
-                <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-primary/10 pb-4 sm:pb-0 sm:pr-4">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Daily Driving</span>
-                  <span className={cn(
-                    "text-2xl font-black tabular-nums leading-none",
-                    calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'text-destructive' : 'text-primary'
-                  )}>
-                    {formatMins(calculations.totalDrivingMinutes)}
-                  </span>
+          <div className="space-y-8 h-fit">
+            {/* Real-time Compliance Check */}
+            <Card className="border-primary/20 bg-primary/5 shadow-md">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Real-time Compliance Check</CardTitle>
+                    {calculations.breaksDetected > 0 && (
+                        <Badge variant="outline" className="bg-white/80 border-primary/20 text-[10px] font-bold">
+                            <Coffee className="h-3 w-3 mr-1 text-primary" /> {calculations.breaksDetected} BREAKS (30m+)
+                        </Badge>
+                    )}
                 </div>
-                <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-primary/10 py-4 sm:py-0 sm:px-4">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Cont. Driving</span>
-                  <span className={cn(
-                    "text-2xl font-black tabular-nums leading-none",
-                    calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'text-destructive' : 'text-foreground'
-                  )}>
-                    {formatMins(calculations.maxContinuousMins)}
-                  </span>
-                </div>
-                <div className="flex flex-col pt-4 sm:pt-0 sm:pl-4">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Shift length</span>
-                  <span className={cn(
-                    "text-2xl font-black tabular-nums leading-none",
-                    calculations.totalShiftMinutes > LIMIT_SHIFT_MINS ? 'text-destructive' : 'text-foreground'
-                  )}>
-                    {formatMins(calculations.totalShiftMinutes)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-6 pt-4">
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
-                    <span>Break Requirement (5.5h)</span>
-                    <span className="text-primary">{formatMins(Math.max(0, LIMIT_CONTINUOUS_MINS - calculations.maxContinuousMins))} LEFT</span>
+                <CardDescription>GB Domestic Hours Calculations for Current Entry</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
+                  <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-primary/10 pb-4 sm:pb-0 sm:pr-4">
+                    <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Daily Driving</span>
+                    <span className={cn(
+                      "text-2xl font-black tabular-nums leading-none",
+                      calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'text-destructive' : 'text-primary'
+                    )}>
+                      {formatMins(calculations.totalDrivingMinutes)}
+                    </span>
                   </div>
-                  <div className="h-3 w-full bg-white/50 rounded-full overflow-hidden border border-primary/5">
-                    <div 
-                      className={`h-full transition-all duration-500 ${calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'bg-destructive' : 'bg-primary'}`}
-                      style={{ width: `${Math.min(100, (calculations.maxContinuousMins / LIMIT_CONTINUOUS_MINS) * 100)}%` }}
-                    />
+                  <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-primary/10 py-4 sm:py-0 sm:px-4">
+                    <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Cont. Driving</span>
+                    <span className={cn(
+                      "text-2xl font-black tabular-nums leading-none",
+                      calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'text-destructive' : 'text-foreground'
+                    )}>
+                      {formatMins(calculations.maxContinuousMins)}
+                    </span>
+                  </div>
+                  <div className="flex flex-col pt-4 sm:pt-0 sm:pl-4">
+                    <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Shift length</span>
+                    <span className={cn(
+                      "text-2xl font-black tabular-nums leading-none",
+                      calculations.totalShiftMinutes > LIMIT_SHIFT_MINS ? 'text-destructive' : 'text-foreground'
+                    )}>
+                      {formatMins(calculations.totalShiftMinutes)}
+                    </span>
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
-                    <span>Daily 10h Limit</span>
-                    <span className="text-orange-600">{formatMins(Math.max(0, LIMIT_DAILY_DRIVING_MINS - calculations.totalDrivingMinutes))} LEFT</span>
+                <div className="space-y-6 pt-4">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
+                      <span>Break Requirement (5.5h)</span>
+                      <span className="text-primary">{formatMins(Math.max(0, LIMIT_CONTINUOUS_MINS - calculations.maxContinuousMins))} LEFT</span>
+                    </div>
+                    <div className="h-3 w-full bg-white/50 rounded-full overflow-hidden border border-primary/5">
+                      <div 
+                        className={`h-full transition-all duration-500 ${calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'bg-destructive' : 'bg-primary'}`}
+                        style={{ width: `${Math.min(100, (calculations.maxContinuousMins / LIMIT_CONTINUOUS_MINS) * 100)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-3 w-full bg-white/50 rounded-full overflow-hidden border border-primary/5">
-                    <div 
-                      className={`h-full transition-all duration-500 ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'bg-destructive' : 'bg-orange-500'}`}
-                      style={{ width: `${Math.min(100, (calculations.totalDrivingMinutes / LIMIT_DAILY_DRIVING_MINS) * 100)}%` }}
-                    />
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
+                      <span>Daily 10h Limit</span>
+                      <span className="text-orange-600">{formatMins(Math.max(0, LIMIT_DAILY_DRIVING_MINS - calculations.totalDrivingMinutes))} LEFT</span>
+                    </div>
+                    <div className="h-3 w-full bg-white/50 rounded-full overflow-hidden border border-primary/5">
+                      <div 
+                        className={`h-full transition-all duration-500 ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'bg-destructive' : 'bg-orange-500'}`}
+                        style={{ width: `${Math.min(100, (calculations.totalDrivingMinutes / LIMIT_DAILY_DRIVING_MINS) * 100)}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {calculations.breaches.length > 0 && (
-                <Alert variant="destructive" className="border-4 shadow-lg animate-pulse mt-4">
-                  <AlertTriangle className="h-5 w-5" />
-                  <AlertTitle className="font-black text-xs uppercase">Regulation Breach</AlertTitle>
-                  <AlertDescription>
-                    <ul className="list-disc list-inside text-[10px] mt-2 font-bold space-y-1">
-                      {calculations.breaches.map((b, i) => <li key={i}>{b}</li>)}
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
+                {calculations.breaches.length > 0 && (
+                  <Alert variant="destructive" className="border-4 shadow-lg animate-pulse mt-4">
+                    <AlertTriangle className="h-5 w-5" />
+                    <AlertTitle className="font-black text-xs uppercase">Regulation Breach</AlertTitle>
+                    <AlertDescription>
+                      <ul className="list-disc list-inside text-[10px] mt-2 font-bold space-y-1">
+                        {calculations.breaches.map((b, i) => <li key={i}>{b}</li>)}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* GB Domestic Rules Quick Guide */}
+            <Card className="border-muted bg-muted/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                  GB Domestic Rules Guide
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs space-y-3">
+                <div className="flex items-start gap-2">
+                  <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-[10px] font-bold text-primary">1</span>
+                  </div>
+                  <div>
+                    <p className="font-bold">Daily Driving Limit</p>
+                    <p className="text-muted-foreground">Maximum of <span className="text-foreground font-semibold">10 hours</span> driving in any working day.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-[10px] font-bold text-primary">2</span>
+                  </div>
+                  <div>
+                    <p className="font-bold">Continuous Driving & Breaks</p>
+                    <p className="text-muted-foreground">After <span className="text-foreground font-semibold">5.5 hours</span> of driving, a break of at least <span className="text-foreground font-semibold">30 minutes</span> must be taken for rest or refreshment.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-[10px] font-bold text-primary">3</span>
+                  </div>
+                  <div>
+                    <p className="font-bold">Shift Length (Duty)</p>
+                    <p className="text-muted-foreground">The maximum working day (spreadover) should not exceed <span className="text-foreground font-semibold">16 hours</span>.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-[10px] font-bold text-primary">4</span>
+                  </div>
+                  <div>
+                    <p className="font-bold">Daily Rest</p>
+                    <p className="text-muted-foreground">Drivers must have at least <span className="text-foreground font-semibold">10 hours</span> rest between working days (can be reduced to 8.5h in some cases).</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* History Log */}
