@@ -1,86 +1,76 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * FIRESTORE SECURITY RULES DOCUMENTATION
-     *
-     * Core Philosophy:
-     * This ruleset enforces a strict User-Ownership model. Access to data is 
-     * fundamentally tied to the authenticated user's identity (UID).
-     *
-     * Data Structure:
-     * All user-specific data is organized hierarchically under the /users/{userId} 
-     * path. Specifically, Call Logs are stored in a subcollection: 
-     * /users/{userId}/callLogs/{callLogId}.
-     *
-     * Key Security Decisions:
-     * 1. Strict Ownership: Users can only read, create, or modify their own logs.
-     * 2. Relational Integrity: The 'userId' field within a document must match 
-     *    the userId in the document path to ensure data consistency.
-     * 3. Immutability: The 'userId' field is immutable after creation to 
-     *    prevent documents from being "transferred" between users.
-     * 4. Prototyping Flexibility: While ownership is strictly enforced, the 
-     *    internal schema (fields like 'details' or 'phoneNumber') is not 
-     *    validated for type or presence, allowing for rapid UI iteration.
-     *
-     * Denormalization for Authorization:
-     * The 'userId' is explicitly stored within each CallLog document. This allows 
-     * for single-document lookups and simple, high-performance security checks 
-     * without requiring cross-collection 'get()' calls.
+     * FIRESTORE SECURITY RULES
      */
 
-    // --- Global Helper Functions ---
-
-    /** 
-     * Returns true if the request is made by an authenticated user.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /** 
-     * Returns true if the authenticated user's UID matches the provided userId.
-     */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /** 
-     * Returns true if the user owns the existing document and the document exists.
-     * Used for update and delete operations to ensure state-changing requests are valid.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' ||
+        request.auth.uid == 'QkN2XNYugte0wl1Wfsrmq2elNG22'
+      );
     }
 
-    // --- Collection Rules ---
+    function isAdmin() {
+      return isSuperAdmin() || (
+        isSignedIn() && exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true
+      );
+    }
 
-    /**
-     * @description Rules for managing individual user call logs.
-     * @path /users/{userId}/callLogs/{callLogId}
-     * @allow (create) if auth.uid matches {userId} and data.userId matches {userId}.
-     * @deny (list) if auth.uid does not match {userId}.
-     * @principle Restricts access to a user's own data tree and validates relational integrity.
-     */
+    match /userProfiles/{uid} {
+      allow get: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
+      allow list: if isSuperAdmin() || isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
+      allow delete: if isSuperAdmin();
+    }
+
     match /users/{userId}/callLogs/{callLogId} {
-      
-      // Users can only view their own logs.
-      allow get, list: if isOwner(userId);
-
-      // On creation, the userId in the data must match the userId in the path.
-      allow create: if isOwner(userId) 
-                    && request.resource.data.userId == userId;
-
-      // On update, the userId field must remain unchanged (immutable ownership).
-      allow update: if isExistingOwner(userId) 
-                    && request.resource.data.userId == resource.data.userId;
-
-      // Users can only delete their own existing logs.
-      allow delete: if isExistingOwner(userId);
+      allow get, list: if isOwner(userId) || isSuperAdmin();
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwner(userId) || isSuperAdmin();
     }
 
-    // Default deny for any paths not explicitly matched above.
+    match /invitations/{id} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isAdmin();
+    }
+
+    match /monitoredHazards/{id} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin() || isAdmin();
+    }
+
+    match /activeAlerts/{id} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /alertHistory/{id} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /networkUpdates/{id} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isAdmin();
+    }
+
+    match /driverHours/{id} {
+      allow read, write: if isSignedIn();
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }

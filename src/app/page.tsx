@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Map, Radio, Shield, Route, Loader2, ShieldAlert, Clock, Calendar, Coffee } from 'lucide-react';
+import { Map, Radio, Shield, Route, Loader2, ShieldAlert, Clock, Calendar, Coffee, ClipboardList } from 'lucide-react';
 import UserMenu from '@/components/auth/UserMenu';
 import TickerTape from '@/components/TickerTape';
 import BreakingNewsTicker from '@/components/BreakingNewsTicker';
@@ -141,7 +142,13 @@ export default function HomePage() {
                           RRA Dashboard
                           </Link>
                       </Button>
-                      <Button asChild size="lg">
+                      <Button asChild size="lg" variant="secondary">
+                          <Link href="/call-logs">
+                          <ClipboardList className="mr-2 h-5 w-5" />
+                          Call Logs
+                          </Link>
+                      </Button>
+                      <Button asChild size="lg" variant="outline">
                           <Link href="/journey-planner">
                           <Route className="mr-2 h-5 w-5" />
                           Journey Planner

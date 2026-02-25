@@ -113,3 +113,24 @@ export interface AlertHistory {
   acknowledgedAt?: Timestamp;
   acknowledgedBy?: string;
 }
+
+export interface CallLog {
+  id: string;
+  userId: string;
+  callTime: string;
+  employeeNumber: string;
+  fleetNumber: string;
+  serviceNumber: string;
+  depot: string;
+  phoneNumber: string;
+  timeFrom: string;
+  timeTo: string;
+  details: string;
+  isTeamsRelated: boolean;
+  isTicketerRelated: boolean;
+  isEPMRelated: boolean;
+  isIRRelated: boolean;
+  isTSIRelated: boolean;
+  isDriverReportRelated: boolean;
+  createdAt: Timestamp;
+}
