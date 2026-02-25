@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -30,7 +31,7 @@ export default function SignUpPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6) {
       toast({
@@ -40,44 +41,57 @@ export default function SignUpPage() {
       });
       return;
     }
+    
     setIsLoading(true);
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+    
+    createUserWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        const user = userCredential.user;
 
-      await updateProfile(user, { displayName });
+        // Perform side-effects after creation
+        updateProfile(user, { displayName });
 
-      const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
+        const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
 
-      const userProfile = {
-        uid: user.uid,
-        email: user.email,
-        displayName: displayName,
-        isAdmin: isSuperAdmin,
-        isContentCreator: false,
-        isActive: isSuperAdmin,
-        passwordChangeRequired: false,
-        forceSignOut: false,
-      };
-      
-      const userProfileRef = doc(db, 'userProfiles', user.uid);
-      setDocumentNonBlocking(userProfileRef, userProfile, { merge: false });
+        const userProfile = {
+          uid: user.uid,
+          email: user.email,
+          displayName: displayName,
+          isAdmin: isSuperAdmin,
+          isContentCreator: false,
+          isActive: isSuperAdmin,
+          passwordChangeRequired: false,
+          forceSignOut: false,
+        };
+        
+        const userProfileRef = doc(db, 'userProfiles', user.uid);
+        setDocumentNonBlocking(userProfileRef, userProfile, { merge: false });
 
-      toast({
-        title: 'Account Created',
-        description: 'Your account is now pending activation by an administrator.',
+        toast({
+          title: 'Account Created',
+          description: 'Your account is now pending activation by an administrator.',
+        });
+      })
+      .catch((error: any) => {
+        console.error('Sign up error:', error);
+        let message = 'An unknown error occurred.';
+        if (error.code === 'auth/email-already-in-use') {
+          message = 'This email is already registered. Please login instead.';
+        } else if (error.code === 'auth/invalid-email') {
+          message = 'The email address is not valid.';
+        } else if (error.code === 'auth/weak-password') {
+          message = 'The password is too weak.';
+        } else if (error.message) {
+          message = error.message;
+        }
+
+        toast({
+          variant: 'destructive',
+          title: 'Sign Up Failed',
+          description: message,
+        });
+        setIsLoading(false);
       });
-
-    } catch (error: any) {
-      console.error('Sign up error:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Sign Up Failed',
-        description: error.message || 'An unknown error occurred.',
-      });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (

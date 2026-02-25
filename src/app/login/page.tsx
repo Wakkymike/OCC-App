@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -25,26 +26,38 @@ export default function LoginPage() {
   const auth = useAuth();
   const { toast } = useToast();
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({
-        title: 'Login Successful',
-        description: 'Welcome back!',
+    
+    signInWithEmailAndPassword(auth, email, password)
+      .then(() => {
+        toast({
+          title: 'Login Successful',
+          description: 'Welcome back!',
+        });
+        // Redirect is handled by ClientLayout
+      })
+      .catch((error: any) => {
+        console.error('Login error:', error);
+        let message = 'An unknown error occurred.';
+        
+        // Handle common Firebase Auth errors gracefully
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+          message = 'Invalid email or password. Please check your credentials and try again.';
+        } else if (error.code === 'auth/too-many-requests') {
+          message = 'Too many failed login attempts. Please try again later.';
+        } else if (error.message) {
+          message = error.message;
+        }
+
+        toast({
+          variant: 'destructive',
+          title: 'Login Failed',
+          description: message,
+        });
+        setIsLoading(false);
       });
-      // Redirect is handled by ClientLayout
-    } catch (error: any) {
-      console.error('Login error:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Login Failed',
-        description: error.message || 'An unknown error occurred.',
-      });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (
