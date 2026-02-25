@@ -193,7 +193,7 @@ export default function DriversHoursPage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           {/* Shift Entry Form */}
           <Card className="shadow-md border-primary/10">
             <CardHeader>
