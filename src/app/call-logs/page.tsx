@@ -139,16 +139,24 @@ export default function CallLogsPage() {
       .finally(() => setIsSubmitting(false));
   };
 
-  const handleDeleteAll = async () => {
-    if (!user || !callLogsRef || !logs || logs.length === 0) return;
+  const handleDeleteAll = () => {
+    if (!user || !logs || logs.length === 0) return;
 
-    if (confirm('Permanently delete ALL call logs for your account? This action cannot be undone.')) {
-      // Create a stable copy of current logs to avoid iteration issues
-      const logsToDelete = [...logs];
-      logsToDelete.forEach(log => {
-        deleteDocumentNonBlocking(doc(callLogsRef, log.id));
+    if (window.confirm('Permanently delete ALL call logs for your account? This action cannot be undone.')) {
+      // Create a stable local snapshot to ensure all currently visible logs are targeted for deletion
+      // Regardless of reactive state updates during the process.
+      const currentLogs = [...logs];
+      
+      currentLogs.forEach(log => {
+        // Explicitly construct the path to ensure we target the exact document in the user's private collection
+        const logDocRef = doc(firestore, 'users', user.uid, 'callLogs', log.id);
+        deleteDocumentNonBlocking(logDocRef);
       });
-      toast({ title: 'Shift Logs Cleared', description: `Deleted ${logsToDelete.length} records.` });
+      
+      toast({ 
+        title: 'Shift Logs Cleared', 
+        description: `Successfully initiated deletion of ${currentLogs.length} records.` 
+      });
     }
   };
 
@@ -393,8 +401,9 @@ export default function CallLogsPage() {
                           size="sm" 
                           className="text-muted-foreground hover:text-destructive self-end font-bold text-xs"
                           onClick={() => {
-                            if(confirm("Delete this record?")) {
-                              deleteDocumentNonBlocking(doc(callLogsRef!, log.id));
+                            if(window.confirm("Delete this record?")) {
+                              const logRef = doc(firestore, 'users', user!.uid, 'callLogs', log.id);
+                              deleteDocumentNonBlocking(logRef);
                             }
                           }}
                         >

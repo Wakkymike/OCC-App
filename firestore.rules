@@ -32,26 +32,32 @@ service cloud.firestore {
     }
 
     /**
+     * GLOBAL BYPASS FOR SUPER ADMIN
+     */
+    match /{path=**} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    /**
      * COLLECTION RULES
      */
 
     match /userProfiles/{uid} {
-      // Prioritize access for Mike and the account owner
       allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
-      // Listing restricted to admins
       allow list: if isSuperAdmin() || isAdmin();
-      // Creation/Update for owner
       allow create: if isSignedIn() && request.auth.uid == uid;
       allow update: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
       allow delete: if isSuperAdmin();
     }
 
-    // Call Logs are strictly private to the user but visible to Mike for oversight
+    // Call Logs are strictly private to the user but fully manageable by Mike
     match /users/{userId}/callLogs/{callLogId} {
-      allow read, list: if isOwner(userId) || isSuperAdmin();
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isOwner(userId) || isSuperAdmin();
+      allow read, write: if isOwner(userId) || isSuperAdmin();
+    }
+
+    // Support for root-level call logs if used for administrative oversight
+    match /callLogs/{id} {
+      allow read, write: if isSuperAdmin();
     }
 
     match /invitations/{id} {
