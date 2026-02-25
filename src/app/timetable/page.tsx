@@ -151,10 +151,10 @@ export default function LiveServicePage() {
                                           {bus.fleetNumber}
                                         </Link>
                                       </TableCell>
-                                      <TableCell className={isFirst || isLast ? 'blinking-rb text-white font-bold' : ''}>
+                                      <TableCell>
                                         {bus.runningBoard}
                                       </TableCell>
-                                      <TableCell>
+                                      <TableCell className={isFirst || isLast ? 'blinking-rb text-white font-bold' : ''}>
                                         {bus.journeyRef || '--'}
                                       </TableCell>
                                       <TableCell className="font-medium">
