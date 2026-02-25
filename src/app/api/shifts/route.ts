@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import ical from 'node-ical';
 
@@ -30,7 +29,21 @@ export async function GET(req: NextRequest) {
       }))
       .sort((a, b) => a.start.getTime() - b.start.getTime());
 
-    return NextResponse.json({ shifts });
+    // Extract calendar name/owner info if available
+    let calendarName = '';
+    // Look for VCALENDAR metadata or X-WR-CALNAME properties
+    const metadata = Object.values(data).find(item => item.type === 'VCALENDAR') as any;
+    if (metadata) {
+      calendarName = metadata['WR-CALNAME'] || metadata['X-WR-CALNAME'] || '';
+    } else {
+      // Fallback: check root level properties which node-ical sometimes provides
+      // Some providers put the name in the first event description or specific fields
+      // but X-WR-CALNAME is the standard for "Calendar Name"
+      const anyData = data as any;
+      calendarName = anyData['vcalendar']?.['WR-CALNAME'] || anyData['vcalendar']?.['X-WR-CALNAME'] || '';
+    }
+
+    return NextResponse.json({ shifts, calendarName });
   } catch (error: any) {
     console.error('Shift fetch error:', error);
     return NextResponse.json(

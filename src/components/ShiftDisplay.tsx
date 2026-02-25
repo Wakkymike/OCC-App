@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -31,7 +30,8 @@ import {
   CalendarDays,
   CalendarRange,
   Settings,
-  X
+  X,
+  User as UserIcon
 } from 'lucide-react';
 import { 
   format, 
@@ -70,6 +70,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [calendarName, setCalendarName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,6 +87,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to fetch shifts');
       setShifts(data.shifts);
+      setCalendarName(data.calendarName || '');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -223,14 +225,27 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
         </div>
       ) : (
         <div className="space-y-6">
-          {!showSettings && (
-            <div className="flex justify-end">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <UserIcon className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold tracking-tight">
+                  {calendarName || user?.displayName || 'My'} Rota
+                </h2>
+                <p className="text-xs text-muted-foreground italic">
+                  {calendarName ? `Synced from ${calendarName}` : 'Personal shift schedule'}
+                </p>
+              </div>
+            </div>
+            {!showSettings && (
               <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="h-8">
                 <Settings className="h-4 w-4 mr-2" />
                 Update iCal Link
               </Button>
-            </div>
-          )}
+            )}
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-1 space-y-6">
