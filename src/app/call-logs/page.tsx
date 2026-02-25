@@ -227,7 +227,7 @@ export default function CallLogsPage() {
                           <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Ext (3-Dig)</Label>
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Phone No (3-Dig)</Label>
                           <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
                         </div>
                       </div>
@@ -345,13 +345,13 @@ export default function CallLogsPage() {
                       <div className="flex-grow space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Depot & Extension</Label>
+                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Depot & Phone No</Label>
                             <div className="flex items-center gap-2 font-bold text-sm">
                               <Home className="h-3.5 w-3.5 text-primary" />
                               <span>{log.depot}</span>
                               <span className="text-muted-foreground">|</span>
                               <Phone className="h-3.5 w-3.5 text-primary" />
-                              <span>Ext: {log.phoneNumber}</span>
+                              <span>Phone No: {log.phoneNumber}</span>
                             </div>
                           </div>
                           <div className="space-y-1">

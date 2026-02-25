@@ -36,8 +36,8 @@ service cloud.firestore {
      */
 
     match /userProfiles/{uid} {
-      // Direct access for self or Super Admin
-      allow get: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
+      // Prioritize access for Mike and the account owner
+      allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
       // Listing restricted to admins
       allow list: if isSuperAdmin() || isAdmin();
       // Creation/Update for owner
