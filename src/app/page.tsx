@@ -10,8 +10,6 @@ import BreakingNewsTicker from '@/components/BreakingNewsTicker';
 import NetworkUpdatesBox from '@/components/NetworkUpdatesBox';
 import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ShiftDisplay from '@/components/ShiftDisplay';
 
 export default function HomePage() {
   const { user, isUserLoading } = useUser();
@@ -47,21 +45,7 @@ export default function HomePage() {
                     </p>
                 </div>
 
-                <Tabs defaultValue="dashboard" className="w-full max-w-6xl">
-                  <div className="flex justify-center mb-8">
-                    <TabsList className="grid w-full max-w-md grid-cols-2">
-                      <TabsTrigger value="dashboard" className="flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        Dashboard
-                      </TabsTrigger>
-                      <TabsTrigger value="shifts" className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        My Shifts
-                      </TabsTrigger>
-                    </TabsList>
-                  </div>
-
-                  <TabsContent value="dashboard" className="space-y-12">
+                <div className="w-full max-w-6xl space-y-12">
                     <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-4">
                       <Button asChild size="lg">
                           <Link href="/map">
@@ -79,6 +63,12 @@ export default function HomePage() {
                           <Link href="/journey-planner">
                           <Route className="mr-2 h-5 w-5" />
                           Journey Planner
+                          </Link>
+                      </Button>
+                      <Button asChild size="lg" variant="outline">
+                          <Link href="/shifts">
+                          <Calendar className="mr-2 h-5 w-5" />
+                          My Shifts
                           </Link>
                       </Button>
                       <Button asChild size="lg" variant="outline">
@@ -112,15 +102,11 @@ export default function HomePage() {
                     <div className="flex justify-center">
                       <NetworkUpdatesBox />
                     </div>
-                  </TabsContent>
-
-                  <TabsContent value="shifts">
-                    <ShiftDisplay userProfile={userProfile} />
-                  </TabsContent>
-                </Tabs>
+                </div>
             </main>
         </div>
         <footer className="w-full flex-shrink-0">
+            Ticker Tape
             <TickerTape />
         </footer>
     </div>
