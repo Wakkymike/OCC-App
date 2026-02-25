@@ -123,6 +123,7 @@ export default function LiveServicePage() {
                           <TableRow>
                             <TableHead>Fleet No.</TableHead>
                             <TableHead>Running Board</TableHead>
+                            <TableHead>Journey No.</TableHead>
                             <TableHead>Destination</TableHead>
                             <TableHead>Direction</TableHead>
                           </TableRow>
@@ -152,6 +153,9 @@ export default function LiveServicePage() {
                                       </TableCell>
                                       <TableCell className={isFirst || isLast ? 'blinking-rb text-white font-bold' : ''}>
                                         {bus.runningBoard}
+                                      </TableCell>
+                                      <TableCell className="font-mono text-xs">
+                                        {bus.journeyRef || '--'}
                                       </TableCell>
                                       <TableCell className="font-medium">
                                         {bus.destination}
