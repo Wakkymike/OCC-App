@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -367,7 +366,7 @@ export default function DriversHoursPage() {
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] font-bold uppercase">
                       <span>Until 5.5h Break</span>
-                      <span>{Math.max(0, LIMIT_CONTINUOUS_MINS - calculations.maxContinuousMins)}m left</span>
+                      <span>{formatMins(Math.max(0, LIMIT_CONTINUOUS_MINS - calculations.maxContinuousMins))} left</span>
                     </div>
                     <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
                       <div 
@@ -380,7 +379,7 @@ export default function DriversHoursPage() {
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] font-bold uppercase">
                       <span>Daily 10h Limit</span>
-                      <span>{Math.max(0, LIMIT_DAILY_DRIVING_MINS - calculations.totalDrivingMinutes)}m left</span>
+                      <span>{formatMins(Math.max(0, LIMIT_DAILY_DRIVING_MINS - calculations.totalDrivingMinutes))} left</span>
                     </div>
                     <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
                       <div 
