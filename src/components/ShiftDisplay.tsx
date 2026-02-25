@@ -10,10 +10,46 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Calendar as CalendarIcon, Link as LinkIcon, Clock, MapPin, AlertCircle, Save, Coffee } from 'lucide-react';
-import { format, isAfter, isBefore, addDays, isWithinInterval, startOfDay, endOfDay, isSameDay, eachDayOfInterval } from 'date-fns';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { 
+  Loader2, 
+  Calendar as CalendarIcon, 
+  Link as LinkIcon, 
+  Clock, 
+  MapPin, 
+  AlertCircle, 
+  Save, 
+  Coffee,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
+  CalendarRange
+} from 'lucide-react';
+import { 
+  format, 
+  isAfter, 
+  addDays, 
+  isWithinInterval, 
+  startOfDay, 
+  isSameDay, 
+  eachDayOfInterval, 
+  startOfMonth, 
+  endOfMonth, 
+  startOfWeek, 
+  endOfWeek, 
+  addMonths, 
+  subMonths,
+  subDays
+} from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Shift {
   id: string;
@@ -33,6 +69,10 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // View state
+  const [viewType, setViewType] = useState<'month' | 'week'>('month');
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   const fetchShifts = async (url: string) => {
     if (!url) return;
@@ -78,13 +118,28 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
     return shifts.find(s => isAfter(new Date(s.start), now));
   }, [shifts, now]);
 
-  // Generate a full month timeline (next 30 days) including rest days
-  const monthTimeline = useMemo(() => {
-    const endRange = addDays(startOfDay(now), 30);
-    const days = eachDayOfInterval({
-      start: startOfDay(now),
-      end: endRange,
-    });
+  // Generate selectable months (current + 11 more)
+  const selectableMonths = useMemo(() => {
+    const months = [];
+    const start = startOfMonth(now);
+    for (let i = 0; i < 12; i++) {
+      months.push(addMonths(start, i));
+    }
+    return months;
+  }, [now]);
+
+  // Generate the timeline based on viewType and currentDate
+  const timelineDays = useMemo(() => {
+    let start, end;
+    if (viewType === 'month') {
+      start = startOfMonth(currentDate);
+      end = endOfMonth(currentDate);
+    } else {
+      start = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday start
+      end = endOfWeek(currentDate, { weekStartsOn: 1 });
+    }
+
+    const days = eachDayOfInterval({ start, end });
 
     return days.map(day => {
       const dayShifts = shifts.filter(s => isSameDay(new Date(s.start), day));
@@ -94,7 +149,20 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
         isRestDay: dayShifts.length === 0
       };
     });
-  }, [shifts, now]);
+  }, [shifts, viewType, currentDate]);
+
+  const goToPrev = () => {
+    setCurrentDate(prev => viewType === 'month' ? subMonths(prev, 1) : subDays(prev, 7));
+  };
+
+  const goToNext = () => {
+    setCurrentDate(prev => viewType === 'month' ? addMonths(prev, 1) : addDays(prev, 7));
+  };
+
+  const handleMonthSelect = (val: string) => {
+    setCurrentDate(new Date(val));
+    setViewType('month');
+  };
 
   return (
     <div className="space-y-8 w-full max-w-4xl mx-auto">
@@ -201,26 +269,67 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
           </div>
 
           <Card className="md:col-span-2">
-            <CardHeader className="border-b bg-muted/10">
-              <CardTitle className="text-lg flex items-center justify-between">
-                <span>Monthly Timeline</span>
-                <Badge variant="outline" className="font-normal text-[10px]">NEXT 30 DAYS</Badge>
-              </CardTitle>
-              <CardDescription>Comprehensive list of shifts and rest days.</CardDescription>
+            <CardHeader className="border-b bg-muted/10 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <span>Shift Timeline</span>
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Tabs value={viewType} onValueChange={(v: any) => setViewType(v)} className="w-auto">
+                    <TabsList className="h-8">
+                      <TabsTrigger value="week" className="text-xs px-2 h-7"><CalendarRange className="h-3 w-3 mr-1"/> Week</TabsTrigger>
+                      <TabsTrigger value="month" className="text-xs px-2 h-7"><CalendarDays className="h-3 w-3 mr-1"/> Month</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  
+                  <Select onValueChange={handleMonthSelect} value={startOfMonth(currentDate).toISOString()}>
+                    <SelectTrigger className="h-8 w-[140px] text-xs">
+                      <SelectValue placeholder="Select Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectableMonths.map((m) => (
+                        <SelectItem key={m.toISOString()} value={m.toISOString()}>
+                          {format(m, 'MMMM yyyy')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-4">
+                <Button variant="outline" size="sm" onClick={goToPrev} className="h-7 px-2">
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  {viewType === 'month' ? 'Prev Month' : 'Prev Week'}
+                </Button>
+                <span className="text-sm font-bold">
+                  {viewType === 'month' 
+                    ? format(currentDate, 'MMMM yyyy') 
+                    : `Week of ${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'do MMM')}`
+                  }
+                </span>
+                <Button variant="outline" size="sm" onClick={goToNext} className="h-7 px-2">
+                  {viewType === 'month' ? 'Next Month' : 'Next Week'}
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <ScrollArea className="h-[500px]">
                 <div className="divide-y">
-                  {monthTimeline.map((item, idx) => (
+                  {timelineDays.map((item, idx) => (
                     <div 
                       key={idx} 
                       className={cn(
                         "flex items-start gap-4 p-4 transition-colors",
-                        item.isRestDay ? "bg-muted/5 opacity-60" : "hover:bg-muted/30"
+                        item.isRestDay ? "bg-muted/5 opacity-60" : "hover:bg-muted/30",
+                        isSameDay(item.date, now) && "bg-primary/5 border-l-4 border-primary"
                       )}
                     >
                       <div className="w-16 shrink-0 text-center">
-                        <p className="text-[10px] uppercase font-bold text-muted-foreground">{format(item.date, 'EEE')}</p>
+                        <p className={cn(
+                          "text-[10px] uppercase font-bold",
+                          item.date.getDay() === 0 || item.date.getDay() === 6 ? "text-destructive" : "text-muted-foreground"
+                        )}>{format(item.date, 'EEE')}</p>
                         <p className="text-xl font-black leading-none">{format(item.date, 'd')}</p>
                         <p className="text-[10px] text-muted-foreground">{format(item.date, 'MMM')}</p>
                       </div>
@@ -235,7 +344,12 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
                           <div className="space-y-3">
                             {item.shifts.map(s => (
                               <div key={s.id} className="space-y-1">
-                                <p className="font-bold text-sm leading-tight">{s.summary}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-bold text-sm leading-tight">{s.summary}</p>
+                                  {isSameDay(item.date, now) && currentShift?.id === s.id && (
+                                    <Badge variant="outline" className="text-[8px] h-4 py-0 bg-green-50 text-green-700 border-green-200">ACTIVE</Badge>
+                                  )}
+                                </div>
                                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                   <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {format(new Date(s.start), 'HH:mm')} - {format(new Date(s.end), 'HH:mm')}</span>
                                   {s.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {s.location}</span>}
