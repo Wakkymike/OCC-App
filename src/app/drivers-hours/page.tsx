@@ -257,26 +257,26 @@ export default function DriversHoursPage() {
                     )}
                   >
                     <div className="grid grid-cols-2 gap-4 flex-grow">
-                      <div className="space-y-1 flex flex-col">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1 h-4">
-                          {seg.type === 'break' ? <Coffee className="h-2 w-2" /> : <Clock className="h-2 w-2" />}
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1.5 h-5">
+                          {seg.type === 'break' ? <Coffee className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
                           {seg.type === 'driving' ? 'Driving Start' : 'Break Start'}
                         </span>
                         <Input 
                           type="time" 
-                          className="bg-background mt-1"
+                          className="bg-background mt-1.5"
                           value={seg.start} 
                           onChange={(e) => updateSegment(idx, 'start', e.target.value)}
                         />
                       </div>
-                      <div className="space-y-1 flex flex-col">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1 h-4">
-                          <span className="w-2" /> {/* Spacer to align with left column icons */}
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1.5 h-5">
+                          <span className="w-3.5" /> {/* Invisible spacer matching icon width */}
                           {seg.type === 'driving' ? 'Driving End' : 'Break End'}
                         </span>
                         <Input 
                           type="time" 
-                          className="bg-background mt-1"
+                          className="bg-background mt-1.5"
                           value={seg.end} 
                           onChange={(e) => updateSegment(idx, 'end', e.target.value)}
                         />
@@ -326,22 +326,31 @@ export default function DriversHoursPage() {
               <CardDescription>GB Domestic Hours Calculations for Current Entry</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-primary/10 pb-4 sm:pb-0 pr-4">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Daily Driving</span>
-                  <span className={`text-2xl font-black tabular-nums ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'text-destructive' : 'text-primary'}`}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
+                <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-primary/10 pb-4 sm:pb-0 sm:pr-4">
+                  <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Daily Driving</span>
+                  <span className={cn(
+                    "text-2xl font-black tabular-nums leading-none",
+                    calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'text-destructive' : 'text-primary'
+                  )}>
                     {formatMins(calculations.totalDrivingMinutes)}
                   </span>
                 </div>
-                <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-primary/10 pb-4 sm:pb-0 pr-4">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Continuous Driving</span>
-                  <span className={`text-2xl font-black tabular-nums ${calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'text-destructive' : 'text-foreground'}`}>
+                <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-primary/10 py-4 sm:py-0 sm:px-4">
+                  <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Continuous Driving</span>
+                  <span className={cn(
+                    "text-2xl font-black tabular-nums leading-none",
+                    calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'text-destructive' : 'text-foreground'
+                  )}>
                     {formatMins(calculations.maxContinuousMins)}
                   </span>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Shift length</span>
-                  <span className={`text-2xl font-black tabular-nums ${calculations.totalShiftMinutes > LIMIT_SHIFT_MINS ? 'text-destructive' : 'text-foreground'}`}>
+                <div className="flex flex-col pt-4 sm:pt-0 sm:pl-4">
+                  <span className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Shift length</span>
+                  <span className={cn(
+                    "text-2xl font-black tabular-nums leading-none",
+                    calculations.totalShiftMinutes > LIMIT_SHIFT_MINS ? 'text-destructive' : 'text-foreground'
+                  )}>
                     {formatMins(calculations.totalShiftMinutes)}
                   </span>
                 </div>
