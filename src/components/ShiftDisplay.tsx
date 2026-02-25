@@ -48,7 +48,8 @@ import {
   subMonths,
   subDays,
   addWeeks,
-  subWeeks
+  subWeeks,
+  startOfToday
 } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -75,9 +76,9 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // View state
+  // View state - Normalized to start of period
   const [viewType, setViewType] = useState<'month' | 'week'>('month');
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => startOfMonth(new Date()));
 
   const fetchShifts = async (url: string) => {
     if (!url) return;
@@ -113,27 +114,29 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
     setShowSettings(false);
   };
 
-  const now = new Date();
+  const today = startOfToday();
 
   const currentShift = useMemo(() => {
+    const now = new Date();
     return shifts.find(s => 
       isWithinInterval(now, { start: new Date(s.start), end: new Date(s.end) })
     );
-  }, [shifts, now]);
+  }, [shifts]);
 
   const nextShift = useMemo(() => {
+    const now = new Date();
     return shifts.find(s => isAfter(new Date(s.start), now));
-  }, [shifts, now]);
+  }, [shifts]);
 
   // Generate selectable months (current + 11 more)
   const selectableMonths = useMemo(() => {
     const months = [];
-    const start = startOfMonth(now);
+    const start = startOfMonth(today);
     for (let i = 0; i < 12; i++) {
       months.push(addMonths(start, i));
     }
     return months;
-  }, [now]);
+  }, [today]);
 
   // Generate the timeline based on viewType and currentDate
   const timelineDays = useMemo(() => {
@@ -161,11 +164,9 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const goToPrev = () => {
     setCurrentDate(prev => {
       if (viewType === 'month') {
-        // Snap to the 1st of the previous month
-        return startOfMonth(subMonths(startOfMonth(prev), 1));
+        return startOfMonth(subMonths(prev, 1));
       } else {
-        // Snap to the Monday of the previous week
-        return startOfWeek(subWeeks(startOfWeek(prev, { weekStartsOn: 1 }), 1), { weekStartsOn: 1 });
+        return startOfWeek(subWeeks(prev, 1), { weekStartsOn: 1 });
       }
     });
   };
@@ -173,18 +174,15 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const goToNext = () => {
     setCurrentDate(prev => {
       if (viewType === 'month') {
-        // Snap to the 1st of the next month
-        return startOfMonth(addMonths(startOfMonth(prev), 1));
+        return startOfMonth(addMonths(prev, 1));
       } else {
-        // Snap to the Monday of the next week
-        return startOfWeek(addWeeks(startOfWeek(prev, { weekStartsOn: 1 }), 1), { weekStartsOn: 1 });
+        return startOfWeek(addWeeks(prev, 1), { weekStartsOn: 1 });
       }
     });
   };
 
   const handleViewTypeChange = (newView: 'month' | 'week') => {
     setViewType(newView);
-    // Snap currentDate to the start of the period when switching views
     setCurrentDate(prev => {
       if (newView === 'month') {
         return startOfMonth(prev);
@@ -389,7 +387,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
                         className={cn(
                           "flex items-start gap-4 p-4 transition-colors",
                           item.isRestDay ? "bg-muted/5 opacity-60" : "hover:bg-muted/30",
-                          isSameDay(item.date, now) && "bg-primary/5 border-l-4 border-primary"
+                          isSameDay(item.date, today) && "bg-primary/5 border-l-4 border-primary"
                         )}
                       >
                         <div className="w-16 shrink-0 text-center">
@@ -413,7 +411,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
                                 <div key={s.id} className="space-y-1">
                                   <div className="flex items-center gap-2">
                                     <p className="font-bold text-sm leading-tight">{s.summary}</p>
-                                    {isSameDay(item.date, now) && currentShift?.id === s.id && (
+                                    {isSameDay(item.date, today) && currentShift?.id === s.id && (
                                       <Badge variant="outline" className="text-[8px] h-4 py-0 bg-green-50 text-green-700 border-green-200">ACTIVE</Badge>
                                     )}
                                   </div>
