@@ -29,7 +29,9 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
-  CalendarRange
+  CalendarRange,
+  Settings,
+  X
 } from 'lucide-react';
 import { 
   format, 
@@ -66,6 +68,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   
   const [icalUrl, setIcalUrl] = useState(userProfile?.icalUrl || '');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +107,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
     toast({ title: 'iCal Link Saved', description: 'Your rota calendar has been updated.' });
     fetchShifts(icalUrl);
     setIsUpdating(false);
+    setShowSettings(false);
   };
 
   const now = new Date();
@@ -166,30 +170,39 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
 
   return (
     <div className="space-y-8 w-full max-w-4xl mx-auto">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <LinkIcon className="h-5 w-5 text-primary" />
-            <CardTitle>Rota Integration</CardTitle>
-          </div>
-          <CardDescription>Paste your iCal subscription link from your rota system here.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex gap-4">
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="ical-url">iCal Subscription URL</Label>
-            <Input 
-              id="ical-url" 
-              placeholder="https://example.com/rota.ics" 
-              value={icalUrl}
-              onChange={(e) => setIcalUrl(e.target.value)}
-            />
-          </div>
-          <Button onClick={handleSaveUrl} disabled={isUpdating} className="self-end">
-            {isUpdating ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4 mr-2" />}
-            Save Link
-          </Button>
-        </CardContent>
-      </Card>
+      {(showSettings || !userProfile?.icalUrl) && (
+        <Card className="animate-in fade-in slide-in-from-top-4 duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <LinkIcon className="h-5 w-5 text-primary" />
+                <CardTitle>Rota Integration</CardTitle>
+              </div>
+              <CardDescription>Paste your iCal subscription link from your rota system here.</CardDescription>
+            </div>
+            {userProfile?.icalUrl && (
+              <Button variant="ghost" size="icon" onClick={() => setShowSettings(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent className="flex gap-4">
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="ical-url">iCal Subscription URL</Label>
+              <Input 
+                id="ical-url" 
+                placeholder="https://example.com/rota.ics" 
+                value={icalUrl}
+                onChange={(e) => setIcalUrl(e.target.value)}
+              />
+            </div>
+            <Button onClick={handleSaveUrl} disabled={isUpdating} className="self-end">
+              {isUpdating ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4 mr-2" />}
+              Save Link
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
@@ -209,162 +222,173 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
           <p>Provide an iCal link above to see your shifts here.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-1 space-y-6">
-            <Card className={currentShift ? "border-green-500 bg-green-50/50" : ""}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm uppercase text-muted-foreground font-bold flex items-center justify-between">
-                  Current Status
-                  {currentShift && <Badge className="bg-green-600">ON DUTY</Badge>}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {currentShift ? (
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-black">{currentShift.summary}</h3>
-                    <div className="flex items-center text-sm gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>{format(new Date(currentShift.start), 'HH:mm')} - {format(new Date(currentShift.end), 'HH:mm')}</span>
-                    </div>
-                    {currentShift.location && (
-                      <div className="flex items-center text-xs text-muted-foreground gap-2">
-                        <MapPin className="h-3 w-3" />
-                        <span>{currentShift.location}</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Coffee className="h-4 w-4" />
-                    <span className="italic">Off Duty</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-primary/20 bg-primary/5">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm uppercase text-muted-foreground font-bold">Next Shift</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {nextShift ? (
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-black">{nextShift.summary}</h3>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center text-sm font-bold gap-2">
-                        <CalendarIcon className="h-4 w-4" />
-                        <span>{format(new Date(nextShift.start), 'EEEE, do MMM')}</span>
-                      </div>
-                      <div className="flex items-center text-sm gap-2 text-primary">
+        <div className="space-y-6">
+          {!showSettings && (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="h-8">
+                <Settings className="h-4 w-4 mr-2" />
+                Update iCal Link
+              </Button>
+            </div>
+          )}
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-1 space-y-6">
+              <Card className={currentShift ? "border-green-500 bg-green-50/50" : ""}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm uppercase text-muted-foreground font-bold flex items-center justify-between">
+                    Current Status
+                    {currentShift && <Badge className="bg-green-600">ON DUTY</Badge>}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {currentShift ? (
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-black">{currentShift.summary}</h3>
+                      <div className="flex items-center text-sm gap-2">
                         <Clock className="h-4 w-4" />
-                        <span>Starts at {format(new Date(nextShift.start), 'HH:mm')}</span>
+                        <span>{format(new Date(currentShift.start), 'HH:mm')} - {format(new Date(currentShift.end), 'HH:mm')}</span>
+                      </div>
+                      {currentShift.location && (
+                        <div className="flex items-center text-xs text-muted-foreground gap-2">
+                          <MapPin className="h-3 w-3" />
+                          <span>{currentShift.location}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Coffee className="h-4 w-4" />
+                      <span className="italic">Off Duty</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-primary/20 bg-primary/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm uppercase text-muted-foreground font-bold">Next Shift</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {nextShift ? (
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-black">{nextShift.summary}</h3>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center text-sm font-bold gap-2">
+                          <CalendarIcon className="h-4 w-4" />
+                          <span>{format(new Date(nextShift.start), 'EEEE, do MMM')}</span>
+                        </div>
+                        <div className="flex items-center text-sm gap-2 text-primary">
+                          <Clock className="h-4 w-4" />
+                          <span>Starts at {format(new Date(nextShift.start), 'HH:mm')}</span>
+                        </div>
                       </div>
                     </div>
+                  ) : (
+                    <p className="text-muted-foreground italic text-sm">No future shifts found.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="md:col-span-2">
+              <CardHeader className="border-b bg-muted/10 pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <span>Shift Timeline</span>
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Tabs value={viewType} onValueChange={(v: any) => setViewType(v)} className="w-auto">
+                      <TabsList className="h-8">
+                        <TabsTrigger value="week" className="text-xs px-2 h-7"><CalendarRange className="h-3 w-3 mr-1"/> Week</TabsTrigger>
+                        <TabsTrigger value="month" className="text-xs px-2 h-7"><CalendarDays className="h-3 w-3 mr-1"/> Month</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    
+                    <Select onValueChange={handleMonthSelect} value={startOfMonth(currentDate).toISOString()}>
+                      <SelectTrigger className="h-8 w-[140px] text-xs">
+                        <SelectValue placeholder="Select Month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectableMonths.map((m) => (
+                          <SelectItem key={m.toISOString()} value={m.toISOString()}>
+                            {format(m, 'MMMM yyyy')}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : (
-                  <p className="text-muted-foreground italic text-sm">No future shifts found.</p>
-                )}
+                </div>
+                <div className="flex items-center justify-between mt-4">
+                  <Button variant="outline" size="sm" onClick={goToPrev} className="h-7 px-2">
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    {viewType === 'month' ? 'Prev Month' : 'Prev Week'}
+                  </Button>
+                  <span className="text-sm font-bold">
+                    {viewType === 'month' 
+                      ? format(currentDate, 'MMMM yyyy') 
+                      : `Week of ${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'do MMM')}`
+                    }
+                  </span>
+                  <Button variant="outline" size="sm" onClick={goToNext} className="h-7 px-2">
+                    {viewType === 'month' ? 'Next Month' : 'Next Week'}
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[500px]">
+                  <div className="divide-y">
+                    {timelineDays.map((item, idx) => (
+                      <div 
+                        key={idx} 
+                        className={cn(
+                          "flex items-start gap-4 p-4 transition-colors",
+                          item.isRestDay ? "bg-muted/5 opacity-60" : "hover:bg-muted/30",
+                          isSameDay(item.date, now) && "bg-primary/5 border-l-4 border-primary"
+                        )}
+                      >
+                        <div className="w-16 shrink-0 text-center">
+                          <p className={cn(
+                            "text-[10px] uppercase font-bold",
+                            item.date.getDay() === 0 || item.date.getDay() === 6 ? "text-destructive" : "text-muted-foreground"
+                          )}>{format(item.date, 'EEE')}</p>
+                          <p className="text-xl font-black leading-none">{format(item.date, 'd')}</p>
+                          <p className="text-[10px] text-muted-foreground">{format(item.date, 'MMM')}</p>
+                        </div>
+                        
+                        <div className="flex-grow pt-1">
+                          {item.isRestDay ? (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Coffee className="h-3.5 w-3.5" />
+                              <span className="text-sm font-medium italic">Rest Day</span>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {item.shifts.map(s => (
+                                <div key={s.id} className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-bold text-sm leading-tight">{s.summary}</p>
+                                    {isSameDay(item.date, now) && currentShift?.id === s.id && (
+                                      <Badge variant="outline" className="text-[8px] h-4 py-0 bg-green-50 text-green-700 border-green-200">ACTIVE</Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {format(new Date(s.start), 'HH:mm')} - {format(new Date(s.end), 'HH:mm')}</span>
+                                    {s.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {s.location}</span>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               </CardContent>
             </Card>
           </div>
-
-          <Card className="md:col-span-2">
-            <CardHeader className="border-b bg-muted/10 pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <span>Shift Timeline</span>
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Tabs value={viewType} onValueChange={(v: any) => setViewType(v)} className="w-auto">
-                    <TabsList className="h-8">
-                      <TabsTrigger value="week" className="text-xs px-2 h-7"><CalendarRange className="h-3 w-3 mr-1"/> Week</TabsTrigger>
-                      <TabsTrigger value="month" className="text-xs px-2 h-7"><CalendarDays className="h-3 w-3 mr-1"/> Month</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                  
-                  <Select onValueChange={handleMonthSelect} value={startOfMonth(currentDate).toISOString()}>
-                    <SelectTrigger className="h-8 w-[140px] text-xs">
-                      <SelectValue placeholder="Select Month" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {selectableMonths.map((m) => (
-                        <SelectItem key={m.toISOString()} value={m.toISOString()}>
-                          {format(m, 'MMMM yyyy')}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex items-center justify-between mt-4">
-                <Button variant="outline" size="sm" onClick={goToPrev} className="h-7 px-2">
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  {viewType === 'month' ? 'Prev Month' : 'Prev Week'}
-                </Button>
-                <span className="text-sm font-bold">
-                  {viewType === 'month' 
-                    ? format(currentDate, 'MMMM yyyy') 
-                    : `Week of ${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'do MMM')}`
-                  }
-                </span>
-                <Button variant="outline" size="sm" onClick={goToNext} className="h-7 px-2">
-                  {viewType === 'month' ? 'Next Month' : 'Next Week'}
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[500px]">
-                <div className="divide-y">
-                  {timelineDays.map((item, idx) => (
-                    <div 
-                      key={idx} 
-                      className={cn(
-                        "flex items-start gap-4 p-4 transition-colors",
-                        item.isRestDay ? "bg-muted/5 opacity-60" : "hover:bg-muted/30",
-                        isSameDay(item.date, now) && "bg-primary/5 border-l-4 border-primary"
-                      )}
-                    >
-                      <div className="w-16 shrink-0 text-center">
-                        <p className={cn(
-                          "text-[10px] uppercase font-bold",
-                          item.date.getDay() === 0 || item.date.getDay() === 6 ? "text-destructive" : "text-muted-foreground"
-                        )}>{format(item.date, 'EEE')}</p>
-                        <p className="text-xl font-black leading-none">{format(item.date, 'd')}</p>
-                        <p className="text-[10px] text-muted-foreground">{format(item.date, 'MMM')}</p>
-                      </div>
-                      
-                      <div className="flex-grow pt-1">
-                        {item.isRestDay ? (
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Coffee className="h-3.5 w-3.5" />
-                            <span className="text-sm font-medium italic">Rest Day</span>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {item.shifts.map(s => (
-                              <div key={s.id} className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-bold text-sm leading-tight">{s.summary}</p>
-                                  {isSameDay(item.date, now) && currentShift?.id === s.id && (
-                                    <Badge variant="outline" className="text-[8px] h-4 py-0 bg-green-50 text-green-700 border-green-200">ACTIVE</Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {format(new Date(s.start), 'HH:mm')} - {format(new Date(s.end), 'HH:mm')}</span>
-                                  {s.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {s.location}</span>}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
         </div>
       )}
     </div>
