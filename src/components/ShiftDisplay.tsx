@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, updateDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -78,6 +78,10 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   // View state - Strictly normalized to start of period
   const [viewType, setViewType] = useState<'month' | 'week'>('month');
   const [currentDate, setCurrentDate] = useState(() => startOfMonth(new Date()));
+  const [hasScrolledToToday, setHasScrolledToToday] = useState(false);
+
+  const today = startOfToday();
+  const todayRef = useRef<HTMLDivElement>(null);
 
   const fetchShifts = async (url: string) => {
     if (!url) return;
@@ -102,6 +106,18 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
     }
   }, [userProfile?.icalUrl]);
 
+  // Handle automatic jump to today on initial load or reset
+  useEffect(() => {
+    if (!isLoading && shifts.length > 0 && todayRef.current && !hasScrolledToToday) {
+      // Small timeout to ensure DOM is fully ready within the scroll area
+      const timeout = setTimeout(() => {
+        todayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHasScrolledToToday(true);
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading, shifts, hasScrolledToToday]);
+
   const handleSaveUrl = () => {
     if (!user) return;
     setIsUpdating(true);
@@ -112,8 +128,6 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
     setIsUpdating(false);
     setShowSettings(false);
   };
-
-  const today = startOfToday();
 
   const currentShift = useMemo(() => {
     const now = new Date();
@@ -138,7 +152,6 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   }, [today]);
 
   // Generate the timeline based on viewType and currentDate
-  // Always ensures the interval starts exactly at the beginning of the period
   const timelineDays = useMemo(() => {
     let start, end;
     if (viewType === 'month') {
@@ -164,25 +177,23 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const goToPrev = () => {
     setCurrentDate(prev => {
       if (viewType === 'month') {
-        // Jump to the 1st of the previous month
         return startOfMonth(subMonths(prev, 1));
       } else {
-        // Jump to the Monday of the previous week
         return startOfWeek(subWeeks(prev, 1), { weekStartsOn: 1 });
       }
     });
+    setHasScrolledToToday(true); // Don't snap to today when manually navigating
   };
 
   const goToNext = () => {
     setCurrentDate(prev => {
       if (viewType === 'month') {
-        // Jump to the 1st of the next month
         return startOfMonth(addMonths(prev, 1));
       } else {
-        // Jump to the Monday of the next week
         return startOfWeek(addWeeks(prev, 1), { weekStartsOn: 1 });
       }
     });
+    setHasScrolledToToday(true); // Don't snap to today when manually navigating
   };
 
   const handleViewTypeChange = (newView: 'month' | 'week') => {
@@ -199,6 +210,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const handleMonthSelect = (val: string) => {
     setCurrentDate(startOfMonth(new Date(val)));
     setViewType('month');
+    setHasScrolledToToday(true);
   };
 
   return (
@@ -383,57 +395,57 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                {/* 
-                  The key prop ensures that the ScrollArea resets its scroll position 
-                  to the top whenever the view period or type changes. 
-                */}
                 <ScrollArea className="h-[500px]" key={`${viewType}-${currentDate.toISOString()}`}>
                   <div className="divide-y">
-                    {timelineDays.map((item, idx) => (
-                      <div 
-                        key={idx} 
-                        className={cn(
-                          "flex items-start gap-4 p-4 transition-colors",
-                          item.isRestDay ? "bg-muted/5 opacity-60" : "hover:bg-muted/30",
-                          isSameDay(item.date, today) && "bg-primary/5 border-l-4 border-primary"
-                        )}
-                      >
-                        <div className="w-16 shrink-0 text-center">
-                          <p className={cn(
-                            "text-[10px] uppercase font-bold",
-                            item.date.getDay() === 0 || item.date.getDay() === 6 ? "text-destructive" : "text-muted-foreground"
-                          )}>{format(item.date, 'EEE')}</p>
-                          <p className="text-xl font-black leading-none">{format(item.date, 'd')}</p>
-                          <p className="text-[10px] text-muted-foreground">{format(item.date, 'MMM')}</p>
-                        </div>
-                        
-                        <div className="flex-grow pt-1">
-                          {item.isRestDay ? (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Coffee className="h-3.5 w-3.5" />
-                              <span className="text-sm font-medium italic">Rest Day</span>
-                            </div>
-                          ) : (
-                            <div className="space-y-3">
-                              {item.shifts.map(s => (
-                                <div key={s.id} className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-bold text-sm leading-tight">{s.summary}</p>
-                                    {isSameDay(item.date, today) && currentShift?.id === s.id && (
-                                      <Badge variant="outline" className="text-[8px] h-4 py-0 bg-green-50 text-green-700 border-green-200">ACTIVE</Badge>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {format(new Date(s.start), 'HH:mm')} - {format(new Date(s.end), 'HH:mm')}</span>
-                                    {s.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {s.location}</span>}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                    {timelineDays.map((item, idx) => {
+                      const isToday = isSameDay(item.date, today);
+                      return (
+                        <div 
+                          key={idx} 
+                          ref={isToday ? todayRef : null}
+                          className={cn(
+                            "flex items-start gap-4 p-4 transition-colors",
+                            item.isRestDay ? "bg-muted/5 opacity-60" : "hover:bg-muted/30",
+                            isToday && "bg-green-50/50 border-l-4 border-green-500"
                           )}
+                        >
+                          <div className="w-16 shrink-0 text-center">
+                            <p className={cn(
+                              "text-[10px] uppercase font-bold",
+                              item.date.getDay() === 0 || item.date.getDay() === 6 ? "text-destructive" : "text-muted-foreground"
+                            )}>{format(item.date, 'EEE')}</p>
+                            <p className="text-xl font-black leading-none">{format(item.date, 'd')}</p>
+                            <p className="text-[10px] text-muted-foreground">{format(item.date, 'MMM')}</p>
+                          </div>
+                          
+                          <div className="flex-grow pt-1">
+                            {item.isRestDay ? (
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Coffee className="h-3.5 w-3.5" />
+                                <span className="text-sm font-medium italic">Rest Day</span>
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                {item.shifts.map(s => (
+                                  <div key={s.id} className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-bold text-sm leading-tight">{s.summary}</p>
+                                      {isToday && currentShift?.id === s.id && (
+                                        <Badge variant="outline" className="text-[8px] h-4 py-0 bg-green-100 text-green-700 border-green-200">ACTIVE</Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {format(new Date(s.start), 'HH:mm')} - {format(new Date(s.end), 'HH:mm')}</span>
+                                      {s.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {s.location}</span>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               </CardContent>
