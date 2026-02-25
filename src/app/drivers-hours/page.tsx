@@ -11,10 +11,30 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText, Stepper } from 'lucide-react';
+import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+
+// Custom Steering Wheel Icon
+const SteeringWheelIcon = ({ className }: { className?: string }) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={className}
+  >
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="3" />
+    <line x1="12" y1="9" x2="12" y2="2" />
+    <line x1="9.39" y1="13.5" x2="3.34" y2="15.5" />
+    <line x1="14.61" y1="13.5" x2="20.66" y2="15.5" />
+  </svg>
+);
 
 interface DrivingSegment {
   start: string;
@@ -237,25 +257,26 @@ export default function DriversHoursPage() {
                     )}
                   >
                     <div className="grid grid-cols-2 gap-4 flex-grow">
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1">
+                      <div className="space-y-1 flex flex-col">
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1 h-4">
                           {seg.type === 'break' ? <Coffee className="h-2 w-2" /> : <Clock className="h-2 w-2" />}
                           {seg.type === 'driving' ? 'Driving Start' : 'Break Start'}
                         </span>
                         <Input 
                           type="time" 
-                          className="bg-background"
+                          className="bg-background mt-1"
                           value={seg.start} 
                           onChange={(e) => updateSegment(idx, 'start', e.target.value)}
                         />
                       </div>
-                      <div className="space-y-1">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                      <div className="space-y-1 flex flex-col">
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1 h-4">
+                          <span className="w-2" /> {/* Spacer to align with left column icons */}
                           {seg.type === 'driving' ? 'Driving End' : 'Break End'}
                         </span>
                         <Input 
                           type="time" 
-                          className="bg-background"
+                          className="bg-background mt-1"
                           value={seg.end} 
                           onChange={(e) => updateSegment(idx, 'end', e.target.value)}
                         />
@@ -264,7 +285,7 @@ export default function DriversHoursPage() {
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="text-destructive hover:bg-destructive/10 h-10 w-10 shrink-0"
+                      className="text-destructive hover:bg-destructive/10 h-10 w-10 shrink-0 mb-[1px]"
                       onClick={() => removeSegment(idx)}
                       disabled={segments.length === 1}
                       title="Delete segment"
@@ -276,7 +297,7 @@ export default function DriversHoursPage() {
                 
                 <div className="flex gap-3">
                   <Button variant="outline" className="flex-1 border-dashed py-6 hover:bg-primary/5 hover:border-primary/50 transition-all" onClick={addDrivingSegment}>
-                    <Plus className="mr-2 h-4 w-4" /> Add Driving
+                    <SteeringWheelIcon className="mr-2 h-4 w-4" /> Add Driving
                   </Button>
                   <Button variant="outline" className="flex-1 border-dashed py-6 border-blue-200 hover:bg-blue-50 transition-all" onClick={addBreakSegment}>
                     <Coffee className="mr-2 h-4 w-4 text-blue-500" /> Add Break
@@ -313,7 +334,7 @@ export default function DriversHoursPage() {
                   </span>
                 </div>
                 <div className="flex flex-col border-b sm:border-b-0 sm:border-r border-primary/10 pb-4 sm:pb-0 pr-4">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Peak block</span>
+                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Continuous Driving</span>
                   <span className={`text-2xl font-black tabular-nums ${calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'text-destructive' : 'text-foreground'}`}>
                     {formatMins(calculations.maxContinuousMins)}
                   </span>
@@ -408,7 +429,7 @@ export default function DriversHoursPage() {
                       <TableCell>
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-semibold">{formatMins(record.totalDrivingMinutes)} total</span>
-                            <span className="text-[10px] text-muted-foreground italic">Max block: {formatMins(record.maxContinuousMins)}</span>
+                            <span className="text-[10px] text-muted-foreground italic">Continuous: {formatMins(record.maxContinuousMins)}</span>
                         </div>
                       </TableCell>
                       <TableCell>
