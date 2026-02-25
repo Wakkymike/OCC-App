@@ -38,7 +38,6 @@ import {
   isAfter, 
   addDays, 
   isWithinInterval, 
-  startOfDay, 
   isSameDay, 
   eachDayOfInterval, 
   startOfMonth, 
@@ -47,7 +46,9 @@ import {
   endOfWeek, 
   addMonths, 
   subMonths,
-  subDays
+  subDays,
+  addWeeks,
+  subWeeks
 } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -160,10 +161,11 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const goToPrev = () => {
     setCurrentDate(prev => {
       if (viewType === 'month') {
-        return startOfMonth(subMonths(prev, 1));
+        // Snap to the 1st of the previous month
+        return startOfMonth(subMonths(startOfMonth(prev), 1));
       } else {
-        // Find the Monday of the previous week
-        return startOfWeek(subDays(prev, 7), { weekStartsOn: 1 });
+        // Snap to the Monday of the previous week
+        return startOfWeek(subWeeks(startOfWeek(prev, { weekStartsOn: 1 }), 1), { weekStartsOn: 1 });
       }
     });
   };
@@ -171,10 +173,23 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const goToNext = () => {
     setCurrentDate(prev => {
       if (viewType === 'month') {
-        return startOfMonth(addMonths(prev, 1));
+        // Snap to the 1st of the next month
+        return startOfMonth(addMonths(startOfMonth(prev), 1));
       } else {
-        // Find the Monday of the next week
-        return startOfWeek(addDays(prev, 7), { weekStartsOn: 1 });
+        // Snap to the Monday of the next week
+        return startOfWeek(addWeeks(startOfWeek(prev, { weekStartsOn: 1 }), 1), { weekStartsOn: 1 });
+      }
+    });
+  };
+
+  const handleViewTypeChange = (newView: 'month' | 'week') => {
+    setViewType(newView);
+    // Snap currentDate to the start of the period when switching views
+    setCurrentDate(prev => {
+      if (newView === 'month') {
+        return startOfMonth(prev);
+      } else {
+        return startOfWeek(prev, { weekStartsOn: 1 });
       }
     });
   };
@@ -327,7 +342,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
                     <span>Shift Timeline</span>
                   </CardTitle>
                   <div className="flex items-center gap-2">
-                    <Tabs value={viewType} onValueChange={(v: any) => setViewType(v)} className="w-auto">
+                    <Tabs value={viewType} onValueChange={(v: any) => handleViewTypeChange(v)} className="w-auto">
                       <TabsList className="h-8">
                         <TabsTrigger value="week" className="text-xs px-2 h-7"><CalendarRange className="h-3 w-3 mr-1"/> Week</TabsTrigger>
                         <TabsTrigger value="month" className="text-xs px-2 h-7"><CalendarDays className="h-3 w-3 mr-1"/> Month</TabsTrigger>
