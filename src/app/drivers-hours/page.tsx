@@ -141,7 +141,7 @@ export default function DriversHoursPage() {
     if (totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS) breaches.push('Daily Driving (> 10h total)');
     if (totalShiftMinutes > LIMIT_SHIFT_MINS) breaches.push('Shift Duration (> 16h)');
 
-    return { totalDrivingMinutes, totalShiftMinutes, maxContinuousMins, breaches, breaksDetected };
+    return { totalDrivingMinutes, totalShiftMinutes, maxContinuousMins, currentContinuousMins, breaches, breaksDetected };
   }, [segments]);
 
   const handleSave = async () => {
@@ -342,7 +342,7 @@ export default function DriversHoursPage() {
                       "text-2xl font-black tabular-nums leading-none",
                       calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'text-destructive' : 'text-foreground'
                     )}>
-                      {formatMins(calculations.maxContinuousMins)}
+                      {formatMins(calculations.currentContinuousMins)}
                     </span>
                   </div>
                   <div className="flex flex-col pt-4 sm:pt-0 sm:pl-4">
@@ -360,12 +360,12 @@ export default function DriversHoursPage() {
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
                       <span>Break Requirement (5.5h)</span>
-                      <span className="text-primary">{formatMins(Math.max(0, LIMIT_CONTINUOUS_MINS - calculations.maxContinuousMins))} LEFT</span>
+                      <span className="text-primary">{formatMins(Math.max(0, LIMIT_CONTINUOUS_MINS - calculations.currentContinuousMins))} LEFT</span>
                     </div>
                     <div className="h-3 w-full bg-white/50 rounded-full overflow-hidden border border-primary/5">
                       <div 
-                        className={`h-full transition-all duration-500 ${calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'bg-destructive' : 'bg-primary'}`}
-                        style={{ width: `${Math.min(100, (calculations.maxContinuousMins / LIMIT_CONTINUOUS_MINS) * 100)}%` }}
+                        className={`h-full transition-all duration-500 ${calculations.currentContinuousMins > LIMIT_CONTINUOUS_MINS ? 'bg-destructive' : 'bg-primary'}`}
+                        style={{ width: `${Math.min(100, (calculations.currentContinuousMins / LIMIT_CONTINUOUS_MINS) * 100)}%` }}
                       />
                     </div>
                   </div>
@@ -487,7 +487,7 @@ export default function DriversHoursPage() {
                       <TableCell>
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-semibold">{formatMins(record.totalDrivingMinutes)} total</span>
-                            <span className="text-[10px] text-muted-foreground italic">Continuous: {formatMins(record.maxContinuousMins)}</span>
+                            <span className="text-[10px] text-muted-foreground italic">Peak Block: {formatMins(record.maxContinuousMins)}</span>
                         </div>
                       </TableCell>
                       <TableCell>
