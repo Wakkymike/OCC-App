@@ -158,15 +158,29 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   }, [shifts, viewType, currentDate]);
 
   const goToPrev = () => {
-    setCurrentDate(prev => viewType === 'month' ? subMonths(prev, 1) : subDays(prev, 7));
+    setCurrentDate(prev => {
+      if (viewType === 'month') {
+        return startOfMonth(subMonths(prev, 1));
+      } else {
+        // Find the Monday of the previous week
+        return startOfWeek(subDays(prev, 7), { weekStartsOn: 1 });
+      }
+    });
   };
 
   const goToNext = () => {
-    setCurrentDate(prev => viewType === 'month' ? addMonths(prev, 1) : addDays(prev, 7));
+    setCurrentDate(prev => {
+      if (viewType === 'month') {
+        return startOfMonth(addMonths(prev, 1));
+      } else {
+        // Find the Monday of the next week
+        return startOfWeek(addDays(prev, 7), { weekStartsOn: 1 });
+      }
+    });
   };
 
   const handleMonthSelect = (val: string) => {
-    setCurrentDate(new Date(val));
+    setCurrentDate(startOfMonth(new Date(val)));
     setViewType('month');
   };
 
