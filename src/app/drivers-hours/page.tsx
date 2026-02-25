@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, addDoc, serverTimestamp, query, orderBy, limit, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee } from 'lucide-react';
 import Link from 'next/link';
@@ -165,6 +165,11 @@ export default function DriversHoursPage() {
     }
   };
 
+  const handleDeleteRecord = (id: string) => {
+    deleteDocumentNonBlocking(doc(firestore, 'driverHours', id));
+    toast({ title: 'Record Deleted' });
+  };
+
   const formatMins = (mins: number) => {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
@@ -246,9 +251,10 @@ export default function DriversHoursPage() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="text-destructive h-10 w-10"
                         onClick={() => removeSegment(idx)}
                         disabled={segments.length === 1}
+                        title="Delete segment"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -282,6 +288,7 @@ export default function DriversHoursPage() {
                         <TableHead>Driver</TableHead>
                         <TableHead>Driving</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -306,6 +313,11 @@ export default function DriversHoursPage() {
                             ) : (
                               <Badge variant="secondary" className="bg-green-100 text-green-800">Compliant</Badge>
                             )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteRecord(record.id)} className="text-muted-foreground hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
