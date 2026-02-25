@@ -82,6 +82,31 @@
         "acknowledgedBy": { "type": "string" }
       },
       "required": ["busId", "fleetNumber", "service", "hazardId", "monitorId", "hazardValue", "timestamp"]
+    },
+    "DriverHoursRecord": {
+      "title": "Driver Hours Record",
+      "type": "object",
+      "description": "A log of a driver's daily driving segments and shift calculations.",
+      "properties": {
+        "driverName": { "type": "string" },
+        "employeeNumber": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "segments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "string" },
+              "end": { "type": "string" }
+            }
+          }
+        },
+        "totalDrivingMinutes": { "type": "number" },
+        "totalShiftMinutes": { "type": "number" },
+        "hasBreach": { "type": "boolean" },
+        "breachTypes": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -103,6 +128,10 @@
     "/alertHistory/{historyId}": {
       "schema": { "$ref": "#/entities/AlertHistory" },
       "description": "Permanent log of all historical geofence breaches."
+    },
+    "/driverHours/{recordId}": {
+      "schema": { "$ref": "#/entities/DriverHoursRecord" },
+      "description": "Daily driving hours logs."
     }
   }
 }

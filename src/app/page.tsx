@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Map, Radio, Shield, Route, Loader2, ShieldAlert } from 'lucide-react';
+import { Map, Radio, Shield, Route, Loader2, ShieldAlert, Clock } from 'lucide-react';
 import UserMenu from '@/components/auth/UserMenu';
 import TickerTape from '@/components/TickerTape';
 import BreakingNewsTicker from '@/components/BreakingNewsTicker';
@@ -62,6 +62,12 @@ export default function HomePage() {
                         <Link href="/journey-planner">
                         <Route className="mr-2 h-5 w-5" />
                         Journey Planner
+                        </Link>
+                    </Button>
+                    <Button asChild size="lg" variant="outline">
+                        <Link href="/drivers-hours">
+                        <Clock className="mr-2 h-5 w-5" />
+                        Drivers Hours
                         </Link>
                     </Button>
                     <Button asChild size="lg" variant="outline">
