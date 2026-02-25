@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, deleteDocumentNonBlocking, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, Timestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin } from 'lucide-react';
+import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { subDays, format } from 'date-fns';
@@ -332,8 +332,8 @@ export default function CallLogsPage() {
                             <UserIcon className="h-3 w-3 mr-1" /> EMP: {log.employeeNumber}
                           </Badge>
                           <div className="grid grid-cols-2 gap-2">
-                            <Badge variant="outline" className="justify-center bg-muted/50 text-[9px] font-black">
-                              FLT: {log.fleetNumber}
+                            <Badge variant="outline" className="justify-center bg-muted/50 text-[9px] font-black truncate" title={log.depot}>
+                              DEP: {log.depot}
                             </Badge>
                             <Badge variant="outline" className="justify-center bg-muted/50 text-[9px] font-black">
                               SVC: {log.serviceNumber}
@@ -346,10 +346,10 @@ export default function CallLogsPage() {
                       <div className="flex-grow space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                           <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Depot</Label>
+                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Fleet Number</Label>
                             <div className="flex items-center gap-2 font-bold text-sm">
-                              <Home className="h-3.5 w-3.5 text-primary" />
-                              <span>{log.depot}</span>
+                              <Bus className="h-3.5 w-3.5 text-primary" />
+                              <span>{log.fleetNumber}</span>
                             </div>
                           </div>
                           <div className="space-y-1">
