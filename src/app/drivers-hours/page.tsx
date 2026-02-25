@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -10,13 +11,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText } from 'lucide-react';
+import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText, Stepper } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface DrivingSegment {
   start: string;
   end: string;
+  type: 'driving' | 'break';
 }
 
 interface Record {
@@ -40,7 +43,7 @@ const LIMIT_SHIFT_MINS = 16 * 60; // 960 mins
 export default function DriversHoursPage() {
   const [driverName, setDriverName] = useState('');
   const [employeeNumber, setEmployeeNumber] = useState('');
-  const [segments, setSegments] = useState<DrivingSegment[]>([{ start: '', end: '' }]);
+  const [segments, setSegments] = useState<DrivingSegment[]>([{ start: '', end: '', type: 'driving' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const firestore = useFirestore();
@@ -52,7 +55,8 @@ export default function DriversHoursPage() {
   );
   const { data: history, isLoading: isHistoryLoading } = useCollection<Record>(historyQuery);
 
-  const addSegment = () => setSegments([...segments, { start: '', end: '' }]);
+  const addDrivingSegment = () => setSegments([...segments, { start: '', end: '', type: 'driving' }]);
+  const addBreakSegment = () => setSegments([...segments, { start: '', end: '', type: 'break' }]);
   
   const removeSegment = (index: number) => {
     if (segments.length > 1) {
@@ -62,7 +66,7 @@ export default function DriversHoursPage() {
 
   const updateSegment = (index: number, field: keyof DrivingSegment, value: string) => {
     const newSegments = [...segments];
-    newSegments[index][field] = value;
+    (newSegments[index][field] as string) = value;
     setSegments(newSegments);
   };
 
@@ -78,33 +82,22 @@ export default function DriversHoursPage() {
     let latestEnd = '';
     let breaksDetected = 0;
 
-    sortedSegments.forEach((s, idx) => {
+    sortedSegments.forEach((s) => {
       const [h1, m1] = s.start.split(':').map(Number);
       const [h2, m2] = s.end.split(':').map(Number);
       const startMins = h1 * 60 + m1;
       const endMins = h2 * 60 + m2;
       const duration = endMins >= startMins ? endMins - startMins : (1440 - startMins + endMins);
 
-      totalDrivingMinutes += duration;
-
-      if (idx > 0) {
-        const prev = sortedSegments[idx - 1];
-        const [ph2, pm2] = prev.end.split(':').map(Number);
-        const prevEndMins = ph2 * 60 + pm2;
-        
-        let gap = startMins - prevEndMins;
-        if (gap < 0) gap += 1440; // Overnight gap
-
-        if (gap >= 30) {
-          // Meal break detected (>= 30 mins)
-          breaksDetected++;
-          currentContinuousMins = duration;
-        } else {
-          // Continuity maintained
-          currentContinuousMins += duration;
-        }
+      if (s.type === 'driving') {
+        totalDrivingMinutes += duration;
+        currentContinuousMins += duration;
       } else {
-        currentContinuousMins = duration;
+        // It's a break
+        if (duration >= 30) {
+          breaksDetected++;
+          currentContinuousMins = 0; // Reset continuous block if break is >= 30 mins
+        }
       }
 
       if (currentContinuousMins > maxContinuousMins) {
@@ -125,7 +118,7 @@ export default function DriversHoursPage() {
     }
 
     const breaches = [];
-    if (maxContinuousMins > LIMIT_CONTINUOUS_MINS) breaches.push('Continuous Driving (> 5.5h between breaks)');
+    if (maxContinuousMins > LIMIT_CONTINUOUS_MINS) breaches.push('Continuous Driving (> 5.5h without 30m break)');
     if (totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS) breaches.push('Daily Driving (> 10h total)');
     if (totalShiftMinutes > LIMIT_SHIFT_MINS) breaches.push('Shift Duration (> 16h)');
 
@@ -158,7 +151,7 @@ export default function DriversHoursPage() {
         createdAt: serverTimestamp(),
       });
       toast({ title: 'Success', description: 'Record saved successfully.' });
-      setSegments([{ start: '', end: '' }]);
+      setSegments([{ start: '', end: '', type: 'driving' }]);
       setDriverName('');
       setEmployeeNumber('');
     } catch (e) {
@@ -201,7 +194,7 @@ export default function DriversHoursPage() {
                   <FileText className="h-5 w-5 text-primary" />
                   New Shift Entry
               </CardTitle>
-              <CardDescription>Log driving segments. Gaps of 30+ mins count as legal breaks.</CardDescription>
+              <CardDescription>Log driving and breaks. 30+ min breaks reset the 5.5h clock.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -234,12 +227,21 @@ export default function DriversHoursPage() {
               </div>
 
               <div className="space-y-4">
-                <Label className="text-muted-foreground text-xs uppercase font-bold tracking-wider">Driving Segments</Label>
+                <Label className="text-muted-foreground text-xs uppercase font-bold tracking-wider">Shift Timeline</Label>
                 {segments.map((seg, idx) => (
-                  <div key={idx} className="flex items-end gap-3 p-3 rounded-lg bg-muted/10 border border-transparent hover:border-primary/20 transition-colors group">
+                  <div 
+                    key={idx} 
+                    className={cn(
+                      "flex items-end gap-3 p-3 rounded-lg border transition-colors group",
+                      seg.type === 'break' ? "bg-muted/30 border-blue-200/50" : "bg-muted/10 border-transparent hover:border-primary/20"
+                    )}
+                  >
                     <div className="grid grid-cols-2 gap-4 flex-grow">
                       <div className="space-y-1">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Start Time</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1">
+                          {seg.type === 'break' ? <Coffee className="h-2 w-2" /> : <Clock className="h-2 w-2" />}
+                          {seg.type === 'driving' ? 'Driving Start' : 'Break Start'}
+                        </span>
                         <Input 
                           type="time" 
                           className="bg-background"
@@ -248,7 +250,9 @@ export default function DriversHoursPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">End Time</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                          {seg.type === 'driving' ? 'Driving End' : 'Break End'}
+                        </span>
                         <Input 
                           type="time" 
                           className="bg-background"
@@ -269,9 +273,15 @@ export default function DriversHoursPage() {
                     </Button>
                   </div>
                 ))}
-                <Button variant="outline" className="w-full border-dashed py-6 hover:bg-primary/5 hover:border-primary/50 transition-all" onClick={addSegment}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Segment
-                </Button>
+                
+                <div className="flex gap-3">
+                  <Button variant="outline" className="flex-1 border-dashed py-6 hover:bg-primary/5 hover:border-primary/50 transition-all" onClick={addDrivingSegment}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Driving
+                  </Button>
+                  <Button variant="outline" className="flex-1 border-dashed py-6 border-blue-200 hover:bg-blue-50 transition-all" onClick={addBreakSegment}>
+                    <Coffee className="mr-2 h-4 w-4 text-blue-500" /> Add Break
+                  </Button>
+                </div>
               </div>
             </CardContent>
             <CardFooter className="bg-muted/30 pt-6 rounded-b-lg">
@@ -288,7 +298,7 @@ export default function DriversHoursPage() {
                   <CardTitle className="text-lg">Real-time Compliance Check</CardTitle>
                   {calculations.breaksDetected > 0 && (
                       <Badge variant="outline" className="bg-white/80 border-primary/20 text-[10px] font-bold">
-                          <Coffee className="h-3 w-3 mr-1 text-primary" /> {calculations.breaksDetected} BREAKS
+                          <Coffee className="h-3 w-3 mr-1 text-primary" /> {calculations.breaksDetected} BREAKS (30m+)
                       </Badge>
                   )}
               </div>

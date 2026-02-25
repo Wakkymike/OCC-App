@@ -97,7 +97,8 @@
             "type": "object",
             "properties": {
               "start": { "type": "string" },
-              "end": { "type": "string" }
+              "end": { "type": "string" },
+              "type": { "type": "string", "enum": ["driving", "break"] }
             }
           }
         },
