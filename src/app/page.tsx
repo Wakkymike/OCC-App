@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -65,13 +64,13 @@ export default function HomePage() {
             <main className="flex flex-col items-center p-8 gap-8">
                 <div className="flex flex-col md:flex-row items-center justify-between w-full max-w-6xl mb-4 gap-6 px-4">
                     {/* Left: Current Status */}
-                    <div className="flex-1 flex justify-start w-full md:w-auto h-16">
+                    <div className="flex-1 flex justify-start w-full md:w-auto h-20">
                         {userProfile?.icalUrl && !isLoadingShifts && (
-                            <div className="text-left">
+                            <div className="text-left w-full">
                                 {currentShift ? (
                                     <div className="animate-in fade-in slide-in-from-left-4 duration-500">
                                         <Badge className="bg-green-600 hover:bg-green-700 mb-1 font-black text-[10px]">ON DUTY</Badge>
-                                        <p className="text-sm font-bold truncate max-w-[250px] leading-tight">{currentShift.summary}</p>
+                                        <p className="text-sm font-bold truncate max-w-[200px] lg:max-w-[300px] leading-tight">{currentShift.summary}</p>
                                         <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
                                             <Clock className="h-3 w-3" />
                                             Finishes at {format(new Date(currentShift.end), 'HH:mm')}
@@ -80,40 +79,51 @@ export default function HomePage() {
                                 ) : (
                                     <div className="text-muted-foreground opacity-60">
                                         <p className="text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-1">
-                                            <Coffee className="h-3 w-3" /> My Status
+                                            <Coffee className="h-3 w-3" /> Current Status
                                         </p>
                                         <p className="text-sm font-bold italic">Off Duty</p>
                                     </div>
                                 )}
                             </div>
                         )}
-                        {isLoadingShifts && <div className="h-4 w-24 bg-muted animate-pulse rounded" />}
+                        {isLoadingShifts && <div className="h-4 w-24 bg-muted animate-pulse rounded self-center" />}
                     </div>
 
                     {/* Center: Main Title */}
-                    <div className="text-center shrink-0">
+                    <div className="text-center shrink-0 px-4">
                         <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-6xl drop-shadow-sm">
                         OCC App
                         </h1>
-                        <p className="mt-4 text-lg leading-8 text-muted-foreground max-w-md mx-auto">
-                        Your portal for live bus tracking and service information.
+                        <p className="mt-4 text-lg leading-8 text-muted-foreground max-w-md mx-auto hidden sm:block">
+                        Live bus tracking and service information.
                         </p>
                     </div>
 
                     {/* Right: Next Shift */}
-                    <div className="flex-1 flex justify-end w-full md:w-auto h-16">
-                        {userProfile?.icalUrl && !isLoadingShifts && nextShift && (
-                            <div className="text-right animate-in fade-in slide-in-from-right-4 duration-500">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 flex items-center justify-end gap-1">
-                                    <Calendar className="h-3 w-3" /> Next Duty
-                                </p>
-                                <p className="text-sm font-bold leading-tight">{nextShift.summary}</p>
-                                <p className="text-xs text-primary font-bold mt-0.5">
-                                    {format(new Date(nextShift.start), 'EEE, do MMM @ HH:mm')}
-                                </p>
+                    <div className="flex-1 flex justify-end w-full md:w-auto h-20">
+                        {userProfile?.icalUrl && !isLoadingShifts && (
+                            <div className="text-right w-full">
+                                {nextShift ? (
+                                    <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1 flex items-center justify-end gap-1">
+                                            <Calendar className="h-3 w-3" /> Next Duty
+                                        </p>
+                                        <p className="text-sm font-bold leading-tight truncate max-w-[200px] lg:max-w-[300px] ml-auto">{nextShift.summary}</p>
+                                        <p className="text-xs text-primary font-bold mt-0.5">
+                                            {format(new Date(nextShift.start), 'EEE, do MMM @ HH:mm')}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="text-muted-foreground opacity-60">
+                                        <p className="text-[10px] font-black uppercase tracking-widest mb-1 flex items-center justify-end gap-1">
+                                            <Calendar className="h-3 w-3" /> Next Duty
+                                        </p>
+                                        <p className="text-sm font-bold italic">None Scheduled</p>
+                                    </div>
+                                )}
                             </div>
                         )}
-                        {isLoadingShifts && <div className="h-4 w-24 bg-muted animate-pulse rounded" />}
+                        {isLoadingShifts && <div className="h-4 w-24 bg-muted animate-pulse rounded self-center" />}
                     </div>
                 </div>
 
