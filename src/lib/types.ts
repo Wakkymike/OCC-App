@@ -117,6 +117,7 @@ export interface AlertHistory {
 export interface CallLog {
   id: string;
   userId: string;
+  date: string;
   callTime: string;
   employeeNumber: string;
   fleetNumber: string;

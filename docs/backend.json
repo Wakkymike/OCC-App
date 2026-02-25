@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "CallLog": {
@@ -14,10 +15,13 @@
           "type": "string",
           "description": "Reference to the User who created this call log. (Relationship: User 1:N CallLog)"
         },
+        "date": {
+          "type": "string",
+          "description": "The date when the call was made, formatted as DD/MM/YYYY."
+        },
         "callTime": {
           "type": "string",
-          "description": "The date and time when the call was made.",
-          "format": "date-time"
+          "description": "The time when the call was made, in 24h clock format."
         },
         "employeeNumber": {
           "type": "string",
@@ -37,17 +41,15 @@
         },
         "phoneNumber": {
           "type": "string",
-          "description": "The phone number related to the call. This field is expected to be limited to 3 digits by the application."
+          "description": "The phone number related to the call. Limited to 3 digits."
         },
         "timeFrom": {
           "type": "string",
-          "description": "The start time of an event or period relevant to the call.",
-          "format": "date-time"
+          "description": "The start time of an event relevant to the call."
         },
         "timeTo": {
           "type": "string",
-          "description": "The end time of an event or period relevant to the call.",
-          "format": "date-time"
+          "description": "The end time of an event relevant to the call."
         },
         "details": {
           "type": "string",
@@ -63,15 +65,15 @@
         },
         "isEPMRelated": {
           "type": "boolean",
-          "description": "Indicates if the call is related to EPM (Enterprise Performance Management or similar system)."
+          "description": "Indicates if the call is related to EPM."
         },
         "isIRRelated": {
           "type": "boolean",
-          "description": "Indicates if the call is related to IR (Incident Report or similar)."
+          "description": "Indicates if the call is related to IR (Incident Report)."
         },
         "isTSIRelated": {
           "type": "boolean",
-          "description": "Indicates if the call is related to TSI (Technical Service/Support Incident or similar)."
+          "description": "Indicates if the call is related to TSI."
         },
         "isDriverReportRelated": {
           "type": "boolean",
@@ -79,13 +81,14 @@
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when the call log entry was created, used for implementing the 5-day data retention policy for auto-deletion.",
+          "description": "Timestamp used for the 5-day auto-deletion policy.",
           "format": "date-time"
         }
       },
       "required": [
         "id",
         "userId",
+        "date",
         "callTime",
         "employeeNumber",
         "fleetNumber",
@@ -112,28 +115,11 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}/callLogs/{callLogId}",
-        "definition": {
-          "entityName": "CallLog",
-          "schema": {
-            "$ref": "#/backend/entities/CallLog"
-          },
-          "description": "Stores individual call log entries, exclusively owned by the user specified in the path. Each document includes denormalized 'userId' for robust authorization independence and 'createdAt' for retention policy enforcement.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user who owns this call log."
-            },
-            {
-              "name": "callLogId",
-              "description": "The unique identifier for a specific call log entry."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The recommended Firestore structure for Call Logs follows a path-based ownership model to ensure strict data segregation and clear authorization boundaries. CallLog entities will be stored in a subcollection nested under a user's document: `/users/{userId}/callLogs/{callLogId}`. This design prioritizes Authorization Independence by denormalizing the `userId` into both the document path and the `CallLog` document itself. This allows Firestore Security Rules to evaluate ownership directly using `request.auth.uid` against the `{userId}` wildcard in the path or the `userId` field within the document, eliminating the need for `get()` operations on parent documents. This approach simplifies security rules, makes them atomic, and highly debuggable.\n\nThis structure also inherently supports Query-as-Permission (QAPs). When a user requests their call logs from `/users/{request.auth.uid}/callLogs`, the query is automatically scoped to their specific logs, as the `{userId}` wildcard in the path will be matched by the authenticated user's UID (`request.auth.uid`). This means the database query itself acts as the filter, preventing unauthorized data from ever being returned or requiring complex rule logic to filter results after the fact. Each document within the `/callLogs` subcollection will contain its full data, including the `createdAt` timestamp essential for implementing the 5-day auto-deletion policy via a scheduled Firebase Function. The 'delete record' and 'delete all records' functionalities will leverage standard Firestore delete operations, with 'delete all' likely implemented via a Cloud Function for efficiency and to handle large numbers of documents."
+    "/users/{userId}/callLogs/{callLogId}": {
+      "schema": {
+        "$ref": "#/backend/entities/CallLog"
+      },
+      "description": "Stores per-user call log entries with a 5-day retention policy."
+    }
   }
 }

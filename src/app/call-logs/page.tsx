@@ -10,13 +10,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, serverTimestamp, doc, writeBatch, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, serverTimestamp, doc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Trash2, ShieldAlert, Home, Loader2, Info, Clock, Calendar, CheckCircle2 } from 'lucide-react';
+import { Phone, Trash2, ShieldAlert, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { subDays } from 'date-fns';
+import { subDays, format } from 'date-fns';
 import type { CallLog } from '@/lib/types';
 
 export default function CallLogsPage() {
@@ -25,6 +25,7 @@ export default function CallLogsPage() {
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
+    date: '',
     callTime: '',
     employeeNumber: '',
     fleetNumber: '',
@@ -94,6 +95,29 @@ export default function CallLogsPage() {
     setFormData(prev => ({ ...prev, [name]: checked }));
   };
 
+  const handleStartNewEntry = () => {
+    const now = new Date();
+    setFormData({
+      date: format(now, 'dd/MM/yyyy'),
+      callTime: format(now, 'HH:mm'),
+      employeeNumber: '',
+      fleetNumber: '',
+      serviceNumber: '',
+      depot: '',
+      phoneNumber: '',
+      timeFrom: '',
+      timeTo: '',
+      details: '',
+      isTeamsRelated: false,
+      isTicketerRelated: false,
+      isEPMRelated: false,
+      isIRRelated: false,
+      isTSIRelated: false,
+      isDriverReportRelated: false,
+    });
+    toast({ title: 'New Entry Started', description: 'Current date and time have been autofilled.' });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !callLogsRef) return;
@@ -109,6 +133,7 @@ export default function CallLogsPage() {
       .then(() => {
         toast({ title: 'Log Saved', description: 'Call record added successfully.' });
         setFormData({
+          date: '',
           callTime: '',
           employeeNumber: '',
           fleetNumber: '',
@@ -179,45 +204,66 @@ export default function CallLogsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <Card className="lg:col-span-1 shadow-lg border-primary/5 h-fit sticky top-8">
-            <CardHeader className="bg-muted/30">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />
-                New Entry
-              </CardTitle>
-              <CardDescription>Log event details accurately.</CardDescription>
+            <CardHeader className="bg-muted/30 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  New Entry
+                </CardTitle>
+                <CardDescription>Log event details accurately.</CardDescription>
+              </div>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={handleStartNewEntry}
+                className="font-bold border-primary/30 text-primary hover:bg-primary/10"
+              >
+                <Plus className="mr-1 h-4 w-4" /> Start New
+              </Button>
             </CardHeader>
             <form onSubmit={handleSubmit}>
               <CardContent className="space-y-4 pt-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label htmlFor="date" className="text-[10px] font-bold uppercase text-muted-foreground">Date</Label>
+                    <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} required />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="callTime" className="text-[10px] font-bold uppercase text-muted-foreground">Call Time</Label>
                     <Input type="time" name="callTime" value={formData.callTime} onChange={handleInputChange} required />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="employeeNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Emp No.</Label>
                     <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="fleetNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Fleet No.</Label>
                     <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="serviceNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Svc No.</Label>
                     <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="depot" className="text-[10px] font-bold uppercase text-muted-foreground">Depot</Label>
+                    <Input name="depot" placeholder="Bolton" value={formData.depot} onChange={handleInputChange} required />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="depot" className="text-[10px] font-bold uppercase text-muted-foreground">Depot</Label>
-                    <Input name="depot" placeholder="Bolton" value={formData.depot} onChange={handleInputChange} required />
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="phoneNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Phone (3-Dig)</Label>
                     <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
+                  </div>
+                  <div className="space-y-2">
+                    {/* Empty cell for layout alignment if needed */}
                   </div>
                 </div>
 
@@ -287,6 +333,7 @@ export default function CallLogsPage() {
                   <Table>
                     <TableHeader className="bg-muted/30">
                       <TableRow>
+                        <TableHead className="text-[10px] font-black uppercase">Date</TableHead>
                         <TableHead className="w-[100px] text-[10px] font-black uppercase">Time</TableHead>
                         <TableHead className="text-[10px] font-black uppercase">Fleet/Svc</TableHead>
                         <TableHead className="text-[10px] font-black uppercase">Depot/Ext</TableHead>
@@ -297,6 +344,7 @@ export default function CallLogsPage() {
                     <TableBody>
                       {logs.map((log) => (
                         <TableRow key={log.id} className="group hover:bg-primary/5 transition-colors">
+                          <TableCell className="font-mono text-xs font-bold text-muted-foreground">{log.date || '--/--/--'}</TableCell>
                           <TableCell className="font-mono text-xs font-bold">{log.callTime}</TableCell>
                           <TableCell>
                             <div className="flex flex-col">
