@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Trash2, ShieldAlert, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus } from 'lucide-react';
+import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -23,7 +23,9 @@ export default function CallLogsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const formRef = useRef<HTMLDivElement>(null);
 
+  const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     date: '',
     callTime: '',
@@ -71,7 +73,6 @@ export default function CallLogsPage() {
     });
 
     if (oldLogs.length > 0) {
-      console.log(`Auto-purge: Deleting ${oldLogs.length} records older than 5 days.`);
       oldLogs.forEach(log => {
         deleteDocumentNonBlocking(doc(callLogsRef, log.id));
       });
@@ -115,7 +116,12 @@ export default function CallLogsPage() {
       isTSIRelated: false,
       isDriverReportRelated: false,
     });
-    toast({ title: 'New Entry Started', description: 'Current date and time have been autofilled.' });
+    setShowForm(true);
+    
+    // Smooth scroll to form after a short delay to allow rendering
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -132,6 +138,7 @@ export default function CallLogsPage() {
     addDocumentNonBlocking(callLogsRef, logData)
       .then(() => {
         toast({ title: 'Log Saved', description: 'Call record added successfully.' });
+        setShowForm(false);
         setFormData({
           date: '',
           callTime: '',
@@ -179,6 +186,11 @@ export default function CallLogsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {!showForm && (
+              <Button onClick={handleStartNewEntry} className="font-bold">
+                <Plus className="mr-2 h-4 w-4" /> Start New Entry
+              </Button>
+            )}
             <Button onClick={handleDeleteAll} variant="destructive" size="sm" disabled={!logs || logs.length === 0}>
               <Trash2 className="mr-2 h-4 w-4" /> Clear All Logs
             </Button>
@@ -202,113 +214,111 @@ export default function CallLogsPage() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="lg:col-span-1 shadow-lg border-primary/5 h-fit sticky top-8">
-            <CardHeader className="bg-muted/30 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  New Entry
-                </CardTitle>
-                <CardDescription>Log event details accurately.</CardDescription>
-              </div>
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                onClick={handleStartNewEntry}
-                className="font-bold border-primary/30 text-primary hover:bg-primary/10"
-              >
-                <Plus className="mr-1 h-4 w-4" /> Start New
-              </Button>
-            </CardHeader>
-            <form onSubmit={handleSubmit}>
-              <CardContent className="space-y-4 pt-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="date" className="text-[10px] font-bold uppercase text-muted-foreground">Date</Label>
-                    <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} required />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          {showForm && (
+            <div ref={formRef} className="lg:col-span-1 animate-in fade-in slide-in-from-left-4 duration-300">
+              <Card className="shadow-lg border-primary/10 h-fit">
+                <CardHeader className="bg-muted/30 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-primary" />
+                      New Entry
+                    </CardTitle>
+                    <CardDescription>Log event details accurately.</CardDescription>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="callTime" className="text-[10px] font-bold uppercase text-muted-foreground">Call Time</Label>
-                    <Input type="time" name="callTime" value={formData.callTime} onChange={handleInputChange} required />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="employeeNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Emp No.</Label>
-                    <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fleetNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Fleet No.</Label>
-                    <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="serviceNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Svc No.</Label>
-                    <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="depot" className="text-[10px] font-bold uppercase text-muted-foreground">Depot</Label>
-                    <Input name="depot" placeholder="Bolton" value={formData.depot} onChange={handleInputChange} required />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Phone (3-Dig)</Label>
-                    <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
-                  </div>
-                  <div className="space-y-2">
-                    {/* Empty cell for layout alignment if needed */}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="timeFrom" className="text-[10px] font-bold uppercase text-muted-foreground">Time From</Label>
-                    <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="timeTo" className="text-[10px] font-bold uppercase text-muted-foreground">Time To</Label>
-                    <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} required />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="details" className="text-[10px] font-bold uppercase text-muted-foreground">Details</Label>
-                  <Textarea name="details" placeholder="Shift notes..." value={formData.details} onChange={handleInputChange} required className="min-h-[80px]" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-y-3 pt-4 border-t border-dashed">
-                  {[
-                    { id: 'isTeamsRelated', label: 'Teams' },
-                    { id: 'isTicketerRelated', label: 'Ticketer' },
-                    { id: 'isEPMRelated', label: 'EPM' },
-                    { id: 'isIRRelated', label: 'IR' },
-                    { id: 'isTSIRelated', label: 'TSI' },
-                    { id: 'isDriverReportRelated', label: 'Driver Report' },
-                  ].map(item => (
-                    <div key={item.id} className="flex items-center space-x-2">
-                      <Checkbox id={item.id} checked={(formData as any)[item.id]} onCheckedChange={(v) => handleCheckboxChange(item.id, !!v)} />
-                      <label htmlFor={item.id} className="text-xs font-semibold cursor-pointer select-none text-foreground/80">{item.label}</label>
+                  <Button variant="ghost" size="icon" onClick={() => setShowForm(false)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </CardHeader>
+                <form onSubmit={handleSubmit}>
+                  <CardContent className="space-y-4 pt-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="date" className="text-[10px] font-bold uppercase text-muted-foreground">Date</Label>
+                        <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="callTime" className="text-[10px] font-bold uppercase text-muted-foreground">Call Time</Label>
+                        <Input type="time" name="callTime" value={formData.callTime} onChange={handleInputChange} required />
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-              <CardFooter className="bg-muted/20 mt-4 pt-6 pb-6">
-                <Button type="submit" className="w-full font-bold" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                  Save Record
-                </Button>
-              </CardFooter>
-            </form>
-          </Card>
 
-          <Card className="lg:col-span-2 shadow-sm border-muted/40">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="employeeNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Emp No.</Label>
+                        <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fleetNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Fleet No.</Label>
+                        <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="serviceNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Svc No.</Label>
+                        <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="depot" className="text-[10px] font-bold uppercase text-muted-foreground">Depot</Label>
+                        <Input name="depot" placeholder="Bolton" value={formData.depot} onChange={handleInputChange} required />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="phoneNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Phone (3-Dig)</Label>
+                        <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
+                      </div>
+                      <div className="space-y-2">
+                        {/* Space placeholder */}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="timeFrom" className="text-[10px] font-bold uppercase text-muted-foreground">Time From</Label>
+                        <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="timeTo" className="text-[10px] font-bold uppercase text-muted-foreground">Time To</Label>
+                        <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} required />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="details" className="text-[10px] font-bold uppercase text-muted-foreground">Details</Label>
+                      <Textarea name="details" placeholder="Shift notes..." value={formData.details} onChange={handleInputChange} required className="min-h-[80px]" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-y-3 pt-4 border-t border-dashed">
+                      {[
+                        { id: 'isTeamsRelated', label: 'Teams' },
+                        { id: 'isTicketerRelated', label: 'Ticketer' },
+                        { id: 'isEPMRelated', label: 'EPM' },
+                        { id: 'isIRRelated', label: 'IR' },
+                        { id: 'isTSIRelated', label: 'TSI' },
+                        { id: 'isDriverReportRelated', label: 'Driver Report' },
+                      ].map(item => (
+                        <div key={item.id} className="flex items-center space-x-2">
+                          <Checkbox id={item.id} checked={(formData as any)[item.id]} onCheckedChange={(v) => handleCheckboxChange(item.id, !!v)} />
+                          <label htmlFor={item.id} className="text-xs font-semibold cursor-pointer select-none text-foreground/80">{item.label}</label>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                  <CardFooter className="bg-muted/20 pt-6 pb-6">
+                    <Button type="submit" className="w-full font-bold" disabled={isSubmitting}>
+                      {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                      Save Record
+                    </Button>
+                  </CardFooter>
+                </form>
+              </Card>
+            </div>
+          )}
+
+          <Card className={cn("shadow-sm border-muted/40", showForm ? "lg:col-span-2" : "lg:col-span-3")}>
             <CardHeader className="bg-muted/10 border-b">
               <div className="flex items-center justify-between">
                 <div>

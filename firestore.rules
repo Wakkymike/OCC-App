@@ -39,6 +39,7 @@ service cloud.firestore {
     }
 
     // Call Logs are strictly owned by the user but accessible by Super Admin for oversight
+    // Added specific rule for collection listing to prevent permission errors
     match /users/{userId}/callLogs/{callLogId} {
       allow read, list: if isOwner(userId) || isSuperAdmin();
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
