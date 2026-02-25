@@ -4,7 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * FIRESTORE SECURITY RULES
+     * CORE SECURITY HELPERS
      */
 
     function isSignedIn() {
@@ -15,6 +15,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Explicit Super Admin Check (Mike)
     function isSuperAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'michael.dodsworth@gonorthwest.co.uk' ||
@@ -24,22 +25,28 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSuperAdmin() || (
-        isSignedIn() && exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) && 
+        isSignedIn() && 
+        exists(/databases/$(database)/documents/userProfiles/$(request.auth.uid)) && 
         get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.isAdmin == true
       );
     }
 
+    /**
+     * COLLECTION RULES
+     */
+
     match /userProfiles/{uid} {
-      // Prioritize Super Admin and Owner checks for reliable profile access
+      // Direct access for self or Super Admin
       allow get: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
+      // Listing restricted to admins
       allow list: if isSuperAdmin() || isAdmin();
+      // Creation/Update for owner
       allow create: if isSignedIn() && request.auth.uid == uid;
       allow update: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
       allow delete: if isSuperAdmin();
     }
 
-    // Call Logs are strictly owned by the user but accessible by Super Admin for oversight
-    // Added specific rule for collection listing to prevent permission errors
+    // Call Logs are strictly private to the user but visible to Mike for oversight
     match /users/{userId}/callLogs/{callLogId} {
       allow read, list: if isOwner(userId) || isSuperAdmin();
       allow create: if isOwner(userId) && request.resource.data.userId == userId;

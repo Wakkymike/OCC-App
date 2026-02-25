@@ -7,12 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X } from 'lucide-react';
+import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -67,7 +66,6 @@ export default function CallLogsPage() {
     const fiveDaysAgo = subDays(new Date(), 5);
     const oldLogs = logs.filter(log => {
       if (!log.createdAt) return false;
-      // Handle Firestore Timestamp conversion
       const createdDate = log.createdAt instanceof Timestamp ? log.createdAt.toDate() : new Date(log.createdAt);
       return createdDate < fiveDaysAgo;
     });
@@ -118,7 +116,6 @@ export default function CallLogsPage() {
     });
     setShowForm(true);
     
-    // Smooth scroll to form after a short delay to allow rendering
     setTimeout(() => {
       formRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
@@ -139,24 +136,6 @@ export default function CallLogsPage() {
       .then(() => {
         toast({ title: 'Log Saved', description: 'Call record added successfully.' });
         setShowForm(false);
-        setFormData({
-          date: '',
-          callTime: '',
-          employeeNumber: '',
-          fleetNumber: '',
-          serviceNumber: '',
-          depot: '',
-          phoneNumber: '',
-          timeFrom: '',
-          timeTo: '',
-          details: '',
-          isTeamsRelated: false,
-          isTicketerRelated: false,
-          isEPMRelated: false,
-          isIRRelated: false,
-          isTSIRelated: false,
-          isDriverReportRelated: false,
-        });
       })
       .finally(() => setIsSubmitting(false));
   };
@@ -186,11 +165,9 @@ export default function CallLogsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {!showForm && (
-              <Button onClick={handleStartNewEntry} className="font-bold">
-                <Plus className="mr-2 h-4 w-4" /> Start New Entry
-              </Button>
-            )}
+            <Button onClick={handleStartNewEntry} className="font-bold">
+              <Plus className="mr-2 h-4 w-4" /> Start New Entry
+            </Button>
             <Button onClick={handleDeleteAll} variant="destructive" size="sm" disabled={!logs || logs.length === 0}>
               <Trash2 className="mr-2 h-4 w-4" /> Clear All Logs
             </Button>
@@ -214,193 +191,224 @@ export default function CallLogsPage() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          {showForm && (
-            <div ref={formRef} className="lg:col-span-1 animate-in fade-in slide-in-from-left-4 duration-300">
-              <Card className="shadow-lg border-primary/10 h-fit">
-                <CardHeader className="bg-muted/30 flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-primary" />
-                      New Entry
-                    </CardTitle>
-                    <CardDescription>Log event details accurately.</CardDescription>
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={() => setShowForm(false)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </CardHeader>
-                <form onSubmit={handleSubmit}>
-                  <CardContent className="space-y-4 pt-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="date" className="text-[10px] font-bold uppercase text-muted-foreground">Date</Label>
-                        <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} required />
+        {showForm && (
+          <div ref={formRef} className="animate-in fade-in slide-in-from-top-4 duration-300">
+            <Card className="shadow-lg border-primary/20 bg-muted/5">
+              <CardHeader className="bg-muted/30 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Plus className="h-5 w-5 text-primary" />
+                    Record New Event
+                  </CardTitle>
+                  <CardDescription>Populate all fields accurately for operational tracking.</CardDescription>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowForm(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              <form onSubmit={handleSubmit}>
+                <CardContent className="pt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Time & User Info Section */}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Date</Label>
+                          <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Call Time</Label>
+                          <Input type="time" name="callTime" value={formData.callTime} onChange={handleInputChange} required />
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="callTime" className="text-[10px] font-bold uppercase text-muted-foreground">Call Time</Label>
-                        <Input type="time" name="callTime" value={formData.callTime} onChange={handleInputChange} required />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Emp No.</Label>
+                          <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Ext (3-Dig)</Label>
+                          <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="employeeNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Emp No.</Label>
-                        <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
+                    {/* Operational Section */}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Fleet No.</Label>
+                          <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Svc No.</Label>
+                          <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
+                        </div>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="fleetNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Fleet No.</Label>
-                        <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="serviceNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Svc No.</Label>
-                        <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="depot" className="text-[10px] font-bold uppercase text-muted-foreground">Depot</Label>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Depot</Label>
                         <Input name="depot" placeholder="Bolton" value={formData.depot} onChange={handleInputChange} required />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="phoneNumber" className="text-[10px] font-bold uppercase text-muted-foreground">Phone (3-Dig)</Label>
-                        <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
-                      </div>
-                      <div className="space-y-2">
-                        {/* Space placeholder */}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="timeFrom" className="text-[10px] font-bold uppercase text-muted-foreground">Time From</Label>
-                        <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} required />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="timeTo" className="text-[10px] font-bold uppercase text-muted-foreground">Time To</Label>
-                        <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} required />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="details" className="text-[10px] font-bold uppercase text-muted-foreground">Details</Label>
-                      <Textarea name="details" placeholder="Shift notes..." value={formData.details} onChange={handleInputChange} required className="min-h-[80px]" />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-y-3 pt-4 border-t border-dashed">
-                      {[
-                        { id: 'isTeamsRelated', label: 'Teams' },
-                        { id: 'isTicketerRelated', label: 'Ticketer' },
-                        { id: 'isEPMRelated', label: 'EPM' },
-                        { id: 'isIRRelated', label: 'IR' },
-                        { id: 'isTSIRelated', label: 'TSI' },
-                        { id: 'isDriverReportRelated', label: 'Driver Report' },
-                      ].map(item => (
-                        <div key={item.id} className="flex items-center space-x-2">
-                          <Checkbox id={item.id} checked={(formData as any)[item.id]} onCheckedChange={(v) => handleCheckboxChange(item.id, !!v)} />
-                          <label htmlFor={item.id} className="text-xs font-semibold cursor-pointer select-none text-foreground/80">{item.label}</label>
+                    {/* Window & Logic Section */}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Time From</Label>
+                          <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} required />
                         </div>
-                      ))}
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Time To</Label>
+                          <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} required />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-y-3 pt-2">
+                        {[
+                          { id: 'isTeamsRelated', label: 'Teams' },
+                          { id: 'isTicketerRelated', label: 'Ticketer' },
+                          { id: 'isEPMRelated', label: 'EPM' },
+                          { id: 'isIRRelated', label: 'IR' },
+                          { id: 'isTSIRelated', label: 'TSI' },
+                          { id: 'isDriverReportRelated', label: 'Driver Report' },
+                        ].map(item => (
+                          <div key={item.id} className="flex items-center space-x-2">
+                            <Checkbox id={item.id} checked={(formData as any)[item.id]} onCheckedChange={(v) => handleCheckboxChange(item.id, !!v)} />
+                            <label htmlFor={item.id} className="text-xs font-bold cursor-pointer text-foreground/80">{item.label}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mt-6">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground">Event Details</Label>
+                    <Textarea name="details" placeholder="Operational notes..." value={formData.details} onChange={handleInputChange} required className="min-h-[100px] bg-background" />
+                  </div>
+                </CardContent>
+                <CardFooter className="bg-muted/20 py-4 px-6 mt-6">
+                  <Button type="submit" className="w-full font-bold h-12" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
+                    Save Operational Record
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+          </div>
+        )}
+
+        <div className="space-y-6">
+          <div className="flex items-center justify-between border-b pb-4">
+            <h2 className="text-2xl font-black tracking-tighter uppercase">Recent Operational History</h2>
+            {logs && logs.length > 0 && <Badge className="font-black">{logs.length} RECORDS</Badge>}
+          </div>
+
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <p className="font-black text-xs uppercase tracking-widest opacity-50">Fetching Encrypted Logs...</p>
+            </div>
+          ) : logs && logs.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4">
+              {logs.map((log) => (
+                <Card key={log.id} className="overflow-hidden border-l-4 border-l-primary hover:shadow-md transition-shadow">
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="flex flex-col md:flex-row justify-between gap-6">
+                      {/* Left Column: Identifiers */}
+                      <div className="space-y-4 flex-shrink-0 w-full md:w-48">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-primary">
+                            <Calendar className="h-4 w-4" />
+                            <span className="font-bold text-sm">{log.date}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-5 w-5 text-muted-foreground" />
+                            <span className="text-2xl font-black tabular-nums">{log.callTime}</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Badge variant="secondary" className="w-full justify-center py-1 font-bold text-[10px]">
+                            <UserIcon className="h-3 w-3 mr-1" /> EMP: {log.employeeNumber}
+                          </Badge>
+                          <div className="flex gap-2">
+                            <Badge variant="outline" className="flex-1 justify-center bg-muted/50 text-[9px] font-black">
+                              FLT: {log.fleetNumber}
+                            </Badge>
+                            <Badge variant="outline" className="flex-1 justify-center bg-muted/50 text-[9px] font-black">
+                              SVC: {log.serviceNumber}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Middle Column: Operational Info */}
+                      <div className="flex-grow space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Depot & Extension</Label>
+                            <div className="flex items-center gap-2 font-bold text-sm">
+                              <Home className="h-3.5 w-3.5 text-primary" />
+                              <span>{log.depot}</span>
+                              <span className="text-muted-foreground">|</span>
+                              <Phone className="h-3.5 w-3.5 text-primary" />
+                              <span>Ext: {log.phoneNumber}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Incident Duration</Label>
+                            <div className="flex items-center gap-2 font-mono text-xs">
+                              <Badge variant="outline" className="rounded-sm font-black">{log.timeFrom}</Badge>
+                              <span className="text-muted-foreground font-bold">to</span>
+                              <Badge variant="outline" className="rounded-sm font-black">{log.timeTo}</Badge>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1 pt-2">
+                          <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Incident Details</Label>
+                          <div className="text-sm text-foreground bg-muted/20 p-4 rounded-lg border border-dashed border-primary/20 leading-relaxed italic">
+                            {log.details || "No details provided."}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Column: Tags & Management */}
+                      <div className="flex flex-col justify-between w-full md:w-44 gap-4">
+                        <div className="flex flex-wrap gap-1.5 content-start">
+                          {log.isTeamsRelated && <Badge className="bg-blue-600 hover:bg-blue-600 text-[8px] font-black h-5">TEAMS</Badge>}
+                          {log.isTicketerRelated && <Badge className="bg-orange-600 hover:bg-orange-600 text-[8px] font-black h-5">TICKETER</Badge>}
+                          {log.isEPMRelated && <Badge className="bg-green-600 hover:bg-green-600 text-[8px] font-black h-5">EPM</Badge>}
+                          {log.isIRRelated && <Badge variant="destructive" className="text-[8px] font-black h-5">IR</Badge>}
+                          {log.isTSIRelated && <Badge className="bg-purple-600 hover:bg-purple-600 text-[8px] font-black h-5">TSI</Badge>}
+                          {log.isDriverReportRelated && <Badge variant="secondary" className="border border-foreground/30 text-[8px] font-black h-5">REPORT</Badge>}
+                        </div>
+                        
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-muted-foreground hover:text-destructive self-end font-bold text-xs"
+                          onClick={() => {
+                            if(confirm("Delete this record?")) {
+                              deleteDocumentNonBlocking(doc(callLogsRef!, log.id));
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Entry
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
-                  <CardFooter className="bg-muted/20 pt-6 pb-6">
-                    <Button type="submit" className="w-full font-bold" disabled={isSubmitting}>
-                      {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                      Save Record
-                    </Button>
-                  </CardFooter>
-                </form>
-              </Card>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 text-muted-foreground border-4 border-dashed rounded-2xl bg-muted/5">
+              <Plus className="h-16 w-16 opacity-10 mb-4" />
+              <p className="font-black text-sm uppercase tracking-[0.3em] opacity-40">No shift logs found</p>
+              <Button variant="link" onClick={handleStartNewEntry} className="mt-2 font-bold">Create first entry now</Button>
             </div>
           )}
-
-          <Card className={cn("shadow-sm border-muted/40", showForm ? "lg:col-span-2" : "lg:col-span-3")}>
-            <CardHeader className="bg-muted/10 border-b">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl">Recent Shift Logs</CardTitle>
-                  <CardDescription className="text-xs">Your operational history for the last 5 days.</CardDescription>
-                </div>
-                {logs && logs.length > 0 && (
-                  <Badge variant="secondary" className="font-black text-[10px]">
-                    {logs.length} RECORDS
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="font-bold text-sm tracking-widest uppercase opacity-50">Syncing database...</p>
-                </div>
-              ) : logs && logs.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-muted/30">
-                      <TableRow>
-                        <TableHead className="text-[10px] font-black uppercase">Date</TableHead>
-                        <TableHead className="w-[100px] text-[10px] font-black uppercase">Time</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase">Fleet/Svc</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase">Depot/Ext</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase">Tags</TableHead>
-                        <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {logs.map((log) => (
-                        <TableRow key={log.id} className="group hover:bg-primary/5 transition-colors">
-                          <TableCell className="font-mono text-xs font-bold text-muted-foreground">{log.date || '--/--/--'}</TableCell>
-                          <TableCell className="font-mono text-xs font-bold">{log.callTime}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-black text-sm">{log.fleetNumber}</span>
-                              <span className="text-[9px] text-muted-foreground font-bold tracking-tighter uppercase">Service {log.serviceNumber}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="text-xs font-bold">{log.depot}</span>
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                <Phone className="h-2 w-2" /> Ext: {log.phoneNumber}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {log.isTeamsRelated && <Badge className="text-[8px] h-4 bg-blue-500">Teams</Badge>}
-                              {log.isTicketerRelated && <Badge className="text-[8px] h-4 bg-orange-500">Ticketer</Badge>}
-                              {log.isIRRelated && <Badge variant="destructive" className="text-[8px] h-4">IR</Badge>}
-                              {log.isDriverReportRelated && <Badge variant="outline" className="text-[8px] h-4 border-destructive/50 text-destructive">Report</Badge>}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="text-muted-foreground hover:text-destructive h-8 w-8 rounded-full"
-                              onClick={() => deleteDocumentNonBlocking(doc(callLogsRef!, log.id))}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-24 text-muted-foreground border-2 border-dashed m-6 rounded-xl bg-muted/5">
-                  <Calendar className="h-16 w-16 opacity-5 mb-4" />
-                  <p className="font-black text-xs uppercase tracking-[0.2em] opacity-40">No entries found for this session</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>
