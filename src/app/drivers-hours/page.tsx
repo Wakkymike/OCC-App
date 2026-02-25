@@ -11,8 +11,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home } from 'lucide-react';
+import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee } from 'lucide-react';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
 
 interface DrivingSegment {
   start: string;
@@ -27,6 +28,7 @@ interface Record {
   segments: DrivingSegment[];
   totalDrivingMinutes: number;
   totalShiftMinutes: number;
+  maxContinuousMins: number;
   hasBreach: boolean;
   breachTypes: string[];
   createdAt: any;
@@ -66,28 +68,52 @@ export default function DriversHoursPage() {
   };
 
   const calculations = useMemo(() => {
+    const sortedSegments = [...segments]
+      .filter(s => s.start && s.end)
+      .sort((a, b) => a.start.localeCompare(b.start));
+
     let totalDrivingMinutes = 0;
+    let maxContinuousMins = 0;
+    let currentContinuousMins = 0;
     let earliestStart = '';
     let latestEnd = '';
+    let breaksDetected = 0;
 
-    segments.forEach(s => {
-      if (s.start && s.end) {
-        const [h1, m1] = s.start.split(':').map(Number);
-        const [h2, m2] = s.end.split(':').map(Number);
+    sortedSegments.forEach((s, idx) => {
+      const [h1, m1] = s.start.split(':').map(Number);
+      const [h2, m2] = s.end.split(':').map(Number);
+      const startMins = h1 * 60 + m1;
+      const endMins = h2 * 60 + m2;
+      const duration = endMins >= startMins ? endMins - startMins : (1440 - startMins + endMins);
+
+      totalDrivingMinutes += duration;
+
+      if (idx > 0) {
+        const prev = sortedSegments[idx - 1];
+        const [ph2, pm2] = prev.end.split(':').map(Number);
+        const prevEndMins = ph2 * 60 + pm2;
         
-        const startMins = h1 * 60 + m1;
-        const endMins = h2 * 60 + m2;
-        
-        if (endMins > startMins) {
-          totalDrivingMinutes += (endMins - startMins);
-        } else if (s.end && s.start) {
-          // Crosses midnight
-          totalDrivingMinutes += (1440 - startMins + endMins);
+        let gap = startMins - prevEndMins;
+        if (gap < 0) gap += 1440; // Overnight gap
+
+        if (gap >= 30) {
+          // Meal break detected (>= 30 mins)
+          breaksDetected++;
+          currentContinuousMins = duration;
+        } else {
+          // Continuity maintained
+          currentContinuousMins += duration;
         }
-
-        if (!earliestStart || s.start < earliestStart) earliestStart = s.start;
-        if (!latestEnd || s.end > latestEnd) latestEnd = s.end;
+      } else {
+        currentContinuousMins = duration;
       }
+
+      if (currentContinuousMins > maxContinuousMins) {
+        maxContinuousMins = currentContinuousMins;
+      }
+
+      if (!earliestStart || s.start < earliestStart) earliestStart = s.start;
+      if (!latestEnd || s.end > latestEnd) latestEnd = s.end;
     });
 
     let totalShiftMinutes = 0;
@@ -100,11 +126,11 @@ export default function DriversHoursPage() {
     }
 
     const breaches = [];
-    if (totalDrivingMinutes > LIMIT_CONTINUOUS_MINS) breaches.push('Continuous Driving (> 5.5h)');
-    if (totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS) breaches.push('Daily Driving (> 10h)');
+    if (maxContinuousMins > LIMIT_CONTINUOUS_MINS) breaches.push('Continuous Driving (> 5.5h between breaks)');
+    if (totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS) breaches.push('Daily Driving (> 10h total)');
     if (totalShiftMinutes > LIMIT_SHIFT_MINS) breaches.push('Shift Duration (> 16h)');
 
-    return { totalDrivingMinutes, totalShiftMinutes, breaches };
+    return { totalDrivingMinutes, totalShiftMinutes, maxContinuousMins, breaches, breaksDetected };
   }, [segments]);
 
   const handleSave = async () => {
@@ -122,6 +148,7 @@ export default function DriversHoursPage() {
         segments,
         totalDrivingMinutes: calculations.totalDrivingMinutes,
         totalShiftMinutes: calculations.totalShiftMinutes,
+        maxContinuousMins: calculations.maxContinuousMins,
         hasBreach: calculations.breaches.length > 0,
         breachTypes: calculations.breaches,
         createdAt: serverTimestamp(),
@@ -162,7 +189,7 @@ export default function DriversHoursPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Shift Details</CardTitle>
-                <CardDescription>Enter driving periods for the current shift.</CardDescription>
+                <CardDescription>Enter driving periods. Gaps of 30+ mins count as breaks.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
@@ -267,7 +294,12 @@ export default function DriversHoursPage() {
                               <span className="text-[10px] text-muted-foreground">ID: {record.employeeNumber}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-sm font-medium">{formatMins(record.totalDrivingMinutes)}</TableCell>
+                          <TableCell className="text-sm font-medium">
+                            <div className="flex flex-col">
+                                <span>Total: {formatMins(record.totalDrivingMinutes)}</span>
+                                <span className="text-[10px] text-muted-foreground">Peak Block: {formatMins(record.maxContinuousMins)}</span>
+                            </div>
+                          </TableCell>
                           <TableCell>
                             {record.hasBreach ? (
                               <Badge variant="destructive">Breach</Badge>
@@ -287,15 +319,28 @@ export default function DriversHoursPage() {
           <div className="space-y-6">
             <Card className="border-primary/20 bg-primary/5 sticky top-8">
               <CardHeader>
-                <CardTitle className="text-lg">Calculations</CardTitle>
+                <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Calculations</CardTitle>
+                    {calculations.breaksDetected > 0 && (
+                        <Badge variant="outline" className="bg-white/50 border-primary/20 text-[10px]">
+                            <Coffee className="h-3 w-3 mr-1" /> {calculations.breaksDetected} Breaks
+                        </Badge>
+                    )}
+                </div>
                 <CardDescription>GB Domestic Hours Check</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4">
                   <div className="flex justify-between items-end border-b pb-2">
-                    <span className="text-sm font-medium">Total Driving</span>
-                    <span className={`text-2xl font-black ${calculations.totalDrivingMinutes > LIMIT_CONTINUOUS_MINS ? 'text-destructive' : 'text-primary'}`}>
+                    <span className="text-sm font-medium">Daily Driving</span>
+                    <span className={`text-2xl font-black ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'text-destructive' : 'text-primary'}`}>
                       {formatMins(calculations.totalDrivingMinutes)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-end border-b pb-2">
+                    <span className="text-sm font-medium">Max Cont. Block</span>
+                    <span className={`text-2xl font-black ${calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'text-destructive' : 'text-foreground'}`}>
+                      {formatMins(calculations.maxContinuousMins)}
                     </span>
                   </div>
                   <div className="flex justify-between items-end border-b pb-2">
@@ -310,12 +355,12 @@ export default function DriversHoursPage() {
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] font-bold uppercase">
                       <span>Until 5.5h Break</span>
-                      <span>{Math.max(0, LIMIT_CONTINUOUS_MINS - calculations.totalDrivingMinutes)}m left</span>
+                      <span>{Math.max(0, LIMIT_CONTINUOUS_MINS - calculations.maxContinuousMins)}m left</span>
                     </div>
                     <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
                       <div 
-                        className={`h-full transition-all ${calculations.totalDrivingMinutes > LIMIT_CONTINUOUS_MINS ? 'bg-destructive' : 'bg-primary'}`}
-                        style={{ width: `${Math.min(100, (calculations.totalDrivingMinutes / LIMIT_CONTINUOUS_MINS) * 100)}%` }}
+                        className={`h-full transition-all ${calculations.maxContinuousMins > LIMIT_CONTINUOUS_MINS ? 'bg-destructive' : 'bg-primary'}`}
+                        style={{ width: `${Math.min(100, (calculations.maxContinuousMins / LIMIT_CONTINUOUS_MINS) * 100)}%` }}
                       />
                     </div>
                   </div>
