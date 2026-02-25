@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/firebase';
+import { useAuth, setDocumentNonBlocking } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, getFirestore } from 'firebase/firestore';
+import { doc, getFirestore } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -45,31 +45,28 @@ export default function SignUpPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Update Firebase Auth profile
       await updateProfile(user, { displayName });
 
       const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
 
-      // Create user profile in Firestore
       const userProfile = {
         uid: user.uid,
         email: user.email,
         displayName: displayName,
         isAdmin: isSuperAdmin,
         isContentCreator: false,
-        isActive: isSuperAdmin, // The super admin is active by default
-        passwordChangeRequired: false, // Always false on initial sign-up
+        isActive: isSuperAdmin,
+        passwordChangeRequired: false,
+        forceSignOut: false,
       };
-      await setDoc(doc(db, 'userProfiles', user.uid), userProfile);
+      
+      const userProfileRef = doc(db, 'userProfiles', user.uid);
+      setDocumentNonBlocking(userProfileRef, userProfile, { merge: false });
 
       toast({
         title: 'Account Created',
         description: 'Your account is now pending activation by an administrator.',
       });
-
-      // The ClientLayout component will handle redirecting the user
-      // to the appropriate page (/pending-activation or /).
-      // No explicit router.push here is needed.
 
     } catch (error: any) {
       console.error('Sign up error:', error);

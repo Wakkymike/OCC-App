@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -8,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History } from 'lucide-react';
 import Link from 'next/link';
-import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc, addDocumentNonBlocking, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { sendSignInLinkToEmail, User } from 'firebase/auth';
 import { Switch } from '@/components/ui/switch';
@@ -98,27 +97,29 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
     toast({ title: 'User Session Flagged', description: `${user.displayName} will be signed out on their next page load.` });
   };
 
-  const handleDeleteUser = async (user: UserProfile) => {
-    try {
-        const userDocRef = doc(firestore, 'userProfiles', user.id);
-        await updateDoc(userDocRef, { 
-            isAdmin: false, 
-            isContentCreator: false, 
-            isActive: false, 
-            forceSignOut: true 
-        });
-        deleteDocumentNonBlocking(userDocRef);
-        const invitationsRef = collection(firestore, 'invitations');
-        const q = query(invitationsRef, where("email", "==", user.email));
-        const querySnapshot = await getDocs(q);
+  const handleDeleteUser = (user: UserProfile) => {
+    const userDocRef = doc(firestore, 'userProfiles', user.id);
+    updateDocumentNonBlocking(userDocRef, { 
+        isAdmin: false, 
+        isContentCreator: false, 
+        isActive: false, 
+        forceSignOut: true 
+    });
+    deleteDocumentNonBlocking(userDocRef);
+
+    const invitationsRef = collection(firestore, 'invitations');
+    const q = query(invitationsRef, where("email", "==", user.email));
+    getDocs(q).then((querySnapshot) => {
         querySnapshot.forEach((invDoc) => {
             deleteDocumentNonBlocking(doc(firestore, 'invitations', invDoc.id));
         });
-        toast({ title: 'User Deleted' });
-    } catch (error) {
-        console.error(error);
-        toast({ variant: 'destructive', title: 'Deletion Failed' });
-    }
+    }).catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: invitationsRef.path,
+            operation: 'list',
+        }));
+    });
+    toast({ title: 'User Deletion Initiated' });
   };
 
   return (
@@ -340,20 +341,21 @@ function NetworkUpdateManagement() {
         return [...allUpdates].sort((a, b) => (a.priority - b.priority) || (b.createdAt?.seconds - a.createdAt?.seconds));
     }, [allUpdates]);
 
-    const handleAdd = async (e: React.FormEvent) => {
+    const handleAdd = (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-        try {
-            await addDoc(collection(firestore, 'networkUpdates'), {
-                title, details, priority: 0, isVisible: true, createdAt: serverTimestamp(),
+        const colRef = collection(firestore, 'networkUpdates');
+        const updateData = {
+            title, details, priority: 0, isVisible: true, createdAt: serverTimestamp(),
+        };
+        addDocumentNonBlocking(colRef, updateData)
+            .then(() => {
+                toast({ title: 'Update Added' });
+                setTitle(''); setDetails('');
+            })
+            .finally(() => {
+                setIsSubmitting(false);
             });
-            toast({ title: 'Update Added' });
-            setTitle(''); setDetails('');
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setIsSubmitting(false);
-        }
     };
 
     return (
@@ -401,19 +403,28 @@ export default function AdminPage() {
   const userProfileRef = useMemoFirebase(() => currentUser ? doc(firestore, 'userProfiles', currentUser.uid) : null, [currentUser, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  const handleInvite = async (e: React.FormEvent) => {
+  const handleInvite = (e: React.FormEvent) => {
     e.preventDefault();
     setIsInviting(true);
-    try {
-      const docRef = await addDoc(collection(firestore, 'invitations'), { email: inviteEmail, invitedAt: new Date() });
-      await sendSignInLinkToEmail(auth, inviteEmail, { url: `${window.location.origin}/finish-sign-up?invitationId=${docRef.id}`, handleCodeInApp: true });
-      toast({ title: 'Invitation Sent' });
-      setInviteEmail('');
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setIsInviting(false);
-    }
+    const colRef = collection(firestore, 'invitations');
+    const inviteData = { email: inviteEmail, invitedAt: new Date() };
+    
+    addDoc(colRef, inviteData)
+      .then(async (docRef) => {
+        await sendSignInLinkToEmail(auth, inviteEmail, { url: `${window.location.origin}/finish-sign-up?invitationId=${docRef.id}`, handleCodeInApp: true });
+        toast({ title: 'Invitation Sent' });
+        setInviteEmail('');
+      })
+      .catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: colRef.path,
+            operation: 'create',
+            requestResourceData: inviteData
+        }));
+      })
+      .finally(() => {
+        setIsInviting(false);
+      });
   };
 
   if (isAuthLoading || isProfileLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;

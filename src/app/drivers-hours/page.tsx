@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, orderBy, limit, doc } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
+import { collection, serverTimestamp, query, orderBy, limit, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText, Info, CheckCircle2 } from 'lucide-react';
+import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText, Info } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -112,10 +112,9 @@ export default function DriversHoursPage() {
         totalDrivingMinutes += duration;
         currentContinuousMins += duration;
       } else {
-        // It's a break
         if (duration >= 30) {
           breaksDetected++;
-          currentContinuousMins = 0; // Reset continuous block if break is >= 30 mins
+          currentContinuousMins = 0;
         }
       }
 
@@ -144,7 +143,7 @@ export default function DriversHoursPage() {
     return { totalDrivingMinutes, totalShiftMinutes, maxContinuousMins, currentContinuousMins, breaches, breaksDetected };
   }, [segments]);
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!driverName || !employeeNumber) {
       toast({ variant: 'destructive', title: 'Error', description: 'Please enter driver details.' });
       return;
@@ -156,8 +155,8 @@ export default function DriversHoursPage() {
     }
 
     setIsSubmitting(true);
-    try {
-      await addDoc(collection(firestore, 'driverHours'), {
+    const colRef = collection(firestore, 'driverHours');
+    const recordData = {
         driverName,
         employeeNumber,
         date: new Date().toISOString().split('T')[0],
@@ -168,17 +167,18 @@ export default function DriversHoursPage() {
         hasBreach: calculations.breaches.length > 0,
         breachTypes: calculations.breaches,
         createdAt: serverTimestamp(),
-      });
-      toast({ title: 'Success', description: 'Record saved successfully.' });
-      setSegments([{ start: '', end: '', type: 'driving' }]);
-      setDriverName('');
-      setEmployeeNumber('');
-    } catch (e) {
-      console.error(e);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to save record.' });
-    } finally {
-      setIsSubmitting(false);
-    }
+    };
+
+    addDocumentNonBlocking(colRef, recordData)
+        .then(() => {
+            toast({ title: 'Success', description: 'Record saved successfully.' });
+            setSegments([{ start: '', end: '', type: 'driving' }]);
+            setDriverName('');
+            setEmployeeNumber('');
+        })
+        .finally(() => {
+            setIsSubmitting(false);
+        });
   };
 
   const handleDeleteRecord = (id: string) => {
@@ -206,7 +206,6 @@ export default function DriversHoursPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-          {/* Shift Entry Form */}
           <Card className="shadow-md border-primary/10">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -270,7 +269,7 @@ export default function DriversHoursPage() {
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1.5 h-5">
-                          <span className="w-3.5" /> {/* Invisible spacer matching icon width */}
+                          <span className="w-3.5" />
                           {seg.type === 'driving' ? 'Driving End' : 'Break End'}
                         </span>
                         <Input 
@@ -312,7 +311,6 @@ export default function DriversHoursPage() {
           </Card>
 
           <div className="space-y-8 h-fit">
-            {/* Real-time Compliance Check */}
             <Card className="border-primary/20 bg-primary/5 shadow-md">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -323,7 +321,7 @@ export default function DriversHoursPage() {
                         </Badge>
                     )}
                 </div>
-                <CardDescription>GB Domestic Hours Calculations for Current Entry</CardDescription>
+                <CardDescription>GB Domestic Hours Calculations</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
@@ -377,7 +375,7 @@ export default function DriversHoursPage() {
                     </div>
                     <div className="h-3 w-full bg-white/50 rounded-full overflow-hidden border border-primary/5">
                       <div 
-                        className={`h-full transition-all duration-500 ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'bg-destructive' : 'bg-orange-500'}`}
+                        className={`h-full transition-all duration-500 ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'bg-destructive' : 'bg-orange-50'}`}
                         style={{ width: `${Math.min(100, (calculations.totalDrivingMinutes / LIMIT_DAILY_DRIVING_MINS) * 100)}%` }}
                       />
                     </div>
@@ -398,7 +396,6 @@ export default function DriversHoursPage() {
               </CardContent>
             </Card>
 
-            {/* GB Domestic Rules Quick Guide */}
             <Card className="border-muted bg-muted/20">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -448,7 +445,6 @@ export default function DriversHoursPage() {
           </div>
         </div>
 
-        {/* History Log */}
         <Card className="shadow-sm border-muted">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <div className="flex items-center gap-2">
@@ -487,7 +483,7 @@ export default function DriversHoursPage() {
                       <TableCell>
                         <div className="flex flex-col gap-0.5">
                             <span className="text-sm font-semibold">{formatMins(record.totalDrivingMinutes)} total</span>
-                            <span className="text-[10px] text-muted-foreground italic">Peak Block: {formatMins(record.maxContinuousMins)}</span>
+                            <span className="text-[10px] text-muted-foreground italic">Cont. Driving: {formatMins(record.maxContinuousMins)}</span>
                         </div>
                       </TableCell>
                       <TableCell>

@@ -1,8 +1,7 @@
-
 'use client';
 
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, deleteDoc, doc, query, orderBy, limit } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, useUser, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc, query, orderBy, limit } from 'firebase/firestore';
 import type { ActiveAlert, AlertHistory } from '@/lib/types';
 import { AlertTriangle, ShieldAlert, CheckCircle2, Home, History, Bus as BusIcon, Clock, MapPin, ListFilter, CheckCircle } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -39,8 +38,8 @@ export default function RRAListPage() {
   }, [firestore, user]);
   const { data: history, isLoading: isHistoryLoading } = useCollection<AlertHistory>(historyRef);
 
-  const handleClearAlert = async (alertId: string) => {
-    deleteDoc(doc(firestore, 'activeAlerts', alertId));
+  const handleClearAlert = (alertId: string) => {
+    deleteDocumentNonBlocking(doc(firestore, 'activeAlerts', alertId));
   };
 
   const formatTimestamp = (ts: any) => {

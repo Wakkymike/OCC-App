@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useAuth } from '@/firebase';
+import { useAuth, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import {
   isSignInWithEmailLink,
   signInWithEmailLink,
   updatePassword,
   updateProfile,
 } from 'firebase/auth';
-import { doc, setDoc, getFirestore, getDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getFirestore, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -51,7 +51,6 @@ function FinishSignUpComponent() {
       }
       setInvitationId(invId);
 
-      // 1. Check if the invitation document exists in Firestore.
       const inviteRef = doc(db, 'invitations', invId);
       const inviteSnap = await getDoc(inviteRef);
 
@@ -62,14 +61,12 @@ function FinishSignUpComponent() {
       }
       const inviteEmail = inviteSnap.data().email;
 
-      // 2. Check if the URL is a valid sign-in link from Firebase Auth.
       if (!isSignInWithEmailLink(auth, window.location.href)) {
         setErrorMessage('This is not a valid sign-up link. Please request a new invitation.');
         setStatus('error');
         return;
       }
       
-      // If we've reached here, the invitation is valid. Show the form.
       setEmail(inviteEmail);
       setStatus('form');
     };
@@ -97,33 +94,33 @@ function FinishSignUpComponent() {
       const userCredential = await signInWithEmailLink(auth, email, window.location.href);
       const user = userCredential.user;
 
-      // Now that the user is signed in, update their password and profile
       await updatePassword(user, password);
       await updateProfile(user, { displayName });
 
       const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
 
-      // Create their profile in Firestore
       const userProfile = {
         uid: user.uid,
         email: user.email,
         displayName: displayName,
         isAdmin: isSuperAdmin,
         isContentCreator: false,
-        isActive: isSuperAdmin, // User must be activated by an admin unless they are super admin
+        isActive: isSuperAdmin,
         passwordChangeRequired: false,
+        forceSignOut: false,
       };
-      await setDoc(doc(db, 'userProfiles', user.uid), userProfile);
       
-      // Delete the invitation document so it's no longer pending
-      await deleteDoc(doc(db, 'invitations', invitationId));
+      const userProfileRef = doc(db, 'userProfiles', user.uid);
+      setDocumentNonBlocking(userProfileRef, userProfile, { merge: false });
+      
+      const inviteRef = doc(db, 'invitations', invitationId);
+      deleteDocumentNonBlocking(inviteRef);
 
       toast({
         title: 'Account Created',
         description: 'Your account is now pending activation by an administrator.',
       });
 
-      // Redirect to the pending page. The ClientLayout will handle this.
       router.replace('/pending-activation');
 
     } catch (error: any) {

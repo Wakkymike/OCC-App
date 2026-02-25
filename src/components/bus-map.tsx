@@ -4,8 +4,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard } from '@/lib/types';
-import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
-import { doc, deleteDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { doc, serverTimestamp, collection } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -174,22 +174,22 @@ export default function BusMap({
             return;
         }
 
-        try {
-            await addDoc(collection(firestore, 'monitoredHazards'), {
-                hazardId: 'manual', 
-                type: 'manual', 
-                value, 
-                location: { lat: lngLat.lat, lng: lngLat.lng },
-                description, 
-                radius, 
-                createdAt: serverTimestamp()
-            });
+        const colRef = collection(firestore, 'monitoredHazards');
+        const manualData = {
+            hazardId: 'manual', 
+            type: 'manual', 
+            value, 
+            location: { lat: lngLat.lat, lng: lngLat.lng },
+            description, 
+            radius, 
+            createdAt: serverTimestamp()
+        };
+
+        addDocumentNonBlocking(colRef, manualData).then(() => {
             toast({ title: 'Manual Geofence Added' });
             popup.remove();
             if (setManualGeofenceMode) setManualGeofenceMode(false);
-        } catch (e) {
-            console.error("Failed to add manual geofence", e);
-        }
+        });
     };
   }, [isAdmin, firestore, toast, setManualGeofenceMode]);
 
@@ -213,16 +213,19 @@ export default function BusMap({
 
   const handleAddGeofence = (hazard: Hazard, radius: number) => {
     if (!isAdmin) return;
-    addDoc(collection(firestore, 'monitoredHazards'), {
+    const colRef = collection(firestore, 'monitoredHazards');
+    const geoData = {
       hazardId: hazard.id, type: hazard.type, value: hazard.value, location: hazard.location,
       description: hazard.description, radius, createdAt: serverTimestamp()
+    };
+    addDocumentNonBlocking(colRef, geoData).then(() => {
+        toast({ title: 'Geofence Added' });
     });
-    toast({ title: 'Geofence Added' });
   };
 
   const handleRemoveGeofence = (monitorId: string) => {
     if (!isAdmin) return;
-    deleteDoc(doc(firestore, 'monitoredHazards', monitorId));
+    deleteDocumentNonBlocking(doc(firestore, 'monitoredHazards', monitorId));
     toast({ title: 'Geofence Removed' });
   };
 

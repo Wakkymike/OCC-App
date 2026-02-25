@@ -1,8 +1,7 @@
-
 'use client';
 
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc, serverTimestamp } from 'firebase/firestore';
 import type { ActiveAlert } from '@/lib/types';
 import { AlertTriangle, ShieldAlert, CheckCircle2, Bus as BusIcon, MapPin, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,12 +37,12 @@ export function GlobalAlertOverlay() {
       acknowledgedAt: serverTimestamp()
     };
 
-    // Update the active alert
-    updateDoc(doc(firestore, 'activeAlerts', alert.id), ackData);
+    // Update the active alert using the non-blocking utility which handles contextual errors
+    updateDocumentNonBlocking(doc(firestore, 'activeAlerts', alert.id), ackData);
 
     // Update the linked history log if it exists
     if (alert.historyDocId) {
-      updateDoc(doc(firestore, 'alertHistory', alert.historyDocId), {
+      updateDocumentNonBlocking(doc(firestore, 'alertHistory', alert.historyDocId), {
         acknowledgedBy: ackData.acknowledgedBy,
         acknowledgedAt: ackData.acknowledgedAt
       });
