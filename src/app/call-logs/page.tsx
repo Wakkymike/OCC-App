@@ -10,14 +10,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, deleteDocumentNonBlocking, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, Timestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus } from 'lucide-react';
+import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus, Hash } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { subDays, format } from 'date-fns';
 import type { CallLog } from '@/lib/types';
 
 export default function CallLogsPage() {
-  const { user } = useUser();
+  const { user } = userUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const formRef = useRef<HTMLDivElement>(null);
@@ -328,12 +328,9 @@ export default function CallLogsPage() {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 gap-2">
                             <Badge variant="outline" className="justify-center bg-muted/50 text-[9px] font-black truncate" title={log.depot}>
-                              DEP: {log.depot}
-                            </Badge>
-                            <Badge variant="outline" className="justify-center bg-muted/50 text-[9px] font-black">
-                              SVC: {log.serviceNumber}
+                              Depot: {log.depot}
                             </Badge>
                           </div>
                         </div>
@@ -341,7 +338,7 @@ export default function CallLogsPage() {
 
                       {/* Middle Column: Operational Info */}
                       <div className="flex-grow space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                           <div className="space-y-1">
                             <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Fleet Number</Label>
                             <div className="flex items-center gap-2 font-bold text-sm">
@@ -354,6 +351,13 @@ export default function CallLogsPage() {
                             <div className="flex items-center gap-2 font-bold text-sm">
                               <UserIcon className="h-3.5 w-3.5 text-primary" />
                               <span>{log.employeeNumber}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Service</Label>
+                            <div className="flex items-center gap-2 font-bold text-sm">
+                              <Hash className="h-3.5 w-3.5 text-primary" />
+                              <span>{log.serviceNumber}</span>
                             </div>
                           </div>
                           <div className="space-y-1">
