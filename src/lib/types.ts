@@ -121,6 +121,7 @@ export interface CallLog {
   callTime: string;
   employeeNumber: string;
   fleetNumber: string;
+  runningBoard: string;
   serviceNumber: string;
   depot: string;
   phoneNumber: string;

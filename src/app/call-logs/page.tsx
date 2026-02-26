@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -30,6 +31,7 @@ export default function CallLogsPage() {
     callTime: '',
     employeeNumber: '',
     fleetNumber: '',
+    runningBoard: '',
     serviceNumber: '',
     depot: '',
     phoneNumber: '',
@@ -111,6 +113,7 @@ export default function CallLogsPage() {
       callTime: format(now, 'HH:mm'),
       employeeNumber: '',
       fleetNumber: '',
+      runningBoard: '',
       serviceNumber: '',
       depot: '',
       phoneNumber: '',
@@ -138,6 +141,7 @@ export default function CallLogsPage() {
       callTime: log.callTime,
       employeeNumber: log.employeeNumber,
       fleetNumber: log.fleetNumber,
+      runningBoard: log.runningBoard || '',
       serviceNumber: log.serviceNumber,
       depot: log.depot,
       phoneNumber: log.phoneNumber,
@@ -286,13 +290,19 @@ export default function CallLogsPage() {
                           <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
                         </div>
                         <div className="space-y-2">
+                          <Label className="text-xs font-black uppercase text-muted-foreground">Running Board</Label>
+                          <Input name="runningBoard" placeholder="1234" value={formData.runningBoard} onChange={handleInputChange} required />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
                           <Label className="text-xs font-black uppercase text-muted-foreground">Svc No.</Label>
                           <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
                         </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-black uppercase text-muted-foreground">Depot</Label>
-                        <Input name="depot" placeholder="BOLTON" value={formData.depot} onChange={handleInputChange} required />
+                        <div className="space-y-2">
+                          <Label className="text-xs font-black uppercase text-muted-foreground">Depot</Label>
+                          <Input name="depot" placeholder="BOLTON" value={formData.depot} onChange={handleInputChange} required />
+                        </div>
                       </div>
                     </div>
 
@@ -386,12 +396,19 @@ export default function CallLogsPage() {
 
                       {/* Middle Column: Operational Info */}
                       <div className="flex-grow space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                           <div className="space-y-1">
                             <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Fleet Number</Label>
                             <div className="flex items-center gap-2 font-bold text-sm">
                               <Bus className="h-3.5 w-3.5 text-primary" />
                               <span>{log.fleetNumber}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Running Board</Label>
+                            <div className="flex items-center gap-2 font-bold text-sm">
+                              <Hash className="h-3.5 w-3.5 text-primary" />
+                              <span>{log.runningBoard || '--'}</span>
                             </div>
                           </div>
                           <div className="space-y-1">

@@ -31,6 +31,10 @@
           "type": "string",
           "description": "The fleet number of the vehicle involved in the call."
         },
+        "runningBoard": {
+          "type": "string",
+          "description": "The running board (block) associated with the vehicle activity."
+        },
         "serviceNumber": {
           "type": "string",
           "description": "The service number (route) the vehicle was operating."
@@ -92,6 +96,7 @@
         "callTime",
         "employeeNumber",
         "fleetNumber",
+        "runningBoard",
         "serviceNumber",
         "depot",
         "phoneNumber",
