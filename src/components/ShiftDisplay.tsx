@@ -17,6 +17,12 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { 
   Loader2, 
   Calendar as CalendarIcon, 
   Link as LinkIcon, 
@@ -31,7 +37,8 @@ import {
   CalendarRange,
   Settings,
   X,
-  User as UserIcon
+  User as UserIcon,
+  FileDown
 } from 'lucide-react';
 import { 
   format, 
@@ -48,11 +55,15 @@ import {
   subMonths,
   addWeeks,
   subWeeks,
-  startOfToday
+  startOfToday,
+  startOfYear,
+  endOfYear
 } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Shift {
   id: string;
@@ -73,6 +84,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [calendarName, setCalendarName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // View state - Strictly normalized to start of period
@@ -140,6 +152,103 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
     const now = new Date();
     return shifts.find(s => isAfter(new Date(s.start), now));
   }, [shifts]);
+
+  const handleDownloadPDF = async (period: 'week' | 'month' | 'year') => {
+    if (!shifts || shifts.length === 0) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: 'No shift data found to download.' });
+      return;
+    }
+
+    setIsExporting(true);
+    const doc = new jsPDF();
+    const now = new Date();
+    
+    // Determine interval
+    let start, end, periodLabel;
+    if (period === 'week') {
+      start = startOfWeek(now, { weekStartsOn: 1 });
+      end = endOfWeek(now, { weekStartsOn: 1 });
+      periodLabel = `Week of ${format(start, 'do MMM yyyy')}`;
+    } else if (period === 'month') {
+      start = startOfMonth(now);
+      end = endOfMonth(now);
+      periodLabel = format(now, 'MMMM yyyy');
+    } else {
+      start = startOfYear(now);
+      end = endOfYear(now);
+      periodLabel = `Year ${format(now, 'yyyy')}`;
+    }
+
+    // Add Logo - Using logo.jpg as requested
+    try {
+      const logoUrl = '/logo.jpg';
+      const img = new Image();
+      img.src = logoUrl;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      doc.addImage(img, 'JPEG', 10, 10, 40, 12);
+    } catch (e) {
+      console.warn("PDF Logo could not be loaded, skipping.");
+    }
+
+    // Header Info
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Operational Rota Report', 60, 18);
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`User: ${user?.displayName || user?.email}`, 60, 24);
+    doc.text(`Period: ${periodLabel}`, 60, 29);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 60, 34);
+
+    // Filter and prepare data
+    const daysInPeriod = eachDayOfInterval({ start, end });
+    const tableData = daysInPeriod.map(day => {
+      const dayShifts = shifts.filter(s => isSameDay(new Date(s.start), day));
+      
+      if (dayShifts.length === 0) {
+        return [
+          format(day, 'dd/MM/yyyy'),
+          format(day, 'EEEE'),
+          '--', '--',
+          'REST DAY',
+          '--'
+        ];
+      }
+
+      // Handle multiple shifts on same day if any
+      return dayShifts.map(s => [
+        format(new Date(s.start), 'dd/MM/yyyy'),
+        format(new Date(s.start), 'EEEE'),
+        format(new Date(s.start), 'HH:mm'),
+        format(new Date(s.end), 'HH:mm'),
+        s.summary,
+        s.location || '--'
+      ]);
+    }).flat();
+
+    autoTable(doc, {
+      startY: 45,
+      head: [['Date', 'Day', 'Start', 'End', 'Duty / Summary', 'Location']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [33, 150, 243], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      didParseCell: (data) => {
+        if (data.row.cells[4].text[0] === 'REST DAY') {
+          data.cell.styles.fontStyle = 'italic';
+          data.cell.styles.textColor = [150, 150, 150];
+        }
+      }
+    });
+
+    doc.save(`Rota-Export-${period}-${format(now, 'yyyyMMdd')}.pdf`);
+    setIsExporting(false);
+    toast({ title: 'PDF Generated', description: `Your ${period} rota has been downloaded.` });
+  };
 
   // Generate selectable months (current + 11 more)
   const selectableMonths = useMemo(() => {
@@ -282,12 +391,28 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
                 </p>
               </div>
             </div>
-            {!showSettings && (
-              <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="h-8">
-                <Settings className="h-4 w-4 mr-2" />
-                Update iCal Link
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8" disabled={isExporting}>
+                    {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                    Download PDF Rota
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleDownloadPDF('week')}>Current Week</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDownloadPDF('month')}>Current Month</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDownloadPDF('year')}>Current Year</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              {!showSettings && (
+                <Button variant="outline" size="sm" onClick={() => setShowSettings(true)} className="h-8">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Update iCal Link
+                </Button>
+              )}
+            </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
