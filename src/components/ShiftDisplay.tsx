@@ -231,9 +231,17 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
         4: { cellWidth: 50 }
       },
       didParseCell: (data) => {
-        if (data.row.cells[4].text[0] === 'REST DAY') {
+        const summaryText = data.row.cells[4].text[0] || '';
+        
+        // Handle Rest Days styling
+        if (summaryText === 'REST DAY') {
           data.cell.styles.fontStyle = 'italic';
           data.cell.styles.textColor = [150, 150, 150];
+        }
+
+        // Highlight rows containing "L3" in light orange
+        if (summaryText.includes('L3')) {
+          data.cell.styles.fillColor = [255, 224, 178]; // Light Orange
         }
       }
     });
