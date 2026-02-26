@@ -377,7 +377,7 @@ export default function CallLogsPage() {
                             </div>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Window</Label>
+                            <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Time From / To</Label>
                             <div className="flex items-center gap-2 font-mono text-xs">
                               <Badge variant="outline" className="rounded-sm font-black">{log.timeFrom}</Badge>
                               <span className="text-muted-foreground font-bold">-</span>
