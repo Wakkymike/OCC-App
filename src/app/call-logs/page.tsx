@@ -18,7 +18,7 @@ import {
 import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, Timestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus, Hash, Building2, Pencil, Search } from 'lucide-react';
+import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus, Hash, Building2, Pencil, Search, LayoutList } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { subDays, format } from 'date-fns';
@@ -295,7 +295,7 @@ export default function CallLogsPage() {
                       <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
                     </div>
 
-                    {/* Row 2: Depot, Fleet Number, Service Number */}
+                    {/* Row 2: Depot, Fleet Number, Running Board */}
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Depot</Label>
                       <Input name="depot" placeholder="BOLTON" value={formData.depot} onChange={handleInputChange} required />
@@ -305,11 +305,15 @@ export default function CallLogsPage() {
                       <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
                     </div>
                     <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Running Board</Label>
+                      <Input name="runningBoard" placeholder="1234" value={formData.runningBoard} onChange={handleInputChange} required />
+                    </div>
+
+                    {/* Row 3: Service Number, Phone Number, Time From */}
+                    <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Service Number</Label>
                       <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
                     </div>
-
-                    {/* Row 3: Phone Number, Time From, Time To */}
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Phone Number (3-Dig)</Label>
                       <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
@@ -318,6 +322,8 @@ export default function CallLogsPage() {
                       <Label className="text-xs font-black uppercase text-muted-foreground">Time From</Label>
                       <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} required />
                     </div>
+
+                    {/* Row 4: Time To */}
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Time To</Label>
                       <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} required />
@@ -431,12 +437,19 @@ export default function CallLogsPage() {
 
                       {/* Middle Column: Operational Info - Reordered Grid */}
                       <div className="flex-grow space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                           <div className="space-y-1">
                             <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Fleet Number</Label>
                             <div className="flex items-center gap-2 font-bold text-sm">
                               <Bus className="h-3.5 w-3.5 text-primary" />
                               <span>{log.fleetNumber}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Running Board</Label>
+                            <div className="flex items-center gap-2 font-bold text-sm">
+                              <LayoutList className="h-3.5 w-3.5 text-primary" />
+                              <span>{log.runningBoard || '--'}</span>
                             </div>
                           </div>
                           <div className="space-y-1">
