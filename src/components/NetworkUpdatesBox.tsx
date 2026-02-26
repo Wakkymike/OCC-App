@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -51,30 +50,30 @@ export default function NetworkUpdatesBox() {
   }, [updates, currentIndex]);
 
   return (
-    <Card className="w-full max-w-2xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-xl">
+    <Card className="w-full max-w-5xl shadow-md border-primary/10">
+      <CardHeader className="pb-3 border-b bg-muted/5">
+        <CardTitle className="flex items-center gap-2 text-xl font-bold uppercase tracking-tight text-primary">
           <Rss className="h-5 w-5" />
-          Network Updates
+          Live Network Alerts
         </CardTitle>
       </CardHeader>
-      <CardContent className="h-24 overflow-hidden relative">
+      <CardContent className="min-h-[12rem] h-48 overflow-hidden relative bg-card">
         {isLoading && (
           <div className="flex items-center justify-center h-full text-muted-foreground">
              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            <span>Loading updates...</span>
+            <span className="font-bold text-xs uppercase tracking-widest">Syncing Updates...</span>
           </div>
         )}
         {!isLoading && !currentUpdate && (
              <div className="flex items-center justify-center h-full text-muted-foreground">
-                <p>No active network updates at this time.</p>
+                <p className="italic font-medium">No active network updates at this time.</p>
             </div>
         )}
         {!isLoading && currentUpdate && (
-          <div key={currentUpdate.id} className="animate-scroll-up absolute inset-0 p-1">
-            <h3 className="font-bold text-lg">{currentUpdate.title}</h3>
+          <div key={currentUpdate.id} className="animate-scroll-up absolute inset-0 p-6">
+            <h3 className="font-black text-2xl mb-3 text-foreground leading-tight">{currentUpdate.title}</h3>
             <div 
-              className="text-muted-foreground rich-content"
+              className="text-muted-foreground rich-content text-lg leading-relaxed"
               dangerouslySetInnerHTML={{ __html: currentUpdate.details }}
             />
           </div>
