@@ -4,8 +4,9 @@ import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History } from 'lucide-react';
+import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History, Pencil } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc, addDocumentNonBlocking, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
@@ -332,6 +333,7 @@ function NetworkUpdateManagement() {
     const [title, setTitle] = useState('');
     const [details, setDetails] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     const updatesQuery = useMemoFirebase(() => collection(firestore, 'networkUpdates'), [firestore]);
     const { data: allUpdates, isLoading } = useCollection<NetworkUpdate>(updatesQuery);
@@ -341,21 +343,46 @@ function NetworkUpdateManagement() {
         return [...allUpdates].sort((a, b) => (a.priority - b.priority) || (b.createdAt?.seconds - a.createdAt?.seconds));
     }, [allUpdates]);
 
-    const handleAdd = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
-        const colRef = collection(firestore, 'networkUpdates');
-        const updateData = {
-            title, details, priority: 0, isVisible: true, createdAt: serverTimestamp(),
-        };
-        addDocumentNonBlocking(colRef, updateData)
-            .then(() => {
-                toast({ title: 'Update Added' });
-                setTitle(''); setDetails('');
-            })
-            .finally(() => {
-                setIsSubmitting(false);
-            });
+        
+        if (editingId) {
+            const updateDocRef = doc(firestore, 'networkUpdates', editingId);
+            updateDocumentNonBlocking(updateDocRef, { title, details });
+            toast({ title: 'Update Updated', description: 'Your changes have been saved.' });
+            setTitle('');
+            setDetails('');
+            setEditingId(null);
+            setIsSubmitting(false);
+        } else {
+            const colRef = collection(firestore, 'networkUpdates');
+            const updateData = {
+                title, details, priority: 0, isVisible: true, createdAt: serverTimestamp(),
+            };
+            addDocumentNonBlocking(colRef, updateData)
+                .then(() => {
+                    toast({ title: 'Update Added' });
+                    setTitle(''); setDetails('');
+                })
+                .finally(() => {
+                    setIsSubmitting(false);
+                });
+        }
+    };
+
+    const handleEdit = (update: NetworkUpdate) => {
+        setTitle(update.title);
+        setDetails(update.details);
+        setEditingId(update.id);
+        // Scroll to form if needed
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleCancelEdit = () => {
+        setTitle('');
+        setDetails('');
+        setEditingId(null);
     };
 
     return (
@@ -367,23 +394,36 @@ function NetworkUpdateManagement() {
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
-                <form onSubmit={handleAdd} className="space-y-4 p-4 border rounded-lg">
+                <form onSubmit={handleSubmit} className={`space-y-4 p-4 border rounded-lg ${editingId ? 'bg-primary/5 border-primary/20' : ''}`}>
+                    <div className="flex items-center justify-between">
+                        <Label className="font-bold text-sm uppercase tracking-wider">{editingId ? 'Edit Network Update' : 'Create New Update'}</Label>
+                        {editingId && (
+                            <Button type="button" variant="ghost" size="sm" onClick={handleCancelEdit}>Cancel</Button>
+                        )}
+                    </div>
                     <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" required disabled={isSubmitting} />
                     <Textarea value={details} onChange={(e) => setDetails(e.target.value)} placeholder="Details" required disabled={isSubmitting} />
-                    <Button type="submit" disabled={isSubmitting}>Add Update</Button>
+                    <Button type="submit" disabled={isSubmitting} className="w-full">
+                        {editingId ? 'Save Changes' : 'Add Update'}
+                    </Button>
                 </form>
                 <div className="space-y-4">
                     {isLoading ? (
                         <div className="flex justify-center p-4"><Loader2 className="animate-spin" /></div>
                     ) : updates?.map(update => (
-                        <div key={update.id} className="flex items-start gap-4 p-3 border rounded-lg">
+                        <div key={update.id} className="flex items-start gap-4 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                             <div className="flex-grow">
                                 <p className="font-bold">{update.title}</p>
                                 <p className="text-sm text-muted-foreground">{update.details}</p>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'networkUpdates', update.id))}>
-                                <Trash2 className="h-5 w-5 text-destructive" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(update)} title="Edit Entry">
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'networkUpdates', update.id))} title="Delete Entry">
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </div>
                         </div>
                     ))}
                 </div>
