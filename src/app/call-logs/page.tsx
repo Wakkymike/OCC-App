@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -233,7 +232,7 @@ export default function CallLogsPage() {
     setIsExporting(true);
     const doc = new jsPDF();
     
-    // Add Logo
+    // Add Logo to top left
     try {
       const logoUrl = '/logo.png';
       const img = new Image();
@@ -242,12 +241,13 @@ export default function CallLogsPage() {
         img.onload = resolve;
         img.onerror = reject;
       });
+      // Position logo at top left: x=10, y=10
       doc.addImage(img, 'PNG', 10, 10, 40, 12);
     } catch (e) {
       console.warn("PDF Logo could not be loaded, skipping.");
     }
 
-    // Title and Info
+    // Title and Info - Shifted right to accommodate logo
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text('Operational Call Log Report', 60, 18);
@@ -259,27 +259,39 @@ export default function CallLogsPage() {
     doc.text(`Total Records: ${filteredLogs.length}`, 60, 34);
 
     // Table
-    const tableData = filteredLogs.map(log => [
-      log.date,
-      log.callTime,
-      log.employeeNumber,
-      log.depot,
-      log.fleetNumber,
-      log.runningBoard || '--',
-      log.serviceNumber,
-      log.phoneNumber,
-      log.details
-    ]);
+    const tableData = filteredLogs.map(log => {
+      // Collect active tags
+      const activeTags = [];
+      if (log.isTeamsRelated) activeTags.push('Teams');
+      if (log.isTicketerRelated) activeTags.push('Ticketer');
+      if (log.isEPMRelated) activeTags.push('EPM');
+      if (log.isIRRelated) activeTags.push('IR');
+      if (log.isTSIRelated) activeTags.push('TSI');
+      if (log.isDriverReportRelated) activeTags.push('Report');
+
+      return [
+        log.date,
+        log.callTime,
+        log.employeeNumber,
+        log.depot,
+        log.fleetNumber,
+        log.runningBoard || '--',
+        log.serviceNumber,
+        activeTags.join(', ') || '--', // Tags Column
+        log.details
+      ];
+    });
 
     autoTable(doc, {
       startY: 45,
-      head: [['Date', 'Time', 'Emp', 'Depot', 'Fleet', 'RB', 'Svc', 'Phone', 'Details']],
+      head: [['Date', 'Time', 'Emp', 'Depot', 'Fleet', 'RB', 'Svc', 'Tags', 'Details']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [33, 150, 243], fontSize: 8 },
       bodyStyles: { fontSize: 7 },
       columnStyles: {
-        8: { cellWidth: 60 } // Expand details column
+        7: { cellWidth: 30 }, // Tags column
+        8: { cellWidth: 50 }  // Details column
       }
     });
 
