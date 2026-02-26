@@ -8,6 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, Timestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +23,8 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { subDays, format } from 'date-fns';
 import type { CallLog } from '@/lib/types';
+
+type SearchCategory = 'employeeNumber' | 'fleetNumber' | 'runningBoard';
 
 export default function CallLogsPage() {
   const { user } = useUser();
@@ -27,6 +36,7 @@ export default function CallLogsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchCategory, setSearchCategory] = useState<SearchCategory>('employeeNumber');
   
   const [formData, setFormData] = useState({
     date: '',
@@ -63,17 +73,16 @@ export default function CallLogsPage() {
 
   const { data: logs, isLoading } = useCollection<CallLog>(callLogsQuery);
 
-  // Search filter logic
+  // Search filter logic - Strict filtering by category
   const filteredLogs = useMemo(() => {
     if (!logs) return [];
     if (!searchQuery.trim()) return logs;
     const q = searchQuery.toLowerCase();
-    return logs.filter(log => 
-      log.employeeNumber?.toLowerCase().includes(q) ||
-      log.fleetNumber?.toLowerCase().includes(q) ||
-      log.runningBoard?.toLowerCase().includes(q)
-    );
-  }, [logs, searchQuery]);
+    return logs.filter(log => {
+      const valueToSearch = (log as any)[searchCategory];
+      return valueToSearch?.toLowerCase().includes(q);
+    });
+  }, [logs, searchQuery, searchCategory]);
 
   // Auto-retention logic: Purge records older than 5 days
   useEffect(() => {
@@ -286,7 +295,7 @@ export default function CallLogsPage() {
                       <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
                     </div>
 
-                    {/* Row 2: Depot, Fleet Number, Running Board */}
+                    {/* Row 2: Depot, Fleet Number, Service Number */}
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Depot</Label>
                       <Input name="depot" placeholder="BOLTON" value={formData.depot} onChange={handleInputChange} required />
@@ -296,15 +305,11 @@ export default function CallLogsPage() {
                       <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs font-black uppercase text-muted-foreground">Running Board</Label>
-                      <Input name="runningBoard" placeholder="1234" value={formData.runningBoard} onChange={handleInputChange} required />
-                    </div>
-
-                    {/* Row 3: Service Number, Phone Number, Time From */}
-                    <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Service Number</Label>
                       <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
                     </div>
+
+                    {/* Row 3: Phone Number, Time From, Time To */}
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Phone Number (3-Dig)</Label>
                       <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
@@ -313,14 +318,13 @@ export default function CallLogsPage() {
                       <Label className="text-xs font-black uppercase text-muted-foreground">Time From</Label>
                       <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} required />
                     </div>
-
-                    {/* Row 4: Time To and Checkboxes */}
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Time To</Label>
                       <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} required />
                     </div>
-                    
-                    <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-y-3 pt-6 border-t md:border-t-0">
+
+                    {/* Checkboxes Row */}
+                    <div className="md:col-span-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-y-3 pt-6 border-t">
                       {[
                         { id: 'isTeamsRelated', label: 'Teams' },
                         { id: 'isTicketerRelated', label: 'Ticketer' },
@@ -361,15 +365,32 @@ export default function CallLogsPage() {
               {logs && logs.length > 0 && <Badge className="font-black bg-primary text-primary-foreground">{logs.length} RECORDS</Badge>}
             </div>
             
-            {/* Search Functionality */}
-            <div className="relative w-full max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search by Employee, Fleet, or Running Board..." 
-                className="pl-10 h-10 bg-muted/20 border-primary/10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            {/* Optimized Category Search Functionality */}
+            <div className="flex flex-col sm:flex-row gap-2 w-full max-w-2xl">
+              <div className="flex-grow relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder={`Search records...`} 
+                  className="pl-10 h-10 bg-muted/20 border-primary/10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Select value={searchCategory} onValueChange={(v: SearchCategory) => setSearchCategory(v)}>
+                <SelectTrigger className="w-full sm:w-[200px] h-10 bg-muted/20 border-primary/10">
+                  <SelectValue placeholder="Search by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="employeeNumber">Employee Number</SelectItem>
+                  <SelectItem value="fleetNumber">Fleet Number</SelectItem>
+                  <SelectItem value="runningBoard">Running Board</SelectItem>
+                </SelectContent>
+              </Select>
+              {searchQuery && (
+                <Button variant="ghost" size="icon" onClick={() => setSearchQuery('')} className="h-10 w-10">
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
 
@@ -408,21 +429,14 @@ export default function CallLogsPage() {
                         </div>
                       </div>
 
-                      {/* Middle Column: Operational Info */}
+                      {/* Middle Column: Operational Info - Reordered Grid */}
                       <div className="flex-grow space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                           <div className="space-y-1">
                             <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Fleet Number</Label>
                             <div className="flex items-center gap-2 font-bold text-sm">
                               <Bus className="h-3.5 w-3.5 text-primary" />
                               <span>{log.fleetNumber}</span>
-                            </div>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Running Board</Label>
-                            <div className="flex items-center gap-2 font-bold text-sm">
-                              <Hash className="h-3.5 w-3.5 text-primary" />
-                              <span>{log.runningBoard || '--'}</span>
                             </div>
                           </div>
                           <div className="space-y-1">
@@ -509,7 +523,7 @@ export default function CallLogsPage() {
                 <Plus className="h-16 w-16 opacity-10 mb-4" />
               )}
               <p className="font-black text-sm uppercase tracking-[0.3em] opacity-40">
-                {searchQuery ? 'No matching logs' : 'No shift logs found'}
+                {searchQuery ? 'No matching logs found' : 'No shift logs found'}
               </p>
               {!showForm && !searchQuery && (
                 <Button variant="link" onClick={handleStartNewEntry} className="mt-2 font-bold">Create first entry now</Button>
