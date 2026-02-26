@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, Timestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus, Hash, Building2, Pencil } from 'lucide-react';
+import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus, Hash, Building2, Pencil, Search } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { subDays, format } from 'date-fns';
@@ -26,6 +26,8 @@ export default function CallLogsPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  
   const [formData, setFormData] = useState({
     date: '',
     callTime: '',
@@ -60,6 +62,18 @@ export default function CallLogsPage() {
   }, [callLogsRef]);
 
   const { data: logs, isLoading } = useCollection<CallLog>(callLogsQuery);
+
+  // Search filter logic
+  const filteredLogs = useMemo(() => {
+    if (!logs) return [];
+    if (!searchQuery.trim()) return logs;
+    const q = searchQuery.toLowerCase();
+    return logs.filter(log => 
+      log.employeeNumber?.toLowerCase().includes(q) ||
+      log.fleetNumber?.toLowerCase().includes(q) ||
+      log.runningBoard?.toLowerCase().includes(q)
+    );
+  }, [logs, searchQuery]);
 
   // Auto-retention logic: Purge records older than 5 days
   useEffect(() => {
@@ -258,81 +272,68 @@ export default function CallLogsPage() {
               <form onSubmit={handleSubmit}>
                 <CardContent className="pt-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Time & User Info Section */}
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase text-muted-foreground">Date</Label>
-                          <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} required />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase text-muted-foreground">Call Time</Label>
-                          <Input type="time" name="callTime" value={formData.callTime} onChange={handleInputChange} required />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase text-muted-foreground">Emp No.</Label>
-                          <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase text-muted-foreground">Phone No (3-Dig)</Label>
-                          <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
-                        </div>
-                      </div>
+                    {/* Row 1: Date, Time, Employee Number */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Date</Label>
+                      <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Call Time</Label>
+                      <Input type="time" name="callTime" value={formData.callTime} onChange={handleInputChange} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Employee Number</Label>
+                      <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
                     </div>
 
-                    {/* Operational Section */}
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase text-muted-foreground">Fleet No.</Label>
-                          <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase text-muted-foreground">Running Board</Label>
-                          <Input name="runningBoard" placeholder="1234" value={formData.runningBoard} onChange={handleInputChange} required />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase text-muted-foreground">Svc No.</Label>
-                          <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase text-muted-foreground">Depot</Label>
-                          <Input name="depot" placeholder="BOLTON" value={formData.depot} onChange={handleInputChange} required />
-                        </div>
-                      </div>
+                    {/* Row 2: Depot, Fleet Number, Running Board */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Depot</Label>
+                      <Input name="depot" placeholder="BOLTON" value={formData.depot} onChange={handleInputChange} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Fleet Number</Label>
+                      <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Running Board</Label>
+                      <Input name="runningBoard" placeholder="1234" value={formData.runningBoard} onChange={handleInputChange} required />
                     </div>
 
-                    {/* Window & Logic Section */}
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase text-muted-foreground">Time From</Label>
-                          <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} required />
+                    {/* Row 3: Service Number, Phone Number, Time From */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Service Number</Label>
+                      <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Phone Number (3-Dig)</Label>
+                      <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Time From</Label>
+                      <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} required />
+                    </div>
+
+                    {/* Row 4: Time To and Checkboxes */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Time To</Label>
+                      <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} required />
+                    </div>
+                    
+                    <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-y-3 pt-6 border-t md:border-t-0">
+                      {[
+                        { id: 'isTeamsRelated', label: 'Teams' },
+                        { id: 'isTicketerRelated', label: 'Ticketer' },
+                        { id: 'isEPMRelated', label: 'EPM' },
+                        { id: 'isIRRelated', label: 'IR' },
+                        { id: 'isTSIRelated', label: 'TSI' },
+                        { id: 'isDriverReportRelated', label: 'Driver Report' },
+                      ].map(item => (
+                        <div key={item.id} className="flex items-center space-x-2">
+                          <Checkbox id={item.id} checked={(formData as any)[item.id]} onCheckedChange={(v) => handleCheckboxChange(item.id, !!v)} />
+                          <label htmlFor={item.id} className="text-xs font-bold cursor-pointer text-foreground/80">{item.label}</label>
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs font-black uppercase text-muted-foreground">Time To</Label>
-                          <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} required />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-y-3 pt-2">
-                        {[
-                          { id: 'isTeamsRelated', label: 'Teams' },
-                          { id: 'isTicketerRelated', label: 'Ticketer' },
-                          { id: 'isEPMRelated', label: 'EPM' },
-                          { id: 'isIRRelated', label: 'IR' },
-                          { id: 'isTSIRelated', label: 'TSI' },
-                          { id: 'isDriverReportRelated', label: 'Driver Report' },
-                        ].map(item => (
-                          <div key={item.id} className="flex items-center space-x-2">
-                            <Checkbox id={item.id} checked={(formData as any)[item.id]} onCheckedChange={(v) => handleCheckboxChange(item.id, !!v)} />
-                            <label htmlFor={item.id} className="text-xs font-bold cursor-pointer text-foreground/80">{item.label}</label>
-                          </div>
-                        ))}
-                      </div>
+                      ))}
                     </div>
                   </div>
 
@@ -354,9 +355,22 @@ export default function CallLogsPage() {
 
         {/* History Section */}
         <div className="space-y-6">
-          <div className="flex items-center justify-between border-b pb-4">
-            <h2 className="text-2xl font-black tracking-tighter uppercase">Recent Operational History</h2>
-            {logs && logs.length > 0 && <Badge className="font-black bg-primary text-primary-foreground">{logs.length} RECORDS</Badge>}
+          <div className="flex flex-col gap-4 border-b pb-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-black tracking-tighter uppercase">Recent Operational History</h2>
+              {logs && logs.length > 0 && <Badge className="font-black bg-primary text-primary-foreground">{logs.length} RECORDS</Badge>}
+            </div>
+            
+            {/* Search Functionality */}
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search by Employee, Fleet, or Running Board..." 
+                className="pl-10 h-10 bg-muted/20 border-primary/10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
 
           {isLoading ? (
@@ -364,9 +378,9 @@ export default function CallLogsPage() {
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
               <p className="font-black text-xs uppercase tracking-widest opacity-50">Syncing Secure Logs...</p>
             </div>
-          ) : logs && logs.length > 0 ? (
+          ) : filteredLogs.length > 0 ? (
             <div className="grid grid-cols-1 gap-4">
-              {logs.map((log) => (
+              {filteredLogs.map((log) => (
                 <Card key={log.id} className="overflow-hidden border-l-4 border-l-primary hover:shadow-md transition-all">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col md:flex-row justify-between gap-6">
@@ -489,10 +503,19 @@ export default function CallLogsPage() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-32 text-muted-foreground border-4 border-dashed rounded-2xl bg-muted/5">
-              <Plus className="h-16 w-16 opacity-10 mb-4" />
-              <p className="font-black text-sm uppercase tracking-[0.3em] opacity-40">No shift logs found</p>
-              {!showForm && (
+              {searchQuery ? (
+                <Search className="h-16 w-16 opacity-10 mb-4" />
+              ) : (
+                <Plus className="h-16 w-16 opacity-10 mb-4" />
+              )}
+              <p className="font-black text-sm uppercase tracking-[0.3em] opacity-40">
+                {searchQuery ? 'No matching logs' : 'No shift logs found'}
+              </p>
+              {!showForm && !searchQuery && (
                 <Button variant="link" onClick={handleStartNewEntry} className="mt-2 font-bold">Create first entry now</Button>
+              )}
+              {searchQuery && (
+                <Button variant="link" onClick={() => setSearchQuery('')} className="mt-2 font-bold">Clear search filter</Button>
               )}
             </div>
           )}
