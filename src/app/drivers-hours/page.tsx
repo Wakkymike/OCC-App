@@ -1,19 +1,21 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking, addDocumentNonBlocking, useUser } from '@/firebase';
 import { collection, serverTimestamp, query, orderBy, limit, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText, Info } from 'lucide-react';
+import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText, Info, ChevronDown, ChevronUp, FileDown, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Custom Steering Wheel Icon
 const SteeringWheelIcon = ({ className }: { className?: string }) => (
@@ -60,10 +62,13 @@ const LIMIT_DAILY_DRIVING_MINS = 10 * 60; // 600 mins
 const LIMIT_SHIFT_MINS = 16 * 60; // 960 mins
 
 export default function DriversHoursPage() {
+  const { user } = useUser();
   const [driverName, setDriverName] = useState('');
   const [employeeNumber, setEmployeeNumber] = useState('');
   const [segments, setSegments] = useState<DrivingSegment[]>([{ start: '', end: '', type: 'driving' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -87,6 +92,16 @@ export default function DriversHoursPage() {
     const newSegments = [...segments];
     (newSegments[index][field] as string) = value;
     setSegments(newSegments);
+  };
+
+  const toggleRow = (id: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedRows(newExpanded);
   };
 
   const calculations = useMemo(() => {
@@ -159,7 +174,7 @@ export default function DriversHoursPage() {
     const recordData = {
         driverName,
         employeeNumber,
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toLocaleDateString('en-GB'),
         segments,
         totalDrivingMinutes: calculations.totalDrivingMinutes,
         totalShiftMinutes: calculations.totalShiftMinutes,
@@ -179,6 +194,66 @@ export default function DriversHoursPage() {
         .finally(() => {
             setIsSubmitting(false);
         });
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!history || history.length === 0) {
+      toast({ variant: 'destructive', title: 'No Data', description: 'No history records found to export.' });
+      return;
+    }
+
+    setIsExporting(true);
+    const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
+    
+    try {
+      const img = new Image();
+      img.src = '/logo.jpg';
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
+      if (img.complete && img.width > 0) {
+        doc.addImage(img, 'JPEG', 10, 10, 40, 12);
+      }
+    } catch (e) {}
+
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Operational Drivers Hours Log', 60, 18);
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Exported by: ${user?.displayName || user?.email}`, 60, 24);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 60, 29);
+
+    const tableData = history.map(record => {
+      const timeline = record.segments.map(s => `${s.start}-${s.end} [${s.type === 'driving' ? 'D' : 'B'}]`).join(', ');
+      return [
+        record.date,
+        record.driverName,
+        record.employeeNumber,
+        formatMins(record.totalDrivingMinutes),
+        formatMins(record.totalShiftMinutes),
+        record.hasBreach ? 'BREACH' : 'COMPLIANT',
+        timeline
+      ];
+    });
+
+    autoTable(doc, {
+      startY: 40,
+      head: [['Date', 'Driver', 'ID', 'Driving Time', 'Shift Time', 'Status', 'Timeline']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [33, 150, 243], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        6: { cellWidth: 80 }
+      }
+    });
+
+    doc.save(`Drivers-Hours-Export-${new Date().getTime()}.pdf`);
+    setIsExporting(false);
+    toast({ title: 'PDF Exported' });
   };
 
   const handleDeleteRecord = (id: string) => {
@@ -451,7 +526,13 @@ export default function DriversHoursPage() {
               <History className="h-5 w-5 text-muted-foreground" />
               <CardTitle>Drivers Hours Log</CardTitle>
             </div>
-            <Badge variant="outline" className="text-[10px] uppercase font-bold">Latest 50 Records</Badge>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isExporting || !history?.length}>
+                {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                Download Full Log (PDF)
+              </Button>
+              <Badge variant="outline" className="text-[10px] uppercase font-bold">Latest 50 Records</Badge>
+            </div>
           </CardHeader>
           <CardContent>
             {isHistoryLoading ? (
@@ -463,6 +544,7 @@ export default function DriversHoursPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]"></TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Driver</TableHead>
                     <TableHead>Driving Time</TableHead>
@@ -472,38 +554,78 @@ export default function DriversHoursPage() {
                 </TableHeader>
                 <TableBody>
                   {history.map((record) => (
-                    <TableRow key={record.id} className="group">
-                      <TableCell className="text-[10px] font-mono text-muted-foreground">{record.date}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-sm text-foreground">{record.driverName}</span>
-                          <span className="text-[10px] text-muted-foreground">ID: {record.employeeNumber}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-semibold">{formatMins(record.totalDrivingMinutes)} total</span>
-                            <span className="text-[10px] text-muted-foreground italic">Cont. Driving: {formatMins(record.maxContinuousMins)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {record.hasBreach ? (
-                          <Badge variant="destructive" className="font-black text-[10px]">BREACH</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 text-[10px]">COMPLIANT</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => handleDeleteRecord(record.id)} 
-                            className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                    <Fragment key={record.id}>
+                      <TableRow className="group">
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleRow(record.id)}>
+                            {expandedRows.has(record.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="text-[10px] font-mono text-muted-foreground">{record.date}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm text-foreground">{record.driverName}</span>
+                            <span className="text-[10px] text-muted-foreground">ID: {record.employeeNumber}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-0.5">
+                              <span className="text-sm font-semibold">{formatMins(record.totalDrivingMinutes)} total</span>
+                              <span className="text-[10px] text-muted-foreground italic">Cont. Driving: {formatMins(record.maxContinuousMins)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {record.hasBreach ? (
+                            <Badge variant="destructive" className="font-black text-[10px]">BREACH</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 text-[10px]">COMPLIANT</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleDeleteRecord(record.id)} 
+                              className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      {expandedRows.has(record.id) && (
+                        <TableRow className="bg-muted/30 border-l-4 border-primary">
+                          <TableCell colSpan={6} className="p-4">
+                            <div className="space-y-3">
+                              <p className="font-black text-[10px] uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                                <Clock className="h-3 w-3" />
+                                Shift Timeline Details
+                              </p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                {record.segments.map((seg, idx) => (
+                                  <div key={idx} className="flex items-center justify-between p-2.5 rounded border bg-background shadow-sm">
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-muted-foreground font-bold uppercase">{seg.type}</span>
+                                      <span className="font-mono text-sm font-black">{seg.start} - {seg.end}</span>
+                                    </div>
+                                    <Badge variant={seg.type === 'break' ? 'secondary' : 'outline'} className="text-[8px] font-black h-5">
+                                      {seg.type.substring(0, 1).toUpperCase()}
+                                    </Badge>
+                                  </div>
+                                ))}
+                              </div>
+                              {record.hasBreach && (
+                                <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                                  <p className="text-[10px] font-bold text-destructive uppercase mb-1">Identified Violations:</p>
+                                  <ul className="text-xs font-medium text-destructive list-disc list-inside">
+                                    {record.breachTypes.map((b, i) => <li key={i}>{b}</li>)}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
