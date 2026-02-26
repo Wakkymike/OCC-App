@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History, Pencil, Smile, Bold, Italic, Underline, Palette, Type } from 'lucide-react';
+import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History, Pencil, Smile, Bold, Italic, Underline, Palette, Type, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc, addDocumentNonBlocking, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
@@ -416,6 +416,7 @@ function NetworkUpdateManagement() {
     const [details, setDetails] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [isFormVisible, setIsFormVisible] = useState(false);
     const editorRef = useRef<HTMLDivElement>(null);
 
     const updatesQuery = useMemoFirebase(() => collection(firestore, 'networkUpdates'), [firestore]);
@@ -437,6 +438,7 @@ function NetworkUpdateManagement() {
             setTitle('');
             setDetails('');
             setEditingId(null);
+            setIsFormVisible(false);
             setIsSubmitting(false);
         } else {
             const colRef = collection(firestore, 'networkUpdates');
@@ -447,6 +449,7 @@ function NetworkUpdateManagement() {
                 .then(() => {
                     toast({ title: 'Update Added' });
                     setTitle(''); setDetails('');
+                    setIsFormVisible(false);
                 })
                 .finally(() => {
                     setIsSubmitting(false);
@@ -458,6 +461,7 @@ function NetworkUpdateManagement() {
         setTitle(update.title);
         setDetails(update.details);
         setEditingId(update.id);
+        setIsFormVisible(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -465,6 +469,7 @@ function NetworkUpdateManagement() {
         setTitle('');
         setDetails('');
         setEditingId(null);
+        setIsFormVisible(false);
     };
 
     const insertEmoji = (emoji: string) => {
@@ -480,59 +485,68 @@ function NetworkUpdateManagement() {
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center gap-3">
-                    <Rss className="h-6 w-6" />
-                    <CardTitle className="text-xl">Network Update Management</CardTitle>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <Rss className="h-6 w-6" />
+                        <CardTitle className="text-xl">Network Update Management</CardTitle>
+                    </div>
+                    {!isFormVisible && !editingId && (
+                        <Button onClick={() => setIsFormVisible(true)} size="sm">
+                            <Plus className="mr-2 h-4 w-4" /> Create Update
+                        </Button>
+                    )}
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
-                <form onSubmit={handleSubmit} className={`space-y-4 p-4 border rounded-lg ${editingId ? 'bg-primary/5 border-primary/20' : ''}`}>
-                    <div className="flex items-center justify-between">
-                        <Label className="font-bold text-sm uppercase tracking-wider">{editingId ? 'Edit Network Update' : 'Create New Update'}</Label>
-                        {editingId && (
-                            <Button type="button" variant="ghost" size="sm" onClick={handleCancelEdit}>Cancel</Button>
-                        )}
-                    </div>
-                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Update Title" required disabled={isSubmitting} />
-                    
-                    <div className="space-y-2 relative">
+                {(isFormVisible || editingId) && (
+                    <form onSubmit={handleSubmit} className={`space-y-4 p-4 border rounded-lg animate-in fade-in slide-in-from-top-2 duration-300 ${editingId ? 'bg-primary/5 border-primary/20' : ''}`}>
                         <div className="flex items-center justify-between">
-                            <Label className="text-xs text-muted-foreground font-bold">Details & Information</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button type="button" variant="outline" size="sm" className="h-7 px-2">
-                                        <Smile className="h-4 w-4 mr-1" /> Emojis
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-64 p-2" side="top">
-                                    <div className="grid grid-cols-5 gap-1">
-                                        {TRANSPORT_EMOJIS.map(emoji => (
-                                            <button 
-                                                key={emoji} 
-                                                type="button"
-                                                onClick={() => insertEmoji(emoji)}
-                                                className="text-xl hover:bg-accent p-1 rounded transition-colors"
-                                            >
-                                                {emoji}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
+                            <Label className="font-bold text-sm uppercase tracking-wider">{editingId ? 'Edit Network Update' : 'Create New Update'}</Label>
+                            {(editingId || isFormVisible) && (
+                                <Button type="button" variant="ghost" size="sm" onClick={handleCancelEdit}>Cancel</Button>
+                            )}
                         </div>
+                        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Update Title" required disabled={isSubmitting} />
                         
-                        <RichTextEditor 
-                            value={details} 
-                            onChange={setDetails} 
-                            placeholder="Enter detailed network alert here..."
-                            editorRef={editorRef}
-                        />
-                    </div>
+                        <div className="space-y-2 relative">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs text-muted-foreground font-bold">Details & Information</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button type="button" variant="outline" size="sm" className="h-7 px-2">
+                                            <Smile className="h-4 w-4 mr-1" /> Emojis
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-64 p-2" side="top">
+                                        <div className="grid grid-cols-5 gap-1">
+                                            {TRANSPORT_EMOJIS.map(emoji => (
+                                                <button 
+                                                    key={emoji} 
+                                                    type="button"
+                                                    onClick={() => insertEmoji(emoji)}
+                                                    className="text-xl hover:bg-accent p-1 rounded transition-colors"
+                                                >
+                                                    {emoji}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            
+                            <RichTextEditor 
+                                value={details} 
+                                onChange={setDetails} 
+                                placeholder="Enter detailed network alert here..."
+                                editorRef={editorRef}
+                            />
+                        </div>
 
-                    <Button type="submit" disabled={isSubmitting} className="w-full">
-                        {editingId ? 'Save Changes' : 'Add Update'}
-                    </Button>
-                </form>
+                        <Button type="submit" disabled={isSubmitting} className="w-full">
+                            {editingId ? 'Save Changes' : 'Add Update'}
+                        </Button>
+                    </form>
+                )}
                 
                 <div className="space-y-4">
                     {isLoading ? (
