@@ -132,10 +132,9 @@ export default function CallLogsPage() {
   };
 
   const handleStartNewEntry = () => {
-    const now = new Date();
     setFormData({
-      date: format(now, 'dd/MM/yyyy'),
-      callTime: format(now, 'HH:mm'),
+      date: '',
+      callTime: '',
       employeeNumber: '',
       fleetNumber: '',
       runningBoard: '',
@@ -232,7 +231,7 @@ export default function CallLogsPage() {
     setIsExporting(true);
     const doc = new jsPDF();
     
-    // Add Logo to top left - Using logo.jpg as requested
+    // Add Logo to top left
     try {
       const logoUrl = '/logo.jpg';
       const img = new Image();
@@ -241,13 +240,11 @@ export default function CallLogsPage() {
         img.onload = resolve;
         img.onerror = reject;
       });
-      // Position logo at top left: x=10, y=10
       doc.addImage(img, 'JPEG', 10, 10, 40, 12);
     } catch (e) {
       console.warn("PDF Logo could not be loaded, skipping.");
     }
 
-    // Title and Info - Shifted right to accommodate logo
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text('Operational Call Log Report', 60, 18);
@@ -258,9 +255,7 @@ export default function CallLogsPage() {
     doc.text(`Date: ${new Date().toLocaleString()}`, 60, 29);
     doc.text(`Total Records: ${filteredLogs.length}`, 60, 34);
 
-    // Table mapping - Reordered so Details comes before Tags
     const tableData = filteredLogs.map(log => {
-      // Collect active tags
       const activeTags = [];
       if (log.isTeamsRelated) activeTags.push('Teams');
       if (log.isTicketerRelated) activeTags.push('Ticketer');
@@ -277,8 +272,8 @@ export default function CallLogsPage() {
         log.fleetNumber,
         log.runningBoard || '--',
         log.serviceNumber,
-        log.details, // Details Column (Index 7)
-        activeTags.join(', ') || '--', // Tags Column (Index 8)
+        log.details,
+        activeTags.join(', ') || '--',
       ];
     });
 
@@ -290,8 +285,8 @@ export default function CallLogsPage() {
       headStyles: { fillColor: [33, 150, 243], fontSize: 8 },
       bodyStyles: { fontSize: 7 },
       columnStyles: {
-        7: { cellWidth: 50 }, // Details column (larger)
-        8: { cellWidth: 30 }  // Tags column
+        7: { cellWidth: 50 },
+        8: { cellWidth: 30 }
       }
     });
 
@@ -364,7 +359,6 @@ export default function CallLogsPage() {
               <form onSubmit={handleSubmit}>
                 <CardContent className="pt-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Ordered sequence as requested */}
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Date</Label>
                       <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} required />
@@ -375,29 +369,29 @@ export default function CallLogsPage() {
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Employee Number</Label>
-                      <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
+                      <Input name="employeeNumber" value={formData.employeeNumber} onChange={handleInputChange} required />
                     </div>
 
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Depot</Label>
-                      <Input name="depot" placeholder="BOLTON" value={formData.depot} onChange={handleInputChange} required />
+                      <Input name="depot" value={formData.depot} onChange={handleInputChange} required />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Fleet Number</Label>
-                      <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
+                      <Input name="fleetNumber" value={formData.fleetNumber} onChange={handleInputChange} required />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Running Board</Label>
-                      <Input name="runningBoard" placeholder="1234" value={formData.runningBoard} onChange={handleInputChange} required />
+                      <Input name="runningBoard" value={formData.runningBoard} onChange={handleInputChange} required />
                     </div>
 
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Service Number</Label>
-                      <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
+                      <Input name="serviceNumber" value={formData.serviceNumber} onChange={handleInputChange} required />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Phone Number (3-Dig)</Label>
-                      <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
+                      <Input name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} required />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Time From</Label>
@@ -429,7 +423,7 @@ export default function CallLogsPage() {
 
                   <div className="space-y-2 mt-6">
                     <Label className="text-xs font-black uppercase text-muted-foreground">Event Details</Label>
-                    <Textarea name="details" placeholder="Operational notes..." value={formData.details} onChange={handleInputChange} required className="min-h-[100px] bg-background" />
+                    <Textarea name="details" value={formData.details} onChange={handleInputChange} required className="min-h-[100px] bg-background" />
                   </div>
                 </CardContent>
                 <CardFooter className="bg-muted/20 py-4 px-6 mt-6 rounded-b-lg">
@@ -451,7 +445,6 @@ export default function CallLogsPage() {
               {logs && logs.length > 0 && <Badge className="font-black bg-primary text-primary-foreground">{logs.length} RECORDS</Badge>}
             </div>
             
-            {/* Optimized Category Search Functionality */}
             <div className="flex flex-col sm:flex-row gap-2 w-full max-w-2xl">
               <div className="flex-grow relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -491,7 +484,6 @@ export default function CallLogsPage() {
                 <Card key={log.id} className="overflow-hidden border-l-4 border-l-primary hover:shadow-md transition-all">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col md:flex-row justify-between gap-6">
-                      {/* Left Column: Identifiers */}
                       <div className="space-y-4 flex-shrink-0 w-full md:w-48 border-r md:pr-6">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 text-primary">
@@ -515,7 +507,6 @@ export default function CallLogsPage() {
                         </div>
                       </div>
 
-                      {/* Middle Column: Operational Info */}
                       <div className="flex-grow space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                           <div className="space-y-1">
@@ -571,7 +562,6 @@ export default function CallLogsPage() {
                         </div>
                       </div>
 
-                      {/* Right Column: Tags & Management */}
                       <div className="flex flex-col justify-between w-full md:w-44 gap-4 border-l md:pl-6">
                         <div className="flex flex-wrap gap-1.5 content-start">
                           {log.isTeamsRelated && <Badge className="bg-blue-600 hover:bg-blue-600 text-[8px] font-black h-5">TEAMS</Badge>}
