@@ -90,6 +90,12 @@ export default function CallLogsPage() {
       return;
     }
 
+    // Force Depot to all capitals
+    if (name === 'depot') {
+      setFormData(prev => ({ ...prev, [name]: value.toUpperCase() }));
+      return;
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -333,7 +339,7 @@ export default function CallLogsPage() {
                             <Building2 className="h-3 w-3" />
                             <span className="text-[10px] uppercase font-black tracking-widest">Depot</span>
                           </div>
-                          <div className="text-xl font-black text-foreground truncate leading-none" title={log.depot}>
+                          <div className="text-xl font-black text-foreground truncate leading-none uppercase" title={log.depot}>
                             {log.depot}
                           </div>
                         </div>
