@@ -337,7 +337,7 @@ export default function CallLogsPage() {
                         <div className="space-y-1 pt-2 border-t">
                           <div className="flex items-center gap-1.5 text-muted-foreground">
                             <Building2 className="h-3 w-3" />
-                            <span className="text-[10px] uppercase font-black tracking-widest">Depot</span>
+                            <span className="text-xs uppercase font-black tracking-widest">Depot</span>
                           </div>
                           <div className="text-xl font-black text-foreground truncate leading-none uppercase" title={log.depot}>
                             {log.depot}
@@ -349,35 +349,35 @@ export default function CallLogsPage() {
                       <div className="flex-grow space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                           <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Fleet Number</Label>
+                            <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Fleet Number</Label>
                             <div className="flex items-center gap-2 font-bold text-sm">
                               <Bus className="h-3.5 w-3.5 text-primary" />
                               <span>{log.fleetNumber}</span>
                             </div>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Employee</Label>
+                            <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Employee</Label>
                             <div className="flex items-center gap-2 font-bold text-sm">
                               <UserIcon className="h-3.5 w-3.5 text-primary" />
                               <span>{log.employeeNumber}</span>
                             </div>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Service</Label>
+                            <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Service</Label>
                             <div className="flex items-center gap-2 font-bold text-sm">
                               <Hash className="h-3.5 w-3.5 text-primary" />
                               <span>{log.serviceNumber}</span>
                             </div>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Phone Number</Label>
+                            <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Phone Number</Label>
                             <div className="flex items-center gap-2 font-bold text-sm">
                               <Phone className="h-3.5 w-3.5 text-primary" />
                               <span>{log.phoneNumber}</span>
                             </div>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Window</Label>
+                            <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Window</Label>
                             <div className="flex items-center gap-2 font-mono text-xs">
                               <Badge variant="outline" className="rounded-sm font-black">{log.timeFrom}</Badge>
                               <span className="text-muted-foreground font-bold">-</span>
@@ -387,7 +387,7 @@ export default function CallLogsPage() {
                         </div>
 
                         <div className="space-y-1 pt-2">
-                          <Label className="text-[10px] uppercase font-black text-muted-foreground tracking-widest">Incident Narrative</Label>
+                          <Label className="text-xs uppercase font-black text-muted-foreground tracking-widest">Incident Narrative</Label>
                           <div className="text-sm text-foreground bg-muted/20 p-4 rounded-lg border border-dashed border-primary/20 leading-relaxed italic">
                             {log.details || "No details recorded."}
                           </div>
