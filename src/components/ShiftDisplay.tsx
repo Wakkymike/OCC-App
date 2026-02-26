@@ -362,7 +362,7 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8" disabled={isExporting}>
                     {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                    Download PDF
+                    Download worked shifts PDF
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
