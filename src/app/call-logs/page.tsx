@@ -362,46 +362,46 @@ export default function CallLogsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Date</Label>
-                      <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} required />
+                      <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Time</Label>
-                      <Input type="time" name="callTime" value={formData.callTime} onChange={handleInputChange} required />
+                      <Input type="time" name="callTime" value={formData.callTime} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Employee Number</Label>
-                      <Input name="employeeNumber" value={formData.employeeNumber} onChange={handleInputChange} required />
+                      <Input name="employeeNumber" value={formData.employeeNumber} onChange={handleInputChange} />
                     </div>
 
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Depot</Label>
-                      <Input name="depot" value={formData.depot} onChange={handleInputChange} required />
+                      <Input name="depot" value={formData.depot} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Fleet Number</Label>
-                      <Input name="fleetNumber" value={formData.fleetNumber} onChange={handleInputChange} required />
+                      <Input name="fleetNumber" value={formData.fleetNumber} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Running Board</Label>
-                      <Input name="runningBoard" value={formData.runningBoard} onChange={handleInputChange} required />
+                      <Input name="runningBoard" value={formData.runningBoard} onChange={handleInputChange} />
                     </div>
 
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Service Number</Label>
-                      <Input name="serviceNumber" value={formData.serviceNumber} onChange={handleInputChange} required />
+                      <Input name="serviceNumber" value={formData.serviceNumber} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Phone Number (3-Dig)</Label>
-                      <Input name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} required />
+                      <Input name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Time From</Label>
-                      <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} required />
+                      <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} />
                     </div>
 
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Time To</Label>
-                      <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} required />
+                      <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} />
                     </div>
 
                     {/* Checkboxes Row */}
@@ -424,7 +424,7 @@ export default function CallLogsPage() {
 
                   <div className="space-y-2 mt-6">
                     <Label className="text-xs font-black uppercase text-muted-foreground">Event Details</Label>
-                    <Textarea name="details" value={formData.details} onChange={handleInputChange} required className="min-h-[100px] bg-background" />
+                    <Textarea name="details" value={formData.details} onChange={handleInputChange} className="min-h-[100px] bg-background" />
                   </div>
                 </CardContent>
                 <CardFooter className="bg-muted/20 py-4 px-6 mt-6 rounded-b-lg">
