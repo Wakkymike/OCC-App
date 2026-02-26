@@ -1,4 +1,3 @@
-@import 'react-quill/dist/quill.snow.css';
 
 @tailwind base;
 @tailwind components;
@@ -188,18 +187,4 @@
 
 .animate-bounce-zoom {
   animation: bounce-zoom 2s infinite;
-}
-
-/* Custom Editor Styling */
-.quill {
-  @apply bg-background border rounded-md;
-}
-.ql-toolbar.ql-snow {
-  @apply border-none border-b bg-muted/20 rounded-t-md;
-}
-.ql-container.ql-snow {
-  @apply border-none min-h-[150px];
-}
-.ql-editor {
-  @apply text-base;
 }

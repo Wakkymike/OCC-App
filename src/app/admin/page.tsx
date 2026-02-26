@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History, Pencil, Smile } from 'lucide-react';
+import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History, Pencil, Smile, Bold, Italic, Underline, Palette, Type } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc, addDocumentNonBlocking, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
@@ -27,14 +27,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
-import dynamic from 'next/dynamic';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-
-// Dynamic import for ReactQuill to avoid SSR issues
-const ReactQuill = dynamic(() => import('react-quill'), { 
-  ssr: false,
-  loading: () => <div className="h-[200px] w-full bg-muted animate-pulse rounded-md" />
-});
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface UserProfile {
   id: string;
@@ -335,17 +329,85 @@ function GeofenceManagement() {
     )
 }
 
-const QUILL_MODULES = {
-  toolbar: [
-    [{ 'font': [] }],
-    [{ 'size': ['small', false, 'large', 'huge'] }],
-    ['bold', 'italic', 'underline'],
-    [{ 'color': [] }, { 'background': [] }],
-    ['clean']
-  ],
-};
-
 const TRANSPORT_EMOJIS = ['🚌', '🚍', '🛑', '⚠️', '🚧', '🕒', '📅', '📍', '📢', '🔧', '🚦', '🏁', '✅', '❌', 'ℹ️', '🆘', '🛠️', '💧', '❄️', '🔥'];
+
+/**
+ * Custom Native Rich Text Editor component.
+ * Uses contentEditable to avoid library dependency issues with React 19.
+ */
+function RichTextEditor({ value, onChange, placeholder, editorRef }: { value: string, onChange: (v: string) => void, placeholder: string, editorRef: React.RefObject<HTMLDivElement | null> }) {
+  
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
+    }
+  }, [value, editorRef]);
+
+  const handleInput = () => {
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML);
+    }
+  };
+
+  const exec = (cmd: string, val?: string) => {
+    if (typeof window !== 'undefined') {
+        document.execCommand(cmd, false, val);
+        handleInput();
+    }
+  };
+
+  return (
+    <div className="border rounded-md overflow-hidden bg-background">
+      <div className="flex flex-wrap items-center gap-1 p-1 bg-muted/20 border-b">
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => exec('bold')} title="Bold">
+            <Bold className="h-4 w-4" />
+        </Button>
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => exec('italic')} title="Italic">
+            <Italic className="h-4 w-4" />
+        </Button>
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => exec('underline')} title="Underline">
+            <Underline className="h-4 w-4" />
+        </Button>
+        <div className="w-px h-4 bg-border mx-1" />
+        <Select onValueChange={(v) => exec('foreColor', v)}>
+          <SelectTrigger className="h-8 w-[100px] text-[10px] font-bold uppercase">
+            <Palette className="h-3 w-3 mr-1" /> Color
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="inherit">Default</SelectItem>
+            <SelectItem value="#ef4444">Red</SelectItem>
+            <SelectItem value="#3b82f6">Blue</SelectItem>
+            <SelectItem value="#10b981">Green</SelectItem>
+            <SelectItem value="#f59e0b">Orange</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select onValueChange={(v) => exec('fontSize', v)}>
+          <SelectTrigger className="h-8 w-[100px] text-[10px] font-bold uppercase">
+            <Type className="h-3 w-3 mr-1" /> Size
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="2">Small</SelectItem>
+            <SelectItem value="3">Normal</SelectItem>
+            <SelectItem value="5">Large</SelectItem>
+            <SelectItem value="7">Huge</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div
+        ref={editorRef}
+        contentEditable
+        onInput={handleInput}
+        className="p-3 min-h-[150px] focus:outline-none rich-content text-sm"
+        style={{ whiteSpace: 'pre-wrap' }}
+      />
+      {(!value || value === '<br>') && (
+          <div className="absolute top-[100px] left-3 pointer-events-none text-muted-foreground/50 text-sm">
+              {placeholder}
+          </div>
+      )}
+    </div>
+  );
+}
 
 function NetworkUpdateManagement() {
     const firestore = useFirestore();
@@ -354,6 +416,7 @@ function NetworkUpdateManagement() {
     const [details, setDetails] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const editorRef = useRef<HTMLDivElement>(null);
 
     const updatesQuery = useMemoFirebase(() => collection(firestore, 'networkUpdates'), [firestore]);
     const { data: allUpdates, isLoading } = useCollection<NetworkUpdate>(updatesQuery);
@@ -405,7 +468,13 @@ function NetworkUpdateManagement() {
     };
 
     const insertEmoji = (emoji: string) => {
-        setDetails(prev => prev + emoji);
+        if (editorRef.current) {
+            editorRef.current.focus();
+            document.execCommand('insertText', false, emoji);
+            setDetails(editorRef.current.innerHTML);
+        } else {
+            setDetails(prev => prev + emoji);
+        }
     };
 
     return (
@@ -426,7 +495,7 @@ function NetworkUpdateManagement() {
                     </div>
                     <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Update Title" required disabled={isSubmitting} />
                     
-                    <div className="space-y-2">
+                    <div className="space-y-2 relative">
                         <div className="flex items-center justify-between">
                             <Label className="text-xs text-muted-foreground font-bold">Details & Information</Label>
                             <Popover>
@@ -435,7 +504,7 @@ function NetworkUpdateManagement() {
                                         <Smile className="h-4 w-4 mr-1" /> Emojis
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-64 p-2">
+                                <PopoverContent className="w-64 p-2" side="top">
                                     <div className="grid grid-cols-5 gap-1">
                                         {TRANSPORT_EMOJIS.map(emoji => (
                                             <button 
@@ -451,15 +520,13 @@ function NetworkUpdateManagement() {
                                 </PopoverContent>
                             </Popover>
                         </div>
-                        <div className="rounded-md border overflow-hidden">
-                            <ReactQuill 
-                                theme="snow" 
-                                value={details} 
-                                onChange={setDetails} 
-                                modules={QUILL_MODULES}
-                                placeholder="Enter detailed network alert here..."
-                            />
-                        </div>
+                        
+                        <RichTextEditor 
+                            value={details} 
+                            onChange={setDetails} 
+                            placeholder="Enter detailed network alert here..."
+                            editorRef={editorRef}
+                        />
                     </div>
 
                     <Button type="submit" disabled={isSubmitting} className="w-full">
@@ -475,7 +542,7 @@ function NetworkUpdateManagement() {
                             <div className="flex-grow min-w-0">
                                 <p className="font-bold">{update.title}</p>
                                 <div 
-                                    className="text-xs text-muted-foreground line-clamp-2 mt-1"
+                                    className="text-xs text-muted-foreground line-clamp-2 mt-1 rich-content"
                                     dangerouslySetInnerHTML={{ __html: update.details }} 
                                 />
                             </div>
