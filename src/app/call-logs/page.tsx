@@ -132,9 +132,10 @@ export default function CallLogsPage() {
   };
 
   const handleStartNewEntry = () => {
+    const now = new Date();
     setFormData({
-      date: '',
-      callTime: '',
+      date: format(now, 'dd/MM/yyyy'),
+      callTime: format(now, 'HH:mm'),
       employeeNumber: '',
       fleetNumber: '',
       runningBoard: '',
