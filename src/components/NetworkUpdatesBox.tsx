@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -10,14 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 export default function NetworkUpdatesBox() {
   const firestore = useFirestore();
   
-  // Simplified query to fetch all documents. Filtering and sorting will be done client-side.
   const updatesQuery = useMemoFirebase(
     () => collection(firestore, 'networkUpdates'),
     [firestore]
   );
   const { data: allUpdates, isLoading } = useCollection<NetworkUpdate>(updatesQuery);
 
-  // Memoized client-side filtering and sorting.
   const updates = useMemo(() => {
     if (!allUpdates) return null;
     return allUpdates
@@ -35,17 +34,14 @@ export default function NetworkUpdatesBox() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // This effect manages the cycling of updates.
   useEffect(() => {
-    // When the list of updates changes, reset the ticker to show the first item.
     setCurrentIndex(0);
 
     if (updates && updates.length > 1) {
       const timer = setInterval(() => {
-        // Cycle to the next update. The modulo operator handles wrapping around.
         setCurrentIndex((prevIndex) => (prevIndex + 1) % updates.length);
       }, 25000); // 25 seconds
-      return () => clearInterval(timer); // Clean up the interval on unmount or when updates change.
+      return () => clearInterval(timer);
     }
   }, [updates]);
   
@@ -77,7 +73,10 @@ export default function NetworkUpdatesBox() {
         {!isLoading && currentUpdate && (
           <div key={currentUpdate.id} className="animate-scroll-up absolute inset-0 p-1">
             <h3 className="font-bold text-lg">{currentUpdate.title}</h3>
-            <p className="text-muted-foreground">{currentUpdate.details}</p>
+            <div 
+              className="text-muted-foreground rich-content"
+              dangerouslySetInnerHTML={{ __html: currentUpdate.details }}
+            />
           </div>
         )}
       </CardContent>

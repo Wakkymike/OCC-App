@@ -1,7 +1,10 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Quill Editor Styles */
+@import 'react-quill/dist/quill.snow.css';
 
 @layer base {
   :root {
@@ -83,6 +86,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Rich Text Content Resets for Ticker */
+.rich-content * {
+  margin: 0;
+  padding: 0;
+  display: inline;
+}
+
+.rich-content strong { font-weight: bold; }
+.rich-content em { font-style: italic; }
+.rich-content u { text-decoration: underline; }
 
 @layer utilities {
     @keyframes scroll-up {
@@ -176,4 +190,18 @@
 
 .animate-bounce-zoom {
   animation: bounce-zoom 2s infinite;
+}
+
+/* Custom Editor Styling */
+.quill {
+  @apply bg-background border rounded-md;
+}
+.ql-toolbar.ql-snow {
+  @apply border-none border-b bg-muted/20 rounded-t-md;
+}
+.ql-container.ql-snow {
+  @apply border-none min-h-[150px];
+}
+.ql-editor {
+  @apply text-base;
 }

@@ -1,12 +1,13 @@
+
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History, Pencil } from 'lucide-react';
+import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History, Pencil, Smile } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc, addDocumentNonBlocking, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
@@ -14,7 +15,6 @@ import { sendSignInLinkToEmail, User } from 'firebase/auth';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { NetworkUpdate, MonitoredHazard } from '@/lib/types';
-import { Textarea } from '@/components/ui/textarea';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +27,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
+import dynamic from 'next/dynamic';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
+// Dynamic import for ReactQuill to avoid SSR issues
+const ReactQuill = dynamic(() => import('react-quill'), { 
+  ssr: false,
+  loading: () => <div className="h-[200px] w-full bg-muted animate-pulse rounded-md" />
+});
 
 interface UserProfile {
   id: string;
@@ -327,6 +335,18 @@ function GeofenceManagement() {
     )
 }
 
+const QUILL_MODULES = {
+  toolbar: [
+    [{ 'font': [] }],
+    [{ 'size': ['small', false, 'large', 'huge'] }],
+    ['bold', 'italic', 'underline'],
+    [{ 'color': [] }, { 'background': [] }],
+    ['clean']
+  ],
+};
+
+const TRANSPORT_EMOJIS = ['🚌', '🚍', '🛑', '⚠️', '🚧', '🕒', '📅', '📍', '📢', '🔧', '🚦', '🏁', '✅', '❌', 'ℹ️', '🆘', '🛠️', '💧', '❄️', '🔥'];
+
 function NetworkUpdateManagement() {
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -375,7 +395,6 @@ function NetworkUpdateManagement() {
         setTitle(update.title);
         setDetails(update.details);
         setEditingId(update.id);
-        // Scroll to form if needed
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -383,6 +402,10 @@ function NetworkUpdateManagement() {
         setTitle('');
         setDetails('');
         setEditingId(null);
+    };
+
+    const insertEmoji = (emoji: string) => {
+        setDetails(prev => prev + emoji);
     };
 
     return (
@@ -401,20 +424,60 @@ function NetworkUpdateManagement() {
                             <Button type="button" variant="ghost" size="sm" onClick={handleCancelEdit}>Cancel</Button>
                         )}
                     </div>
-                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" required disabled={isSubmitting} />
-                    <Textarea value={details} onChange={(e) => setDetails(e.target.value)} placeholder="Details" required disabled={isSubmitting} />
+                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Update Title" required disabled={isSubmitting} />
+                    
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-xs text-muted-foreground font-bold">Details & Information</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button type="button" variant="outline" size="sm" className="h-7 px-2">
+                                        <Smile className="h-4 w-4 mr-1" /> Emojis
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64 p-2">
+                                    <div className="grid grid-cols-5 gap-1">
+                                        {TRANSPORT_EMOJIS.map(emoji => (
+                                            <button 
+                                                key={emoji} 
+                                                type="button"
+                                                onClick={() => insertEmoji(emoji)}
+                                                className="text-xl hover:bg-accent p-1 rounded transition-colors"
+                                            >
+                                                {emoji}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <div className="rounded-md border overflow-hidden">
+                            <ReactQuill 
+                                theme="snow" 
+                                value={details} 
+                                onChange={setDetails} 
+                                modules={QUILL_MODULES}
+                                placeholder="Enter detailed network alert here..."
+                            />
+                        </div>
+                    </div>
+
                     <Button type="submit" disabled={isSubmitting} className="w-full">
                         {editingId ? 'Save Changes' : 'Add Update'}
                     </Button>
                 </form>
+                
                 <div className="space-y-4">
                     {isLoading ? (
                         <div className="flex justify-center p-4"><Loader2 className="animate-spin" /></div>
                     ) : updates?.map(update => (
                         <div key={update.id} className="flex items-start gap-4 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                            <div className="flex-grow">
+                            <div className="flex-grow min-w-0">
                                 <p className="font-bold">{update.title}</p>
-                                <p className="text-sm text-muted-foreground">{update.details}</p>
+                                <div 
+                                    className="text-xs text-muted-foreground line-clamp-2 mt-1"
+                                    dangerouslySetInnerHTML={{ __html: update.details }} 
+                                />
                             </div>
                             <div className="flex items-center gap-1">
                                 <Button variant="ghost" size="icon" onClick={() => handleEdit(update)} title="Edit Entry">
