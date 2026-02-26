@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, deleteDocumentNonBlocking, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, serverTimestamp, doc, Timestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus, Hash, Building2 } from 'lucide-react';
+import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus, Hash, Building2, Pencil } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { subDays, format } from 'date-fns';
@@ -24,6 +24,7 @@ export default function CallLogsPage() {
   const hasCheckedRetention = useRef(false);
 
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     date: '',
     callTime: '',
@@ -123,6 +124,34 @@ export default function CallLogsPage() {
       isTSIRelated: false,
       isDriverReportRelated: false,
     });
+    setEditingId(null);
+    setShowForm(true);
+    
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  const handleEditLog = (log: CallLog) => {
+    setFormData({
+      date: log.date,
+      callTime: log.callTime,
+      employeeNumber: log.employeeNumber,
+      fleetNumber: log.fleetNumber,
+      serviceNumber: log.serviceNumber,
+      depot: log.depot,
+      phoneNumber: log.phoneNumber,
+      timeFrom: log.timeFrom,
+      timeTo: log.timeTo,
+      details: log.details,
+      isTeamsRelated: log.isTeamsRelated,
+      isTicketerRelated: log.isTicketerRelated,
+      isEPMRelated: log.isEPMRelated,
+      isIRRelated: log.isIRRelated,
+      isTSIRelated: log.isTSIRelated,
+      isDriverReportRelated: log.isDriverReportRelated,
+    });
+    setEditingId(log.id);
     setShowForm(true);
     
     setTimeout(() => {
@@ -135,18 +164,28 @@ export default function CallLogsPage() {
     if (!user || !callLogsRef) return;
 
     setIsSubmitting(true);
-    const logData = {
-      ...formData,
-      userId: user.uid,
-      createdAt: serverTimestamp(),
-    };
 
-    addDocumentNonBlocking(callLogsRef, logData)
-      .then(() => {
-        toast({ title: 'Log Saved', description: 'Call record added successfully.' });
-        setShowForm(false);
-      })
-      .finally(() => setIsSubmitting(false));
+    if (editingId) {
+      const logDocRef = doc(firestore, 'users', user.uid, 'callLogs', editingId);
+      updateDocumentNonBlocking(logDocRef, formData);
+      toast({ title: 'Log Updated', description: 'Changes saved successfully.' });
+      setShowForm(false);
+      setEditingId(null);
+      setIsSubmitting(false);
+    } else {
+      const logData = {
+        ...formData,
+        userId: user.uid,
+        createdAt: serverTimestamp(),
+      };
+
+      addDocumentNonBlocking(callLogsRef, logData)
+        .then(() => {
+          toast({ title: 'Log Saved', description: 'Call record added successfully.' });
+          setShowForm(false);
+        })
+        .finally(() => setIsSubmitting(false));
+    }
   };
 
   const handleDeleteSingle = (logId: string) => {
@@ -203,12 +242,12 @@ export default function CallLogsPage() {
               <CardHeader className="bg-muted/30 flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <Plus className="h-5 w-5 text-primary" />
-                    Record New Event
+                    {editingId ? <Pencil className="h-5 w-5 text-primary" /> : <Plus className="h-5 w-5 text-primary" />}
+                    {editingId ? 'Edit Operational Record' : 'Record New Event'}
                   </CardTitle>
                   <CardDescription>Populate all fields accurately for operational tracking.</CardDescription>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setShowForm(false)}>
+                <Button variant="ghost" size="icon" onClick={() => { setShowForm(false); setEditingId(null); }}>
                   <X className="h-4 w-4" />
                 </Button>
               </CardHeader>
@@ -219,21 +258,21 @@ export default function CallLogsPage() {
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Date</Label>
+                          <Label className="text-xs font-black uppercase text-muted-foreground">Date</Label>
                           <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} required />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Call Time</Label>
+                          <Label className="text-xs font-black uppercase text-muted-foreground">Call Time</Label>
                           <Input type="time" name="callTime" value={formData.callTime} onChange={handleInputChange} required />
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Emp No.</Label>
+                          <Label className="text-xs font-black uppercase text-muted-foreground">Emp No.</Label>
                           <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Phone No (3-Dig)</Label>
+                          <Label className="text-xs font-black uppercase text-muted-foreground">Phone No (3-Dig)</Label>
                           <Input name="phoneNumber" placeholder="999" value={formData.phoneNumber} onChange={handleInputChange} required />
                         </div>
                       </div>
@@ -243,17 +282,17 @@ export default function CallLogsPage() {
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Fleet No.</Label>
+                          <Label className="text-xs font-black uppercase text-muted-foreground">Fleet No.</Label>
                           <Input name="fleetNumber" placeholder="67001" value={formData.fleetNumber} onChange={handleInputChange} required />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Svc No.</Label>
+                          <Label className="text-xs font-black uppercase text-muted-foreground">Svc No.</Label>
                           <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Depot</Label>
-                        <Input name="depot" placeholder="Bolton" value={formData.depot} onChange={handleInputChange} required />
+                        <Label className="text-xs font-black uppercase text-muted-foreground">Depot</Label>
+                        <Input name="depot" placeholder="BOLTON" value={formData.depot} onChange={handleInputChange} required />
                       </div>
                     </div>
 
@@ -261,11 +300,11 @@ export default function CallLogsPage() {
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Time From</Label>
+                          <Label className="text-xs font-black uppercase text-muted-foreground">Time From</Label>
                           <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} required />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Time To</Label>
+                          <Label className="text-xs font-black uppercase text-muted-foreground">Time To</Label>
                           <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} required />
                         </div>
                       </div>
@@ -288,14 +327,14 @@ export default function CallLogsPage() {
                   </div>
 
                   <div className="space-y-2 mt-6">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground">Event Details</Label>
+                    <Label className="text-xs font-black uppercase text-muted-foreground">Event Details</Label>
                     <Textarea name="details" placeholder="Operational notes..." value={formData.details} onChange={handleInputChange} required className="min-h-[100px] bg-background" />
                   </div>
                 </CardContent>
                 <CardFooter className="bg-muted/20 py-4 px-6 mt-6 rounded-b-lg">
                   <Button type="submit" className="w-full font-bold h-12" disabled={isSubmitting}>
                     {isSubmitting ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
-                    Save Operational Record
+                    {editingId ? 'Save Changes' : 'Save Operational Record'}
                   </Button>
                 </CardFooter>
               </form>
@@ -405,15 +444,26 @@ export default function CallLogsPage() {
                           {log.isDriverReportRelated && <Badge variant="secondary" className="border border-foreground/30 text-[8px] font-black h-5">REPORT</Badge>}
                         </div>
                         
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 self-end font-bold text-xs mt-auto"
-                          onClick={() => handleDeleteSingle(log.id)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Record
-                        </Button>
+                        <div className="flex flex-col gap-2 mt-auto">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-muted-foreground hover:text-primary hover:bg-primary/10 font-bold text-xs justify-start"
+                            onClick={() => handleEditLog(log)}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Record
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-bold text-xs justify-start"
+                            onClick={() => handleDeleteSingle(log.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Record
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
