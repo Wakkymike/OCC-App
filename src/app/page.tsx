@@ -1,8 +1,8 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Map, Radio, Shield, Route, Loader2, ShieldAlert, Clock, Calendar, Coffee, ClipboardList } from 'lucide-react';
 import UserMenu from '@/components/auth/UserMenu';
@@ -13,6 +13,7 @@ import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval, isAfter } from 'date-fns';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export default function HomePage() {
   const { user, isUserLoading } = useUser();
@@ -54,6 +55,8 @@ export default function HomePage() {
   const isContentCreator = userProfile?.isContentCreator === true;
   const canAccessAdmin = isAdmin || isContentCreator;
 
+  const logoImage = PlaceHolderImages.find(img => img.id === 'app-logo');
+
   return (
     <div className="flex flex-col h-screen bg-background">
         <BreakingNewsTicker />
@@ -90,11 +93,18 @@ export default function HomePage() {
                         {isLoadingShifts && <div className="h-4 w-24 bg-muted animate-pulse rounded self-center" />}
                     </div>
 
-                    {/* Center: Main Title */}
+                    {/* Center: Main Title / Logo */}
                     <div className="text-center shrink-0 px-4">
-                        <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-6xl drop-shadow-sm">
-                        OCC App
-                        </h1>
+                        <h1 className="sr-only">OCC App</h1>
+                        <Image 
+                            src={logoImage?.imageUrl || 'https://picsum.photos/seed/occ-logo/400/120'}
+                            alt="OCC App Logo"
+                            width={400}
+                            height={120}
+                            priority
+                            className="mx-auto h-auto w-auto max-h-20 sm:max-h-28 drop-shadow-sm"
+                            data-ai-hint={logoImage?.imageHint || 'transport logo'}
+                        />
                         <p className="mt-4 text-lg leading-8 text-muted-foreground max-w-md mx-auto hidden sm:block">
                         Live bus tracking and service information.
                         </p>
