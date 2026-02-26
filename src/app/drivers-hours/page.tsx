@@ -450,7 +450,7 @@ export default function DriversHoursPage() {
                     </div>
                     <div className="h-3 w-full bg-white/50 rounded-full overflow-hidden border border-primary/5">
                       <div 
-                        className={`h-full transition-all duration-500 ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'bg-destructive' : 'bg-orange-50'}`}
+                        className={`h-full transition-all duration-500 ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'bg-destructive' : 'bg-orange-500'}`}
                         style={{ width: `${Math.min(100, (calculations.totalDrivingMinutes / LIMIT_DAILY_DRIVING_MINS) * 100)}%` }}
                       />
                     </div>
