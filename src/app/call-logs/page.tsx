@@ -258,7 +258,7 @@ export default function CallLogsPage() {
     doc.text(`Date: ${new Date().toLocaleString()}`, 60, 29);
     doc.text(`Total Records: ${filteredLogs.length}`, 60, 34);
 
-    // Table
+    // Table mapping - Reordered so Details comes before Tags
     const tableData = filteredLogs.map(log => {
       // Collect active tags
       const activeTags = [];
@@ -277,21 +277,21 @@ export default function CallLogsPage() {
         log.fleetNumber,
         log.runningBoard || '--',
         log.serviceNumber,
-        activeTags.join(', ') || '--', // Tags Column
-        log.details
+        log.details, // Details Column (Index 7)
+        activeTags.join(', ') || '--', // Tags Column (Index 8)
       ];
     });
 
     autoTable(doc, {
       startY: 45,
-      head: [['Date', 'Time', 'Emp', 'Depot', 'Fleet', 'RB', 'Svc', 'Tags', 'Details']],
+      head: [['Date', 'Time', 'Emp', 'Depot', 'Fleet', 'RB', 'Svc', 'Details', 'Tags']],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [33, 150, 243], fontSize: 8 },
       bodyStyles: { fontSize: 7 },
       columnStyles: {
-        7: { cellWidth: 30 }, // Tags column
-        8: { cellWidth: 50 }  // Details column
+        7: { cellWidth: 50 }, // Details column (larger)
+        8: { cellWidth: 30 }  // Tags column
       }
     });
 
