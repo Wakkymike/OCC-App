@@ -232,9 +232,9 @@ export default function CallLogsPage() {
     setIsExporting(true);
     const doc = new jsPDF();
     
-    // Add Logo to top left
+    // Add Logo to top left - Using logo.jpg as requested
     try {
-      const logoUrl = '/logo.png';
+      const logoUrl = '/logo.jpg';
       const img = new Image();
       img.src = logoUrl;
       await new Promise((resolve, reject) => {
@@ -242,7 +242,7 @@ export default function CallLogsPage() {
         img.onerror = reject;
       });
       // Position logo at top left: x=10, y=10
-      doc.addImage(img, 'PNG', 10, 10, 40, 12);
+      doc.addImage(img, 'JPEG', 10, 10, 40, 12);
     } catch (e) {
       console.warn("PDF Logo could not be loaded, skipping.");
     }
@@ -364,13 +364,13 @@ export default function CallLogsPage() {
               <form onSubmit={handleSubmit}>
                 <CardContent className="pt-6">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Row 1: Date, Time, Employee Number */}
+                    {/* Ordered sequence as requested */}
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Date</Label>
                       <Input name="date" placeholder="DD/MM/YYYY" value={formData.date} onChange={handleInputChange} required />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-xs font-black uppercase text-muted-foreground">Call Time</Label>
+                      <Label className="text-xs font-black uppercase text-muted-foreground">Time</Label>
                       <Input type="time" name="callTime" value={formData.callTime} onChange={handleInputChange} required />
                     </div>
                     <div className="space-y-2">
@@ -378,7 +378,6 @@ export default function CallLogsPage() {
                       <Input name="employeeNumber" placeholder="12345" value={formData.employeeNumber} onChange={handleInputChange} required />
                     </div>
 
-                    {/* Row 2: Depot, Fleet Number, Running Board */}
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Depot</Label>
                       <Input name="depot" placeholder="BOLTON" value={formData.depot} onChange={handleInputChange} required />
@@ -392,7 +391,6 @@ export default function CallLogsPage() {
                       <Input name="runningBoard" placeholder="1234" value={formData.runningBoard} onChange={handleInputChange} required />
                     </div>
 
-                    {/* Row 3: Service Number, Phone Number, Time From */}
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Service Number</Label>
                       <Input name="serviceNumber" placeholder="582" value={formData.serviceNumber} onChange={handleInputChange} required />
@@ -406,7 +404,6 @@ export default function CallLogsPage() {
                       <Input type="time" name="timeFrom" value={formData.timeFrom} onChange={handleInputChange} required />
                     </div>
 
-                    {/* Row 4: Time To */}
                     <div className="space-y-2">
                       <Label className="text-xs font-black uppercase text-muted-foreground">Time To</Label>
                       <Input type="time" name="timeTo" value={formData.timeTo} onChange={handleInputChange} required />
@@ -518,7 +515,7 @@ export default function CallLogsPage() {
                         </div>
                       </div>
 
-                      {/* Middle Column: Operational Info - Reordered Grid */}
+                      {/* Middle Column: Operational Info */}
                       <div className="flex-grow space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                           <div className="space-y-1">
