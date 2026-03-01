@@ -446,11 +446,11 @@ export default function DriversHoursPage() {
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
                       <span>Daily 10h Limit</span>
-                      <span className="text-orange-600">{formatMins(Math.max(0, LIMIT_DAILY_DRIVING_MINS - calculations.totalDrivingMinutes))} LEFT</span>
+                      <span className="text-orange-700 font-bold">{formatMins(Math.max(0, LIMIT_DAILY_DRIVING_MINS - calculations.totalDrivingMinutes))} LEFT</span>
                     </div>
-                    <div className="h-3 w-full bg-white/50 rounded-full overflow-hidden border border-primary/5">
+                    <div className="h-3 w-full bg-white/60 rounded-full overflow-hidden border border-primary/10 shadow-inner">
                       <div 
-                        className={`h-full transition-all duration-500 ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'bg-destructive' : 'bg-orange-500'}`}
+                        className={`h-full transition-all duration-500 ${calculations.totalDrivingMinutes > LIMIT_DAILY_DRIVING_MINS ? 'bg-destructive' : 'bg-orange-600'}`}
                         style={{ width: `${Math.min(100, (calculations.totalDrivingMinutes / LIMIT_DAILY_DRIVING_MINS) * 100)}%` }}
                       />
                     </div>
