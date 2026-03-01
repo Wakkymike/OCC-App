@@ -10,7 +10,7 @@ import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard } from '
 import SearchBar from '@/components/search-bar';
 import LocationSearchBar from '@/components/location-search-bar';
 import mapboxgl from 'mapbox-gl';
-import { Home, Layers3, Radio, ShieldPlus } from 'lucide-react';
+import { Home, Layers3, Radio, ShieldPlus, AlertOctagon } from 'lucide-react';
 import { buttonVariants, Button } from '@/components/ui/button';
 import Link from 'next/link';
 import MapControls from '@/components/map-controls';
@@ -22,6 +22,7 @@ import { useSearchParams } from 'next/navigation';
 import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 export default function Page() {
@@ -98,6 +99,9 @@ export default function Page() {
 
 
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
+
+  // Check for Mapbox Token availability
+  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 
   // Memoize last known position to avoid adding duplicate points
   const lastRecordedPosition = useMemo(() => {
@@ -439,6 +443,20 @@ export default function Page() {
         <LocationSearchBar onSearch={handleLocationSearch} onClear={handleLocationClear} />
         <SearchBar onSearch={handleBusSearch} onClear={handleBusClear} />
       </div>
+
+      {!mapboxToken && (
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4">
+          <Alert variant="destructive" className="bg-destructive text-destructive-foreground border-4 shadow-2xl">
+            <AlertOctagon className="h-6 w-6" />
+            <AlertTitle className="font-black text-lg">CONFIGURATION ERROR</AlertTitle>
+            <AlertDescription className="font-bold">
+              The Mapbox Access Token is missing from the environment variables. 
+              Please check your <code className="bg-black/20 px-1 rounded">.env</code> file or VPS dashboard.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       {(busError || roadworksError || hazardsError) && (
         <div className="absolute top-24 left-4 z-10 flex flex-col gap-2">
            {busError && <p className="text-destructive bg-card p-2 rounded-lg shadow-md">{busError}</p>}

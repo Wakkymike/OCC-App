@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -6,10 +7,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard } from '@/lib/types';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { doc, serverTimestamp, collection } from 'firebase/firestore';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN!;
 
 interface BusMapProps {
   buses: Bus[];
@@ -90,6 +89,7 @@ export default function BusMap({
   
   const [mapLoaded, setMapLoaded] = useState(false);
   const [styleRevision, setStyleRevision] = useState(0);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   const monitoredRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
   const { data: monitoredHazards } = useCollection<MonitoredHazard>(monitoredRef);
@@ -101,24 +101,45 @@ export default function BusMap({
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: mapStyle,
-      center: [-2.24, 53.48],
-      zoom: 13,
-      pitch: 45,
-      antialias: true,
-    });
+    // Safety check for Mapbox Token
+    const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+    if (!token) {
+      setConfigError("Mapbox token is missing. Map cannot be initialized.");
+      return;
+    }
 
-    mapRef.current = map;
-    map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+    try {
+      mapboxgl.accessToken = token;
+      const map = new mapboxgl.Map({
+        container: mapContainerRef.current,
+        style: mapStyle,
+        center: [-2.24, 53.48],
+        zoom: 13,
+        pitch: 45,
+        antialias: true,
+      });
 
-    map.on('load', () => setMapLoaded(true));
-    map.on('style.load', () => setStyleRevision(prev => prev + 1));
+      mapRef.current = map;
+      map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
+
+      map.on('load', () => setMapLoaded(true));
+      map.on('style.load', () => setStyleRevision(prev => prev + 1));
+      map.on('error', (e) => {
+        console.error("Mapbox internal error:", e);
+        if (e.error?.message?.includes('Invalid Access Token')) {
+          setConfigError("The provided Mapbox Access Token is invalid.");
+        }
+      });
+    } catch (err: any) {
+      console.error("Critical error during map initialization:", err);
+      setConfigError(err.message || "Failed to initialize Mapbox engine.");
+    }
     
     return () => {
-      map.remove();
-      mapRef.current = null;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
     };
   }, []);
 
@@ -443,7 +464,16 @@ export default function BusMap({
 
   return (
     <div className="absolute inset-0 w-full h-full bg-muted overflow-hidden">
-      {!mapLoaded && (
+      {configError && (
+        <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-background/90 text-center p-8">
+          <AlertCircle className="h-16 w-16 text-destructive mb-4" />
+          <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">Map Engine Offline</h2>
+          <p className="max-w-md text-muted-foreground font-bold">{configError}</p>
+          <p className="mt-4 text-xs opacity-50 italic">Verify your VPS environment variables and rebuild the application.</p>
+        </div>
+      )}
+      
+      {!mapLoaded && !configError && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/80 gap-3">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
           <p className="font-bold text-muted-foreground">Initializing Network Map...</p>
