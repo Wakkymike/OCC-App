@@ -132,25 +132,12 @@ export async function POST(req: NextRequest) {
             vehicleJourneysList.push(...ensureArray(data.VehicleJourneys?.VehicleJourney));
         }
         
-        // STAGE 2: Process aggregated stop points to build coordinate and name maps
+        // STAGE 2: Coordinate maps for routing
         const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
-        const busStopsMasterList: any[] = [];
-        const seenAtcoCodes = new Set<string>();
 
-        const stopMap = new Map<string, any>();
         for (const sp of allStopPoints) {
-            const atcoCode = getText(sp.AtcoCode);
-            if (atcoCode && !stopMap.has(atcoCode)) {
-                stopMap.set(atcoCode, sp);
-            }
-        }
-        const uniqueStops = Array.from(stopMap.values());
-
-
-        for (const sp of uniqueStops) {
              const atcoCode = getText(sp.AtcoCode);
              const stopPointRef = getText(sp.StopPointRef);
-             const commonName = getText(sp.Descriptor?.CommonName) ?? 'Unknown Stop';
              
              const location = sp.Location ?? sp.Place?.Location;
              const latStr = location ? (getText(location.Latitude) ?? getText(location.latitude)) : undefined;
@@ -160,13 +147,7 @@ export async function POST(req: NextRequest) {
                 const lat = parseFloat(latStr);
                 const lng = parseFloat(lngStr);
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    if (atcoCode) {
-                        stopPointsCoords[atcoCode] = { lat, lng };
-                        if (!seenAtcoCodes.has(atcoCode)) {
-                            busStopsMasterList.push({ atcoCode, name: commonName, lat, lng });
-                            seenAtcoCodes.add(atcoCode);
-                        }
-                    }
+                    if (atcoCode) stopPointsCoords[atcoCode] = { lat, lng };
                     if (stopPointRef && stopPointRef !== atcoCode) stopPointsCoords[stopPointRef] = { lat, lng };
                 }
             }
@@ -277,25 +258,21 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // STAGE 5: Write processed data to files
+        // STAGE 5: Write processed data to files (Stops are now handled by Overpass API)
         await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'timetable-data.json'), JSON.stringify(timetable, null, 2));
         await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'route-geometry.json'), JSON.stringify(routeGeometry, null, 2));
         await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'route-metadata.json'), JSON.stringify(routeMetadata, null, 2));
-        await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'bus-stops.json'), JSON.stringify(busStopsMasterList, null, 2));
 
         // STAGE 6: Generate report
         const routesFound = Object.keys(routeMetadata).length;
         const timetablesFound = Object.keys(timetable).length;
-        const stopsFound = busStopsMasterList.length;
         const serviceNameSample = Array.from(serviceNames).slice(0, 5).join(', ');
         
         let message = `Processed ${filesProcessed} file(s).\n\n`;
         message += `SERVICES: Found ${serviceNames.size} services (e.g., ${serviceNameSample}...).\n`;
         message += `TIMETABLES: Created timetable data for ${timetablesFound} unique journeys.\n`;
-        message += `ROUTES: Successfully constructed ${routesFound} routes.\n`;
-        message += `STOP POINTS: Extracted ${stopsFound} unique bus stops with technical coordinates.\n\n`;
-        
-        message += `Upload successful. You can now select these routes and view all stops on the map page.`;
+        message += `ROUTES: Successfully constructed ${routesFound} routes.\n\n`;
+        message += `NOTE: Bus stop markers are now fetched live from the National Transport dataset (OSM/NaPTAN) for maximum accuracy and are no longer dependent on these XML files.`;
 
         return NextResponse.json({ message }, { status: 200 });
 

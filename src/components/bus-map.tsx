@@ -143,11 +143,15 @@ export default function BusMap({
     };
   }, []);
 
-  // Fetch technical bus stop data
+  // Fetch technical bus stop data from the new live source
   useEffect(() => {
     fetch('/api/bus-stops')
       .then(res => res.json())
-      .then(data => setBusStops(data.stops || []))
+      .then(data => {
+        if (data.stops) {
+          setBusStops(data.stops);
+        }
+      })
       .catch(err => console.error("Failed to fetch bus stops for map:", err));
   }, []);
 
@@ -177,29 +181,32 @@ export default function BusMap({
           }
         });
 
-        // Interactive popup for stops
+        // Interactive popup for stops showing real-world NaPTAN/OSM details
         map.on('click', 'technical-bus-stops-layer', (e) => {
           if (!e.features?.length) return;
           const feature = e.features[0];
           const props = feature.properties;
           
-          new mapboxgl.Popup()
+          new mapboxgl.Popup({ className: 'technical-stop-popup' })
             .setLngLat(e.lngLat)
             .setHTML(`
-              <div class="p-3 space-y-2 min-w-[200px] text-foreground">
+              <div class="p-3 space-y-2 min-w-[220px] text-foreground">
                 <div class="border-b pb-1">
                   <h3 class="font-bold text-sm leading-tight">${props?.name}</h3>
-                  <span class="text-[10px] text-muted-foreground uppercase font-mono">${props?.atcoCode}</span>
+                  <span class="text-[10px] text-muted-foreground uppercase font-mono tracking-widest">ID: ${props?.atcoCode}</span>
                 </div>
-                <div class="grid grid-cols-2 gap-2 text-[10px]">
-                  <div>
-                    <span class="block text-muted-foreground uppercase font-bold">Latitude</span>
-                    <span class="font-mono">${props?.lat}</span>
+                <div class="grid grid-cols-1 gap-2 pt-1">
+                  <div class="flex items-center justify-between text-[10px]">
+                    <span class="text-muted-foreground uppercase font-bold">Latitude</span>
+                    <span class="font-mono bg-muted/50 px-1 rounded">${Number(props?.lat).toFixed(6)}</span>
                   </div>
-                  <div>
-                    <span class="block text-muted-foreground uppercase font-bold">Longitude</span>
-                    <span class="font-mono">${props?.lng}</span>
+                  <div class="flex items-center justify-between text-[10px]">
+                    <span class="text-muted-foreground uppercase font-bold">Longitude</span>
+                    <span class="font-mono bg-muted/50 px-1 rounded">${Number(props?.lng).toFixed(6)}</span>
                   </div>
+                </div>
+                <div class="pt-2 border-t flex justify-center">
+                   <span class="text-[8px] font-black uppercase text-primary/60">Verified NaPTAN Data Source</span>
                 </div>
               </div>
             `)
