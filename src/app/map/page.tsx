@@ -77,6 +77,9 @@ export default function Page() {
 
   const [metrolinkData, setMetrolinkData] = useState<MetrolinkData | null>(null);
   const [txcRoutes, setTxcRoutes] = useState<Record<string, { name: string; route: LatLng[]; busId: string | null }>>({});
+  const [gtfsRoutes, setGtfsRoutes] = useState<Record<string, any>>({});
+  const [selectedGtfsRouteId, setSelectedGtfsRouteId] = useState<string | null>(null);
+  const [showGtfsRoute, setShowGtfsRoute] = useState(false);
 
   // State for route recording
   const [isRecording, setIsRecording] = useState(false);
@@ -115,6 +118,13 @@ export default function Page() {
     }
     return null;
   }, [selectedRouteId, allAvailableRoutes]);
+
+  const gtfsRouteToDisplay = useMemo(() => {
+    if (showGtfsRoute && selectedGtfsRouteId && gtfsRoutes[selectedGtfsRouteId]) {
+        return gtfsRoutes[selectedGtfsRouteId].path;
+    }
+    return null;
+  }, [showGtfsRoute, selectedGtfsRouteId, gtfsRoutes]);
 
 
   const handleStopRecording = useCallback(() => {
@@ -177,40 +187,44 @@ export default function Page() {
     }
 
 
-    // Fetch metrolink data
-    const fetchMetrolinkData = async () => {
+    // Fetch data
+    const fetchData = async () => {
       try {
-        const response = await fetch('/api/metrolink');
-        if (response.ok) {
-          const data = await response.json();
-          setMetrolinkData(data);
-        } else {
-          console.error('Failed to fetch Metrolink data');
+        const [metroRes, routesRes, gtfsRes] = await Promise.all([
+            fetch('/api/metrolink'),
+            fetch('/api/routes'),
+            fetch('/api/gtfs-data')
+        ]);
+
+        if (metroRes.ok) setMetrolinkData(await metroRes.json());
+        if (routesRes.ok) {
+            const data = await routesRes.json();
+            setTxcRoutes(data.txcRoutes || {});
+        }
+        if (gtfsRes.ok) {
+            const data = await gtfsRes.json();
+            setGtfsRoutes(data.gtfsRoutes || {});
         }
       } catch (err) {
-        console.error('Error fetching Metrolink data:', err);
-      }
-    };
-    
-    // Fetch TXC routes data
-    const fetchTxcRoutes = async () => {
-      try {
-        const response = await fetch('/api/routes');
-        if (response.ok) {
-          const data = await response.json();
-          setTxcRoutes(data.txcRoutes || {});
-        } else {
-          console.error('Failed to fetch TransXchange routes');
-        }
-      } catch (err) {
-        console.error('Error fetching TransXchange routes:', err);
+        console.error('Error fetching supplementary map data:', err);
       }
     };
 
-    fetchMetrolinkData();
-    fetchTxcRoutes();
+    fetchData();
 
   }, [searchParams, toast]);
+
+  useEffect(() => {
+    // Zoom to GTFS route when enabled
+    if (showGtfsRoute && selectedGtfsRouteId && gtfsRoutes[selectedGtfsRouteId]) {
+        const path = gtfsRoutes[selectedGtfsRouteId].path;
+        if (path && path.length > 0) {
+            const bounds = new mapboxgl.LngLatBounds();
+            path.forEach((p: LatLng) => bounds.extend([p.lng, p.lat]));
+            setMapView({ bounds });
+        }
+    }
+  }, [showGtfsRoute, selectedGtfsRouteId, gtfsRoutes]);
 
   useEffect(() => {
     // 1. Filter buses based on the operator toggles
@@ -500,6 +514,11 @@ export default function Page() {
               setShowHazards={setShowHazards}
               showGeofences={showGeofences}
               setShowGeofences={setShowGeofences}
+              gtfsRoutes={gtfsRoutes}
+              selectedGtfsRouteId={selectedGtfsRouteId}
+              setSelectedGtfsRouteId={setSelectedGtfsRouteId}
+              showGtfsRoute={showGtfsRoute}
+              setShowGtfsRoute={setShowGtfsRoute}
             />
           </PopoverContent>
         </Popover>
@@ -515,6 +534,7 @@ export default function Page() {
         showBusStops={showBusStops}
         metrolinkData={metrolinkData}
         routeToDisplay={routeToDisplay}
+        gtfsRouteToDisplay={gtfsRouteToDisplay}
         journeyPlan={journeyPlan}
         roadworks={roadworks}
         showRoadworks={showRoadworks}

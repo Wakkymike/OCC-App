@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -24,6 +25,7 @@ interface BusMapProps {
   showBusStops: boolean;
   metrolinkData: MetrolinkData | null;
   routeToDisplay: LatLng[] | null;
+  gtfsRouteToDisplay?: LatLng[] | null;
   journeyPlan: JourneyPlan | null;
   roadworks: Roadwork[] | null;
   showRoadworks: boolean;
@@ -69,6 +71,7 @@ export default function BusMap({
   showBusStops,
   metrolinkData,
   routeToDisplay,
+  gtfsRouteToDisplay,
   journeyPlan,
   roadworks,
   showRoadworks,
@@ -141,6 +144,42 @@ export default function BusMap({
       }
     };
   }, []);
+
+  // GTFS Route Layer
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const updateGtfsLayer = () => {
+        if (!map.isStyleLoaded()) return;
+
+        if (!map.getSource('gtfs-route')) {
+            map.addSource('gtfs-route', {
+                type: 'geojson',
+                data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} }
+            });
+            map.addLayer({
+                id: 'gtfs-route-line',
+                type: 'line',
+                source: 'gtfs-route',
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: { 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 0.8 }
+            });
+        }
+
+        const source = map.getSource('gtfs-route') as mapboxgl.GeoJSONSource;
+        if (source) {
+            const coordinates = gtfsRouteToDisplay ? gtfsRouteToDisplay.map(p => [p.lng, p.lat]) : [];
+            source.setData({
+                type: 'Feature',
+                geometry: { type: 'LineString', coordinates: coordinates as any },
+                properties: {}
+            });
+        }
+    };
+
+    updateGtfsLayer();
+  }, [gtfsRouteToDisplay, mapLoaded, styleRevision]);
 
   // Fetch technical bus stop data from the new live source
   useEffect(() => {

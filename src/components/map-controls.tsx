@@ -1,14 +1,16 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
-import { Layers3, Satellite, Map, Building, Bus, ChevronDown, Triangle, Shield } from 'lucide-react';
+import { Layers3, Satellite, Map, Building, Bus, ChevronDown, Triangle, Shield, Search, Database } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import type { LatLng } from '@/lib/types';
 
 const TrafficConeIcon = () => (
@@ -46,6 +48,12 @@ interface MapControlsProps {
   setShowHazards: (show: boolean) => void;
   showGeofences: boolean;
   setShowGeofences: (show: boolean) => void;
+  // GTFS specific
+  gtfsRoutes?: Record<string, any>;
+  selectedGtfsRouteId?: string | null;
+  setSelectedGtfsRouteId?: (id: string | null) => void;
+  showGtfsRoute?: boolean;
+  setShowGtfsRoute?: (show: boolean) => void;
 }
 
 const styleOptions = [
@@ -82,19 +90,32 @@ export default function MapControls({
   setShowHazards,
   showGeofences,
   setShowGeofences,
+  gtfsRoutes = {},
+  selectedGtfsRouteId,
+  setSelectedGtfsRouteId,
+  showGtfsRoute,
+  setShowGtfsRoute,
 }: MapControlsProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [gtfsSearch, setGtfsSearch] = useState('');
   const currentStyleId = mapStyle.split('/').pop();
 
+  const filteredGtfs = useMemo(() => {
+    if (!gtfsRoutes) return [];
+    return Object.entries(gtfsRoutes)
+        .filter(([id, data]) => data.name.toLowerCase().includes(gtfsSearch.toLowerCase()))
+        .slice(0, 50);
+  }, [gtfsRoutes, gtfsSearch]);
+
   return (
-    <Card className="w-72">
+    <Card className="w-80">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Layers3 className="h-5 w-5" />
           <CardTitle className="text-lg">Map Layers</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 max-h-[70vh] overflow-y-auto">
         <div className="space-y-2">
           <Label className="text-xs font-semibold uppercase text-muted-foreground">Map Style</Label>
           <RadioGroup
@@ -178,6 +199,49 @@ export default function MapControls({
                     />
                </div>
            </div>
+        </div>
+
+        <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-2">
+                <Database className="h-3 w-3" /> GTFS Route Search
+            </Label>
+            <div className="space-y-2 p-2 border rounded-lg bg-muted/5">
+                <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
+                    <Input 
+                        placeholder="Search Route..." 
+                        value={gtfsSearch} 
+                        onChange={(e) => setGtfsSearch(e.target.value)}
+                        className="h-8 pl-7 text-xs bg-background"
+                    />
+                </div>
+                <Select 
+                    value={selectedGtfsRouteId ?? 'none'} 
+                    onValueChange={(v) => setSelectedGtfsRouteId?.(v === 'none' ? null : v)}
+                >
+                    <SelectTrigger className="h-8 text-[10px]">
+                        <SelectValue placeholder="Select path & direction..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="none">No Route Selected</SelectItem>
+                        {filteredGtfs.map(([id, data]) => (
+                            <SelectItem key={id} value={id} className="text-[10px]">
+                                {data.name} ({data.direction})
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <div className="flex items-center justify-between pt-1">
+                    <Label htmlFor="show-gtfs" className="text-[10px] font-bold uppercase opacity-70">Toggle View</Label>
+                    <Switch 
+                        id="show-gtfs" 
+                        checked={showGtfsRoute} 
+                        onCheckedChange={setShowGtfsRoute}
+                        disabled={!selectedGtfsRouteId}
+                        className="scale-75"
+                    />
+                </div>
+            </div>
         </div>
 
         <div className="space-y-2">

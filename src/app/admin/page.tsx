@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History, Pencil, Smile, Bold, Italic, Underline, Palette, Type, Plus } from 'lucide-react';
+import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History, Pencil, Smile, Bold, Italic, Underline, Palette, Type, Plus, FileUp, Database } from 'lucide-react';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc, addDocumentNonBlocking, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
@@ -208,6 +208,70 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
       </CardContent>
     </Card>
   );
+}
+
+function GTFSUpload() {
+    const { toast } = useToast();
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/api/upload-gtfs', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                toast({ title: 'GTFS Upload Successful', description: data.message });
+            } else {
+                throw new Error(data.error || 'Upload failed');
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-3">
+                    <Database className="h-6 w-6" />
+                    <div>
+                        <CardTitle className="text-xl">GTFS Data Management</CardTitle>
+                        <CardDescription>Upload a GTFS ZIP file to update network routes and geometry.</CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div className="flex items-center gap-4">
+                    <Input 
+                        type="file" 
+                        accept=".zip" 
+                        onChange={handleUpload} 
+                        disabled={isUploading}
+                        ref={fileInputRef}
+                        className="max-w-sm"
+                    />
+                    {isUploading && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-4 italic">
+                    Note: Expected files within ZIP: routes.txt, trips.txt, shapes.txt.
+                </p>
+            </CardContent>
+        </Card>
+    );
 }
 
 function PendingInvitations() {
@@ -638,6 +702,7 @@ export default function AdminPage() {
                     </CardContent>
                 </Card>
                 <PendingInvitations />
+                <GTFSUpload />
                 <GeofenceManagement />
                 <NetworkUpdateManagement />
             </>
