@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard } from '@/lib/types';
+import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard, BusStop } from '@/lib/types';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { doc, serverTimestamp, collection } from 'firebase/firestore';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -90,6 +90,7 @@ export default function BusMap({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [styleRevision, setStyleRevision] = useState(0);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [busStops, setBusStops] = useState<BusStop[]>([]);
 
   const monitoredRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
   const { data: monitoredHazards } = useCollection<MonitoredHazard>(monitoredRef);
@@ -101,7 +102,6 @@ export default function BusMap({
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
 
-    // Safety check for Mapbox Token
     const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
     if (!token) {
       setConfigError("Mapbox token is missing. Map cannot be initialized.");
@@ -142,6 +142,91 @@ export default function BusMap({
       }
     };
   }, []);
+
+  // Fetch technical bus stop data
+  useEffect(() => {
+    fetch('/api/bus-stops')
+      .then(res => res.json())
+      .then(data => setBusStops(data.stops || []))
+      .catch(err => console.error("Failed to fetch bus stops for map:", err));
+  }, []);
+
+  // Technical Stop Layer Management
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const updateStopLayer = () => {
+      if (!map.isStyleLoaded()) return;
+
+      if (!map.getSource('technical-bus-stops')) {
+        map.addSource('technical-bus-stops', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+
+        map.addLayer({
+          id: 'technical-bus-stops-layer',
+          type: 'circle',
+          source: 'technical-bus-stops',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2, 15, 6],
+            'circle-color': '#2563eb',
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#ffffff'
+          }
+        });
+
+        // Interactive popup for stops
+        map.on('click', 'technical-bus-stops-layer', (e) => {
+          if (!e.features?.length) return;
+          const feature = e.features[0];
+          const props = feature.properties;
+          
+          new mapboxgl.Popup()
+            .setLngLat(e.lngLat)
+            .setHTML(`
+              <div class="p-3 space-y-2 min-w-[200px] text-foreground">
+                <div class="border-b pb-1">
+                  <h3 class="font-bold text-sm leading-tight">${props?.name}</h3>
+                  <span class="text-[10px] text-muted-foreground uppercase font-mono">${props?.atcoCode}</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-[10px]">
+                  <div>
+                    <span class="block text-muted-foreground uppercase font-bold">Latitude</span>
+                    <span class="font-mono">${props?.lat}</span>
+                  </div>
+                  <div>
+                    <span class="block text-muted-foreground uppercase font-bold">Longitude</span>
+                    <span class="font-mono">${props?.lng}</span>
+                  </div>
+                </div>
+              </div>
+            `)
+            .addTo(map);
+        });
+
+        map.on('mouseenter', 'technical-bus-stops-layer', () => {
+          map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', 'technical-bus-stops-layer', () => {
+          map.getCanvas().style.cursor = '';
+        });
+      }
+
+      const source = map.getSource('technical-bus-stops') as mapboxgl.GeoJSONSource;
+      if (source) {
+        const features = showBusStops ? busStops.map(stop => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [stop.lng, stop.lat] },
+          properties: { ...stop }
+        })) : [];
+        source.setData({ type: 'FeatureCollection', features: features as any });
+      }
+    };
+
+    updateStopLayer();
+  }, [busStops, showBusStops, mapLoaded, styleRevision]);
 
   const handleAddManualGeofence = useCallback((lngLat: mapboxgl.LngLat) => {
     if (!isAdmin || !mapRef.current) return;
@@ -382,7 +467,6 @@ export default function BusMap({
     
     buses.forEach((bus) => {
       if (!bus.position) return;
-      // Use a more stable ID for markers to prevent flickering or disappearing during polling
       const markerId = `${bus.operator}-${bus.fleetNumber}`;
       currentMarkerIds.delete(markerId);
       

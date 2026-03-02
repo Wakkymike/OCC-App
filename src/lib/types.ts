@@ -20,6 +20,13 @@ export interface Bus {
   operator: 'GNW' | 'MET' | 'VB' | 'SC' | 'FB' | 'DB';
 }
 
+export interface BusStop {
+  atcoCode: string;
+  name: string;
+  lat: number;
+  lng: number;
+}
+
 export interface MetrolinkData {
   stops: {
     id: string;

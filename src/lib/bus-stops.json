@@ -1,0 +1,15 @@
+
+[
+  {
+    "atcoCode": "1800BN14011",
+    "name": "Bolton Interchange",
+    "lat": 53.5781,
+    "lng": -2.4295
+  },
+  {
+    "atcoCode": "1800SB04981",
+    "name": "Manchester Piccadilly",
+    "lat": 53.4774,
+    "lng": -2.2309
+  }
+]

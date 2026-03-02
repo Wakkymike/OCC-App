@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import jszip from 'jszip';
 import { XMLParser } from 'fast-xml-parser';
@@ -133,8 +134,8 @@ export async function POST(req: NextRequest) {
         
         // STAGE 2: Process aggregated stop points to build coordinate and name maps
         const stopPointsCoords: Record<string, { lat: number; lng: number }> = {};
-        let stopPointsParsedCount = 0;
-        let failedStopPointSample: any = null;
+        const busStopsMasterList: any[] = [];
+        const seenAtcoCodes = new Set<string>();
 
         const stopMap = new Map<string, any>();
         for (const sp of allStopPoints) {
@@ -149,6 +150,7 @@ export async function POST(req: NextRequest) {
         for (const sp of uniqueStops) {
              const atcoCode = getText(sp.AtcoCode);
              const stopPointRef = getText(sp.StopPointRef);
+             const commonName = getText(sp.Descriptor?.CommonName) ?? 'Unknown Stop';
              
              const location = sp.Location ?? sp.Place?.Location;
              const latStr = location ? (getText(location.Latitude) ?? getText(location.latitude)) : undefined;
@@ -158,14 +160,15 @@ export async function POST(req: NextRequest) {
                 const lat = parseFloat(latStr);
                 const lng = parseFloat(lngStr);
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    if (atcoCode) stopPointsCoords[atcoCode] = { lat, lng };
+                    if (atcoCode) {
+                        stopPointsCoords[atcoCode] = { lat, lng };
+                        if (!seenAtcoCodes.has(atcoCode)) {
+                            busStopsMasterList.push({ atcoCode, name: commonName, lat, lng });
+                            seenAtcoCodes.add(atcoCode);
+                        }
+                    }
                     if (stopPointRef && stopPointRef !== atcoCode) stopPointsCoords[stopPointRef] = { lat, lng };
-                    stopPointsParsedCount++;
-                } else {
-                     if (!failedStopPointSample) failedStopPointSample = sp;
                 }
-            } else {
-                if (!failedStopPointSample) failedStopPointSample = sp;
             }
         }
         
@@ -278,28 +281,21 @@ export async function POST(req: NextRequest) {
         await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'timetable-data.json'), JSON.stringify(timetable, null, 2));
         await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'route-geometry.json'), JSON.stringify(routeGeometry, null, 2));
         await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'route-metadata.json'), JSON.stringify(routeMetadata, null, 2));
+        await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'bus-stops.json'), JSON.stringify(busStopsMasterList, null, 2));
 
         // STAGE 6: Generate report
         const routesFound = Object.keys(routeMetadata).length;
         const timetablesFound = Object.keys(timetable).length;
+        const stopsFound = busStopsMasterList.length;
         const serviceNameSample = Array.from(serviceNames).slice(0, 5).join(', ');
         
         let message = `Processed ${filesProcessed} file(s).\n\n`;
         message += `SERVICES: Found ${serviceNames.size} services (e.g., ${serviceNameSample}...).\n`;
         message += `TIMETABLES: Created timetable data for ${timetablesFound} unique journeys.\n`;
-        message += `ROUTES: Successfully constructed ${routesFound} routes from ${Object.keys(journeyPatternsById).length} patterns.\n`;
-        message += `STOP POINTS: Found coordinates for ${stopPointsParsedCount} unique stops out of ${uniqueStops.length} processed.\n\n`;
+        message += `ROUTES: Successfully constructed ${routesFound} routes.\n`;
+        message += `STOP POINTS: Extracted ${stopsFound} unique bus stops with technical coordinates.\n\n`;
         
-        if (routesFound < Object.keys(journeyPatternsById).length || stopPointsParsedCount < uniqueStops.length) {
-            message += `--- ANALYSIS ---\n`;
-            message += `The system successfully built ${routesFound} routes, but could not build all of them. This is likely because coordinate data could not be found for every bus stop.\n`;
-        } else {
-             message += `Upload successful. You can now select these routes on the map page.`;
-        }
-
-        if (failedStopPointSample) {
-            return NextResponse.json({ message, debug_info: { stop_point_sample: failedStopPointSample } }, { status: 200 });
-        }
+        message += `Upload successful. You can now select these routes and view all stops on the map page.`;
 
         return NextResponse.json({ message }, { status: 200 });
 
