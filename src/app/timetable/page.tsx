@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
-import { Bus } from '@/lib/types';
+import { Bus, BusStop } from '@/lib/types';
 import {
   Accordion,
   AccordionContent,
@@ -21,7 +21,7 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Home } from 'lucide-react';
+import { ArrowLeft, Loader2, Home, MapPin } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -31,11 +31,67 @@ const nightBusRunningBoards = ['3691', '3692', '3693', '1091', '1092', '1093', '
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
 const lastJourneyRefs = ['8001', '8002', '8301', '8302', '8601', '8602'];
 
+/**
+ * Calculates distance between two points in meters.
+ */
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c;
+};
+
 export default function LiveServicePage() {
-  const { buses, error, lastRefreshed } = useBusTracker();
+  const { buses, error } = useBusTracker();
   const [serviceFilters, setServiceFilters] = useState<Record<string, 'all' | 'inbound' | 'outbound'>>({});
+  const [busStops, setBusStops] = useState<BusStop[]>([]);
+
+  // Fetch technical stops once on load
+  useEffect(() => {
+    fetch('/api/bus-stops')
+      .then(res => res.json())
+      .then(data => {
+        if (data.stops) setBusStops(data.stops);
+      })
+      .catch(err => console.error("Timetable: Failed to fetch reference stops", err));
+  }, []);
 
   const gnwBuses = useMemo(() => buses.filter(b => b.operator === 'GNW'), [buses]);
+
+  // Helper to find the nearest stop name for a bus
+  const getNearestStopName = (bus: Bus) => {
+    if (!bus.position || busStops.length === 0) return '--';
+    
+    let minDistance = Infinity;
+    let nearest: BusStop | null = null;
+    
+    // Performance optimization: only check stops within a rough 1km bounding box
+    const nearbyStops = busStops.filter(s => 
+        Math.abs(s.lat - bus.position!.lat) < 0.01 && 
+        Math.abs(s.lng - bus.position!.lng) < 0.01
+    );
+
+    const searchSet = nearbyStops.length > 0 ? nearbyStops : busStops;
+
+    for (const stop of searchSet) {
+        const d = getDistance(bus.position.lat, bus.position.lng, stop.lat, stop.lng);
+        if (d < minDistance) {
+            minDistance = d;
+            nearest = stop;
+        }
+    }
+    
+    // Only return if it's reasonably close (e.g. 400m) to represent "at/passing"
+    return minDistance < 400 ? nearest?.name : '--';
+  };
 
   const handleFilterChange = (serviceNumber: string, value: 'all' | 'inbound' | 'outbound') => {
     setServiceFilters(prev => ({ ...prev, [serviceNumber]: value }));
@@ -64,7 +120,7 @@ export default function LiveServicePage() {
   
   return (
     <main className="flex min-h-screen flex-col items-center bg-background p-4 sm:p-8">
-      <div className="w-full max-w-4xl">
+      <div className="w-full max-w-5xl">
         <Card>
           <CardHeader>
              <div className="flex items-start justify-between gap-4">
@@ -78,7 +134,7 @@ export default function LiveServicePage() {
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Real-time status of all currently running Go North West services.
+                  Real-time status and approximate locations of all Go North West services.
                 </CardDescription>
               </div>
               <Link href="/" className={buttonVariants({ variant: 'outline', size: 'icon' })} aria-label="Home">
@@ -125,6 +181,7 @@ export default function LiveServicePage() {
                             <TableHead>Fleet No.</TableHead>
                             <TableHead>Running Board</TableHead>
                             <TableHead>Journey No.</TableHead>
+                            <TableHead>Last Stop</TableHead>
                             <TableHead>Destination</TableHead>
                             <TableHead>Direction</TableHead>
                           </TableRow>
@@ -136,7 +193,6 @@ export default function LiveServicePage() {
                               return filter === 'all' || bus.direction.toLowerCase() === filter;
                             })
                             .map((bus) => {
-                                // Use physical vehicle identity for row stability
                                 const busId = `${bus.operator}-${bus.fleetNumber}`;
                                 
                                 const isSchool = bus.journeyRef && schoolJourneyRefs.includes(bus.journeyRef);
@@ -145,6 +201,8 @@ export default function LiveServicePage() {
                                 const isGnw = bus.operator === 'GNW';
                                 const isFirst = isGnw && bus.journeyRef && firstJourneyRefs.includes(bus.journeyRef);
                                 const isLast = isGnw && bus.journeyRef && lastJourneyRefs.includes(bus.journeyRef);
+                                
+                                const lastStop = getNearestStopName(bus);
                                 
                                 return (
                                     <TableRow key={busId}>
@@ -156,8 +214,14 @@ export default function LiveServicePage() {
                                       <TableCell>
                                         {bus.runningBoard}
                                       </TableCell>
-                                      <TableCell className={isFirst || isLast ? 'blinking-rb text-white font-bold' : ''}>
+                                      <TableCell className={isFirst || isLast ? 'blinking-rb text-white font-bold text-center' : ''}>
                                         {bus.journeyRef || '--'}
+                                      </TableCell>
+                                      <TableCell className="text-[10px] max-w-[150px]">
+                                        <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                                            <MapPin className="h-3 w-3 shrink-0" />
+                                            <span className="truncate" title={lastStop}>{lastStop}</span>
+                                        </div>
                                       </TableCell>
                                       <TableCell className="font-medium">
                                         {bus.destination}
