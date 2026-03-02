@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import jszip from 'jszip';
 import fs from 'fs/promises';
@@ -70,38 +69,25 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Missing essential GTFS files (routes, trips, or shapes).' }, { status: 400 });
         }
 
-        // 1. Broad Search for Go North West Agency IDs
-        const gnwAgencyIds = (agencyData || [])
-            .filter(a => {
-                const name = (a.agency_name || '').toLowerCase();
-                const url = (a.agency_url || '').toLowerCase();
-                return name.includes('go north west') || 
-                       name.includes('gonorthwest') || 
-                       name.includes('gnw') ||
-                       url.includes('gonorthwest');
-            })
-            .map(a => a.agency_id);
+        // Specific Agency ID for Go North West
+        const TARGET_AGENCY_ID = '7778548';
 
-        // 2. Filter Routes (GNW only)
-        // Check agency ID match OR if the route name itself mentions GNW
-        const routesData = routesDataRaw.filter(r => {
-            const agencyMatch = gnwAgencyIds.length > 0 && gnwAgencyIds.includes(r.agency_id);
-            const longNameMatch = (r.route_long_name || '').toLowerCase().includes('go north west');
-            const shortNameMatch = (r.route_short_name || '').toLowerCase().includes('gnw');
-            
-            return agencyMatch || longNameMatch || shortNameMatch;
-        });
+        // 1. Filter Routes (Agency 7778548 only)
+        const routesData = routesDataRaw.filter(r => String(r.agency_id) === TARGET_AGENCY_ID);
 
         if (routesData.length === 0) {
-            const foundAgencies = (agencyData || []).map(a => a.agency_name || 'Unnamed Agency').join(', ');
+            const foundAgencies = (agencyData || [])
+                .map(a => `${a.agency_name || 'Unnamed'} (ID: ${a.agency_id})`)
+                .join(', ');
+            
             return NextResponse.json({ 
-                error: `No Go North West routes found. Found agencies: [${foundAgencies || 'None'}]. Please ensure the operator is named 'Go North West' in the file.` 
+                error: `No routes found for Agency ID ${TARGET_AGENCY_ID}. Found in file: [${foundAgencies || 'None'}].` 
             }, { status: 404 });
         }
 
         const filteredRouteIds = new Set(routesData.map(r => r.route_id));
 
-        // 3. Process Metadata
+        // 2. Process Metadata
         const metadata: Record<string, any> = {};
         routesData.forEach(r => {
             const id = r.route_id;
@@ -113,7 +99,7 @@ export async function POST(req: NextRequest) {
             };
         });
 
-        // 4. Filter Trips & Shapes
+        // 3. Filter Trips & Shapes
         const filteredTrips = tripsDataRaw.filter(t => filteredRouteIds.has(t.route_id));
         const filteredShapeIds = new Set(filteredTrips.map(t => t.shape_id));
 
@@ -130,7 +116,7 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        // 5. Link representative shapes to routes and directions
+        // 4. Link representative shapes to routes and directions
         const routeGeometry: Record<string, any> = {};
         filteredTrips.forEach(t => {
             const routeId = t.route_id;
@@ -151,11 +137,15 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'gtfs-geometry.json'), JSON.stringify(routeGeometry, null, 2));
-        await fs.writeFile(path.join(process.cwd(), 'src', 'lib', 'gtfs-metadata.json'), JSON.stringify(metadata, null, 2));
+        // Ensure the directory exists
+        const libPath = path.join(process.cwd(), 'src', 'lib');
+        await fs.mkdir(libPath, { recursive: true });
+
+        await fs.writeFile(path.join(libPath, 'gtfs-geometry.json'), JSON.stringify(routeGeometry, null, 2));
+        await fs.writeFile(path.join(libPath, 'gtfs-metadata.json'), JSON.stringify(metadata, null, 2));
 
         return NextResponse.json({ 
-            message: `Successfully processed ${Object.keys(metadata).length} Go North West routes.` 
+            message: `Successfully processed ${Object.keys(metadata).length} Go North West routes for Agency ID ${TARGET_AGENCY_ID}.` 
         });
 
     } catch (error: any) {
