@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -181,33 +180,23 @@ export default function BusMap({
           }
         });
 
-        // Interactive popup for stops showing real-world NaPTAN/OSM details
+        // Interactive "Flag" popup for stops showing operational details
         map.on('click', 'technical-bus-stops-layer', (e) => {
           if (!e.features?.length) return;
           const feature = e.features[0];
           const props = feature.properties;
           
-          new mapboxgl.Popup({ className: 'technical-stop-popup' })
+          new mapboxgl.Popup({ 
+            className: 'bus-stop-popup',
+            closeButton: false,
+            offset: 10
+          })
             .setLngLat(e.lngLat)
             .setHTML(`
-              <div class="p-3 space-y-2 min-w-[220px] text-foreground">
-                <div class="border-b pb-1">
-                  <h3 class="font-bold text-sm leading-tight">${props?.name}</h3>
-                  <span class="text-[10px] text-muted-foreground uppercase font-mono tracking-widest">ID: ${props?.atcoCode}</span>
-                </div>
-                <div class="grid grid-cols-1 gap-2 pt-1">
-                  <div class="flex items-center justify-between text-[10px]">
-                    <span class="text-muted-foreground uppercase font-bold">Latitude</span>
-                    <span class="font-mono bg-muted/50 px-1 rounded">${Number(props?.lat).toFixed(6)}</span>
-                  </div>
-                  <div class="flex items-center justify-between text-[10px]">
-                    <span class="text-muted-foreground uppercase font-bold">Longitude</span>
-                    <span class="font-mono bg-muted/50 px-1 rounded">${Number(props?.lng).toFixed(6)}</span>
-                  </div>
-                </div>
-                <div class="pt-2 border-t flex justify-center">
-                   <span class="text-[8px] font-black uppercase text-primary/60">Verified NaPTAN Data Source</span>
-                </div>
+              <div class="flex flex-col items-center text-center">
+                <div class="font-bold text-[13px] leading-tight whitespace-nowrap">${props?.name}</div>
+                <div class="text-[10px] opacity-80 font-mono mt-1">${Number(props?.lat).toFixed(5)}, ${Number(props?.lng).toFixed(5)}</div>
+                <div class="text-[9px] opacity-60 uppercase font-black tracking-widest mt-0.5">${props?.atcoCode}</div>
               </div>
             `)
             .addTo(map);
