@@ -5,8 +5,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard, BusStop } from '@/lib/types';
-import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { doc, serverTimestamp, collection } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
+import { useSocket } from '@/contexts/socket-context';
+import { SOCKET_EVENTS } from '@/lib/socket/events';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -81,8 +82,8 @@ export default function BusMap({
   manualGeofenceMode = false,
   setManualGeofenceMode,
 }: BusMapProps) {
-  const { user } = useUser();
-  const firestore = useFirestore();
+  const { user } = useAuth();
+  const { on, off } = useSocket();
   const { toast } = useToast();
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -93,13 +94,23 @@ export default function BusMap({
   const [styleRevision, setStyleRevision] = useState(0);
   const [configError, setConfigError] = useState<string | null>(null);
   const [busStops, setBusStops] = useState<BusStop[]>([]);
+  const [monitoredHazards, setMonitoredHazards] = useState<MonitoredHazard[]>([]);
 
-  const monitoredRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
-  const { data: monitoredHazards } = useCollection<MonitoredHazard>(monitoredRef);
+  const isAdmin = user?.isAdmin || user?.isSuperAdmin;
 
-  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
-  const { data: userProfile } = useDoc<any>(userProfileRef);
-  const isAdmin = userProfile?.isAdmin || user?.email === 'michael.dodsworth@gonorthwest.co.uk';
+  // Fetch monitored hazards via REST + listen for real-time updates
+  useEffect(() => {
+    if (!user) return;
+    fetch('/api/monitored-hazards').then(r => r.json()).then(data => setMonitoredHazards(data.hazards || [])).catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    const handler = () => {
+      fetch('/api/monitored-hazards').then(r => r.json()).then(data => setMonitoredHazards(data.hazards || [])).catch(() => {});
+    };
+    on(SOCKET_EVENTS.HAZARD_CHANGED, handler);
+    return () => { off(SOCKET_EVENTS.HAZARD_CHANGED, handler); };
+  }, [on, off]);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -315,7 +326,6 @@ export default function BusMap({
             return;
         }
 
-        const colRef = collection(firestore, 'monitoredHazards');
         const manualData = {
             hazardId: 'manual', 
             type: 'manual', 
@@ -323,16 +333,19 @@ export default function BusMap({
             location: { lat: lngLat.lat, lng: lngLat.lng },
             description, 
             radius, 
-            createdAt: serverTimestamp()
         };
 
-        addDocumentNonBlocking(colRef, manualData).then(() => {
+        fetch('/api/monitored-hazards', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(manualData),
+        }).then(() => {
             toast({ title: 'Manual Geofence Added' });
             popup.remove();
             if (setManualGeofenceMode) setManualGeofenceMode(false);
         });
     };
-  }, [isAdmin, firestore, toast, setManualGeofenceMode]);
+  }, [isAdmin, toast, setManualGeofenceMode]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -354,20 +367,24 @@ export default function BusMap({
 
   const handleAddGeofence = (hazard: Hazard, radius: number) => {
     if (!isAdmin) return;
-    const colRef = collection(firestore, 'monitoredHazards');
     const geoData = {
       hazardId: hazard.id, type: hazard.type, value: hazard.value, location: hazard.location,
-      description: hazard.description, radius, createdAt: serverTimestamp()
+      description: hazard.description, radius,
     };
-    addDocumentNonBlocking(colRef, geoData).then(() => {
+    fetch('/api/monitored-hazards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(geoData),
+    }).then(() => {
         toast({ title: 'Geofence Added' });
     });
   };
 
   const handleRemoveGeofence = (monitorId: string) => {
     if (!isAdmin) return;
-    deleteDocumentNonBlocking(doc(firestore, 'monitoredHazards', monitorId));
-    toast({ title: 'Geofence Removed' });
+    fetch(`/api/monitored-hazards/${monitorId}`, { method: 'DELETE' }).then(() => {
+      toast({ title: 'Geofence Removed' });
+    });
   };
 
   useEffect(() => {

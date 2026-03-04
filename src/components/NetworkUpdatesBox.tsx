@@ -1,20 +1,43 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSocket } from '@/contexts/socket-context';
+import { SOCKET_EVENTS } from '@/lib/socket/events';
 import type { NetworkUpdate } from '@/lib/types';
 import { Rss, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function NetworkUpdatesBox() {
-  const firestore = useFirestore();
-  
-  const updatesQuery = useMemoFirebase(
-    () => collection(firestore, 'networkUpdates'),
-    [firestore]
-  );
-  const { data: allUpdates, isLoading } = useCollection<NetworkUpdate>(updatesQuery);
+  const { on, off } = useSocket();
+  const [allUpdates, setAllUpdates] = useState<NetworkUpdate[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchUpdates = useCallback(async () => {
+    try {
+      const res = await fetch('/api/network-updates');
+      if (res.ok) {
+        const data = await res.json();
+        setAllUpdates(data.updates || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch network updates:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUpdates();
+  }, [fetchUpdates]);
+
+  // Listen for real-time changes
+  useEffect(() => {
+    const handleChange = () => fetchUpdates();
+    on(SOCKET_EVENTS.NETWORK_UPDATE_CHANGED, handleChange);
+    return () => {
+      off(SOCKET_EVENTS.NETWORK_UPDATE_CHANGED, handleChange);
+    };
+  }, [on, off, fetchUpdates]);
 
   const updates = useMemo(() => {
     if (!allUpdates) return null;
@@ -25,7 +48,7 @@ export default function NetworkUpdatesBox() {
           return a.priority - b.priority;
         }
         if (a.createdAt && b.createdAt) {
-          return b.createdAt.seconds - a.createdAt.seconds;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         }
         return 0;
       });

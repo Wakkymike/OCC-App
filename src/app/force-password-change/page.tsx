@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useUser, useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { updatePassword, signOut } from 'firebase/auth';
-import { doc } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -23,8 +21,7 @@ export default function ForcePasswordChangePage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { user } = useUser();
-  const firestore = useFirestore();
+  const { user, logout, refreshUser } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -45,25 +42,26 @@ export default function ForcePasswordChangePage() {
     
     setIsLoading(true);
     try {
-      await updatePassword(user, newPassword);
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword }),
+      });
 
-      // After successful password update, update the user's profile in Firestore.
-      const userProfileRef = doc(firestore, 'userProfiles', user.uid);
-      updateDocumentNonBlocking(userProfileRef, { passwordChangeRequired: false });
-      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update password');
+      }
+
+      await refreshUser();
       toast({ title: 'Password Updated', description: 'Your password has been successfully changed.' });
       router.push('/');
-
     } catch (error: any) {
       console.error('Password update error:', error);
-      let description = error.message;
-      if (error.code === 'auth/requires-recent-login') {
-        description = "This operation is sensitive and requires recent authentication. Please sign out and sign back in to change your password.";
-      }
       toast({
         variant: 'destructive',
         title: 'Update Failed',
-        description: description,
+        description: error.message || 'An unexpected error occurred.',
       });
     } finally {
       setIsLoading(false);
@@ -71,10 +69,8 @@ export default function ForcePasswordChangePage() {
   };
   
   const handleSignOut = async () => {
-    if (user) {
-        await signOut(user.auth);
-        router.replace('/login');
-    }
+    await logout();
+    router.replace('/login');
   };
 
   return (

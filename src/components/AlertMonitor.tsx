@@ -1,10 +1,11 @@
 
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, addDoc, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
+import { useSocket } from '@/contexts/socket-context';
+import { SOCKET_EVENTS } from '@/lib/socket/events';
 import type { MonitoredHazard, ActiveAlert } from '@/lib/types';
 
 /**
@@ -31,30 +32,74 @@ function getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: num
  * Triggers alerts when a Go North West vehicle enters a restricted zone.
  */
 export function AlertMonitor() {
-  const { user } = useUser();
+  const { user } = useAuth();
   const { buses } = useBusTracker();
-  const firestore = useFirestore();
+  const { on, off } = useSocket();
   
-  // Fetch all active geofence monitors
-  const hazardsRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
-  const { data: monitoredHazards } = useCollection<MonitoredHazard>(hazardsRef);
-  
-  // Fetch currently active alerts to prevent duplicate triggers
-  const activeAlertsRef = useMemoFirebase(() => user ? collection(firestore, 'activeAlerts') : null, [firestore, user]);
-  const { data: activeAlerts } = useCollection<ActiveAlert>(activeAlertsRef);
+  const [monitoredHazards, setMonitoredHazards] = useState<MonitoredHazard[]>([]);
+  const [activeAlerts, setActiveAlerts] = useState<ActiveAlert[]>([]);
 
   // Use a ref to prevent overlapping write operations for the same event
   const isWritingRef = useRef<Set<string>>(new Set());
 
+  // Fetch monitored hazards
+  const fetchHazards = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch('/api/monitored-hazards');
+      if (res.ok) {
+        const data = await res.json();
+        setMonitoredHazards(data.hazards || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch monitored hazards:', err);
+    }
+  }, [user]);
+
+  // Fetch active alerts
+  const fetchAlerts = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch('/api/active-alerts');
+      if (res.ok) {
+        const data = await res.json();
+        setActiveAlerts(data.alerts || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch active alerts:', err);
+    }
+  }, [user]);
+
+  // Initial fetch
   useEffect(() => {
-    // Evaluation requires authenticated user, active monitors, and live bus data
+    fetchHazards();
+    fetchAlerts();
+  }, [fetchHazards, fetchAlerts]);
+
+  // Listen for real-time updates via Socket.io
+  useEffect(() => {
+    const handleAlertChange = () => fetchAlerts();
+    const handleHazardChange = () => fetchHazards();
+
+    on(SOCKET_EVENTS.ALERT_CREATED, handleAlertChange);
+    on(SOCKET_EVENTS.ALERT_ACKNOWLEDGED, handleAlertChange);
+    on(SOCKET_EVENTS.ALERT_DELETED, handleAlertChange);
+    on(SOCKET_EVENTS.HAZARD_CHANGED, handleHazardChange);
+
+    return () => {
+      off(SOCKET_EVENTS.ALERT_CREATED, handleAlertChange);
+      off(SOCKET_EVENTS.ALERT_ACKNOWLEDGED, handleAlertChange);
+      off(SOCKET_EVENTS.ALERT_DELETED, handleAlertChange);
+      off(SOCKET_EVENTS.HAZARD_CHANGED, handleHazardChange);
+    };
+  }, [on, off, fetchAlerts, fetchHazards]);
+
+  useEffect(() => {
     if (!user || !monitoredHazards || !buses || !activeAlerts || buses.length === 0) return;
 
-    // Focus exclusively on GNW vehicles with valid GPS coordinates
     const gnwBuses = buses.filter(b => b.operator === 'GNW' && b.position);
     
     gnwBuses.forEach((bus) => {
-      // Standardize the Bus ID by removing whitespace for reliable matching
       const fleet = String(bus.fleetNumber).replace(/\s+/g, '').toUpperCase();
       const svc = String(bus.service).replace(/\s+/g, '').toUpperCase();
       const busId = `${fleet}-${svc}`;
@@ -68,59 +113,43 @@ export function AlertMonitor() {
           center.lng
         );
 
-        // Breach detected if bus is within radius (plus 5m buffer for GPS jitter)
         if (distance <= (monitor.radius + 5)) {
           const alertKey = `${busId}-${monitor.id}`;
           
-          // Skip if a write operation for this specific breach is already in progress
           if (isWritingRef.current.has(alertKey)) continue;
 
-          // Check if an alert for this bus in this zone already exists in the active list
           const existingAlert = activeAlerts.find(a => 
             (a.busId === busId || a.fleetNumber === bus.fleetNumber) && 
             a.monitorId === monitor.id
           );
           
-          // Trigger new alert if none currently exists for this breach
           if (!existingAlert) {
             isWritingRef.current.add(alertKey);
             
-            const alertData = {
-              busId,
-              fleetNumber: bus.fleetNumber,
-              service: bus.service,
-              hazardId: monitor.hazardId, 
-              monitorId: monitor.id,      
-              hazardValue: monitor.value,
-              hazardDescription: monitor.description,
-              isAcknowledged: false,
-              timestamp: serverTimestamp(),
-            };
-
-            const alertsRef = collection(firestore, 'activeAlerts');
-            const historyRef = collection(firestore, 'alertHistory');
-
-            // Pre-generate history doc ID to link them
-            const historyDoc = doc(historyRef);
-            const alertDataWithHistory = { ...alertData, historyDocId: historyDoc.id };
-
-            // Record the breach in both the live monitoring collection and the persistent audit log
-            Promise.all([
-                addDoc(alertsRef, alertDataWithHistory),
-                setDoc(historyDoc, alertData)
-            ]).catch(err => {
-                console.error("Critical: Failed to record geofence breach:", err);
+            fetch('/api/active-alerts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                busId,
+                fleetNumber: bus.fleetNumber,
+                service: bus.service,
+                hazardId: monitor.hazardId,
+                monitorId: monitor.id,
+                hazardValue: monitor.value,
+                hazardDescription: monitor.description,
+              }),
+            }).catch(err => {
+              console.error("Critical: Failed to record geofence breach:", err);
             }).finally(() => {
-                // Lock out re-triggering for 10 seconds to allow Firestore state to synchronize
-                setTimeout(() => {
-                    isWritingRef.current.delete(alertKey);
-                }, 10000);
+              setTimeout(() => {
+                isWritingRef.current.delete(alertKey);
+              }, 10000);
             });
           }
         }
       }
     });
-  }, [buses, monitoredHazards, activeAlerts, firestore, user]);
+  }, [buses, monitoredHazards, activeAlerts, user]);
 
   return null;
 }

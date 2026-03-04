@@ -1,52 +1,72 @@
 'use client';
 
-import { useCollection, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useAuth } from '@/contexts/auth-context';
+import { useSocket } from '@/contexts/socket-context';
+import { SOCKET_EVENTS } from '@/lib/socket/events';
 import type { ActiveAlert } from '@/lib/types';
 import { AlertTriangle, ShieldAlert, CheckCircle2, Bus as BusIcon, MapPin, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useMemo } from 'react';
 
 /**
  * A global, high-visibility overlay that triggers when a geofence breach is detected.
  * It only shows alerts that have not yet been acknowledged.
  */
 export function GlobalAlertOverlay() {
-  const firestore = useFirestore();
-  const { user } = useUser();
-  
-  // Listen for active alerts globally
-  const alertsRef = useMemoFirebase(() => user ? collection(firestore, 'activeAlerts') : null, [firestore, user]);
-  const { data: allAlerts } = useCollection<ActiveAlert>(alertsRef);
-  
-  // Filter for alerts that haven't been acknowledged yet
+  const { user } = useAuth();
+  const { on, off } = useSocket();
+  const [allAlerts, setAllAlerts] = useState<ActiveAlert[]>([]);
+
+  const fetchAlerts = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch('/api/active-alerts');
+      if (res.ok) {
+        const data = await res.json();
+        setAllAlerts(data.alerts || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch alerts:', err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchAlerts();
+  }, [fetchAlerts]);
+
+  // Listen for real-time updates
+  useEffect(() => {
+    const handleChange = () => fetchAlerts();
+    on(SOCKET_EVENTS.ALERT_CREATED, handleChange);
+    on(SOCKET_EVENTS.ALERT_ACKNOWLEDGED, handleChange);
+    on(SOCKET_EVENTS.ALERT_DELETED, handleChange);
+    return () => {
+      off(SOCKET_EVENTS.ALERT_CREATED, handleChange);
+      off(SOCKET_EVENTS.ALERT_ACKNOWLEDGED, handleChange);
+      off(SOCKET_EVENTS.ALERT_DELETED, handleChange);
+    };
+  }, [on, off, fetchAlerts]);
+
   const alerts = useMemo(() => {
     if (!allAlerts) return [];
     return allAlerts.filter(alert => !alert.isAcknowledged);
   }, [allAlerts]);
 
-  // Only show if user is authenticated and there are unacknowledged alerts
   if (!user || !alerts || alerts.length === 0) return null;
 
   const handleAcknowledge = (alert: ActiveAlert) => {
-    const ackData = { 
+    const ackData = {
       isAcknowledged: true,
       acknowledgedBy: user?.displayName || user?.email || 'Unknown User',
-      acknowledgedAt: serverTimestamp()
     };
 
-    // Update the active alert using the non-blocking utility which handles contextual errors
-    updateDocumentNonBlocking(doc(firestore, 'activeAlerts', alert.id), ackData);
-
-    // Update the linked history log if it exists
-    if (alert.historyDocId) {
-      updateDocumentNonBlocking(doc(firestore, 'alertHistory', alert.historyDocId), {
-        acknowledgedBy: ackData.acknowledgedBy,
-        acknowledgedAt: ackData.acknowledgedAt
-      });
-    }
+    fetch(`/api/active-alerts/${alert.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ackData),
+    }).catch(err => console.error('Failed to acknowledge alert:', err));
   };
 
   return (
@@ -98,7 +118,7 @@ export function GlobalAlertOverlay() {
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground justify-end">
                     <Clock className="h-4 w-4" />
-                    <span>{alert.timestamp?.toDate ? alert.timestamp.toDate().toLocaleTimeString() : 'Resolving time...'}</span>
+                    <span>{alert.timestamp ? new Date(alert.timestamp).toLocaleTimeString() : 'Resolving time...'}</span>
                   </div>
                 </div>
               </CardContent>

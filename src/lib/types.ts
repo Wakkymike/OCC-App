@@ -1,5 +1,5 @@
 
-import { Timestamp } from 'firebase/firestore';
+// Timestamps are ISO 8601 date strings from the SQLite/REST API layer
 
 export interface LatLng {
   lat: number;
@@ -68,7 +68,7 @@ export interface NetworkUpdate {
   details: string;
   priority: number;
   isVisible: boolean;
-  createdAt: Timestamp;
+  createdAt: string;
 }
 
 export interface Hazard {
@@ -80,15 +80,15 @@ export interface Hazard {
 }
 
 export interface MonitoredHazard {
-  id: string; // Firestore Document ID
-  hazardId: string; // The original hazard ID from OSM or 'manual'
+  id: string;
+  hazardId: string;
   type: 'height' | 'width' | 'both' | 'manual';
   value: string;
   location: LatLng;
   geofenceCenter?: LatLng;
   description: string;
   radius: number;
-  createdAt: Timestamp;
+  createdAt: string;
 }
 
 export interface ActiveAlert {
@@ -101,9 +101,9 @@ export interface ActiveAlert {
   hazardValue: string;
   hazardDescription: string;
   isAcknowledged: boolean;
-  timestamp: Timestamp;
+  timestamp: string;
   acknowledgedBy?: string;
-  acknowledgedAt?: Timestamp;
+  acknowledgedAt?: string;
   historyDocId?: string;
 }
 
@@ -116,8 +116,8 @@ export interface AlertHistory {
   monitorId: string;
   hazardValue: string;
   hazardDescription: string;
-  timestamp: Timestamp;
-  acknowledgedAt?: Timestamp;
+  timestamp: string;
+  acknowledgedAt?: string;
   acknowledgedBy?: string;
 }
 
@@ -141,5 +141,5 @@ export interface CallLog {
   isIRRelated: boolean;
   isTSIRelated: boolean;
   isDriverReportRelated: boolean;
-  createdAt: Timestamp;
+  createdAt: string;
 }

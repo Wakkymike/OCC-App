@@ -9,9 +9,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Home, Users, Clock, XCircle, Rss, Trash2, LogOut, ShieldAlert, MapPin, History, Pencil, Smile, Bold, Italic, Underline, Palette, Type, Plus, FileUp, Database } from 'lucide-react';
 import Link from 'next/link';
-import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser, useAuth, deleteDocumentNonBlocking, useDoc, addDocumentNonBlocking, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, addDoc, serverTimestamp, doc, Timestamp, query, where, getDocs, updateDoc } from 'firebase/firestore';
-import { sendSignInLinkToEmail, User } from 'firebase/auth';
+import { useAuth } from '@/contexts/auth-context';
+import { useSocket } from '@/contexts/socket-context';
+import { SOCKET_EVENTS } from '@/lib/socket/events';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { NetworkUpdate, MonitoredHazard } from '@/lib/types';
@@ -32,10 +32,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 interface UserProfile {
   id: string;
-  uid: string;
   displayName: string;
   email: string;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   isContentCreator: boolean;
   isActive: boolean;
   passwordChangeRequired: boolean;
@@ -45,84 +45,93 @@ interface UserProfile {
 interface Invitation {
     id: string;
     email: string;
-    invitedAt: Timestamp;
+    invitedAt: string;
 }
 
-function UserManagement({ currentUser }: { currentUser: User | null }) {
-  const firestore = useFirestore();
+function UserManagement({ currentUserId }: { currentUserId: string }) {
   const { toast } = useToast();
-  
-  const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'userProfiles'), [firestore]);
-  const { data: users, isLoading } = useCollection<UserProfile>(usersCollectionRef);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { on, off } = useSocket();
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data.users);
+      }
+    } catch (e) {
+      console.error('Failed to fetch users', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    const handler = () => fetchUsers();
+    on(SOCKET_EVENTS.USER_UPDATED, handler);
+    return () => off(SOCKET_EVENTS.USER_UPDATED, handler);
+  }, [on, off]);
+
+  const patchUser = async (userId: string, data: Partial<UserProfile>) => {
+    await fetch(`/api/users/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  };
 
   const handleAdminToggle = (user: UserProfile, isAdmin: boolean) => {
-    if (user.uid === currentUser?.uid) {
+    if (user.id === currentUserId) {
       toast({ variant: 'destructive', title: 'Action Forbidden', description: "You cannot change your own admin status." });
       return;
     }
-    const userDocRef = doc(firestore, 'userProfiles', user.id);
-    updateDocumentNonBlocking(userDocRef, { isAdmin });
+    patchUser(user.id, { isAdmin });
     toast({ title: 'User Updated', description: `${user.displayName} has been ${isAdmin ? 'granted' : 'revoked'} admin privileges.` });
   };
   
   const handleContentCreatorToggle = (user: UserProfile, isContentCreator: boolean) => {
-    const userDocRef = doc(firestore, 'userProfiles', user.id);
     const updateData: any = { isContentCreator };
     if (isContentCreator) updateData.isActive = true;
-    
-    updateDocumentNonBlocking(userDocRef, updateData);
+    patchUser(user.id, updateData);
     toast({ title: 'User Updated', description: `${user.displayName} has been ${isContentCreator ? 'granted' : 'revoked'} content creator privileges.` });
   };
 
   const handleActiveToggle = (user: UserProfile, isActive: boolean) => {
-    if (user.uid === currentUser?.uid) {
+    if (user.id === currentUserId) {
       toast({ variant: 'destructive', title: 'Action Forbidden', description: "You cannot change your own activation status." });
       return;
     }
-    const userDocRef = doc(firestore, 'userProfiles', user.id);
-    updateDocumentNonBlocking(userDocRef, { isActive });
+    patchUser(user.id, { isActive });
     toast({ title: 'User Updated', description: `${user.displayName}'s account has been ${isActive ? 'activated' : 'deactivated'}.` });
   };
 
   const handlePasswordChangeToggle = (user: UserProfile, required: boolean) => {
-    const userDocRef = doc(firestore, 'userProfiles', user.id);
-    updateDocumentNonBlocking(userDocRef, { passwordChangeRequired: required });
+    patchUser(user.id, { passwordChangeRequired: required });
     toast({ title: 'User Updated', description: `${user.displayName} will ${required ? 'be required to' : 'not be required to'} change their password on next login.` });
   };
 
   const handleForceSignOut = (user: UserProfile) => {
-    if (user.uid === currentUser?.uid) {
+    if (user.id === currentUserId) {
       toast({ variant: 'destructive', title: 'Action Forbidden', description: "You cannot force sign out yourself." });
       return;
     }
-    const userDocRef = doc(firestore, 'userProfiles', user.id);
-    updateDocumentNonBlocking(userDocRef, { forceSignOut: true });
+    patchUser(user.id, { forceSignOut: true });
     toast({ title: 'User Session Flagged', description: `${user.displayName} will be signed out on their next page load.` });
   };
 
-  const handleDeleteUser = (user: UserProfile) => {
-    const userDocRef = doc(firestore, 'userProfiles', user.id);
-    updateDocumentNonBlocking(userDocRef, { 
-        isAdmin: false, 
-        isContentCreator: false, 
-        isActive: false, 
-        forceSignOut: true 
-    });
-    deleteDocumentNonBlocking(userDocRef);
-
-    const invitationsRef = collection(firestore, 'invitations');
-    const q = query(invitationsRef, where("email", "==", user.email));
-    getDocs(q).then((querySnapshot) => {
-        querySnapshot.forEach((invDoc) => {
-            deleteDocumentNonBlocking(doc(firestore, 'invitations', invDoc.id));
-        });
-    }).catch(async (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: invitationsRef.path,
-            operation: 'list',
-        }));
-    });
-    toast({ title: 'User Deletion Initiated' });
+  const handleDeleteUser = async (user: UserProfile) => {
+    try {
+      await fetch(`/api/users/${user.id}`, { method: 'DELETE' });
+      toast({ title: 'User Deletion Initiated' });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Delete Failed' });
+    }
   };
 
   return (
@@ -162,25 +171,25 @@ function UserManagement({ currentUser }: { currentUser: User | null }) {
                   <TableCell className="font-medium text-xs">{user.displayName}</TableCell>
                   <TableCell className="text-xs">{user.email}</TableCell>
                    <TableCell>
-                     <Switch checked={user.isActive} onCheckedChange={(v) => handleActiveToggle(user, v)} disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'} />
+                     <Switch checked={user.isActive} onCheckedChange={(v) => handleActiveToggle(user, v)} disabled={user.isSuperAdmin} />
                   </TableCell>
                   <TableCell>
-                     <Switch checked={user.passwordChangeRequired} onCheckedChange={(v) => handlePasswordChangeToggle(user, v)} disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'} />
+                     <Switch checked={user.passwordChangeRequired} onCheckedChange={(v) => handlePasswordChangeToggle(user, v)} disabled={user.isSuperAdmin} />
                   </TableCell>
                   <TableCell>
-                     <Switch checked={user.isContentCreator} onCheckedChange={(v) => handleContentCreatorToggle(user, v)} disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'} />
+                     <Switch checked={user.isContentCreator} onCheckedChange={(v) => handleContentCreatorToggle(user, v)} disabled={user.isSuperAdmin} />
                   </TableCell>
                   <TableCell>
-                     <Switch checked={user.isAdmin} onCheckedChange={(v) => handleAdminToggle(user, v)} disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk'} />
+                     <Switch checked={user.isAdmin} onCheckedChange={(v) => handleAdminToggle(user, v)} disabled={user.isSuperAdmin} />
                   </TableCell>
                   <TableCell className="text-right flex items-center justify-end gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => handleForceSignOut(user)} title="Force Sign Out" disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk' || user.uid === currentUser?.uid}>
+                    <Button variant="ghost" size="icon" onClick={() => handleForceSignOut(user)} title="Force Sign Out" disabled={user.isSuperAdmin || user.id === currentUserId}>
                         <LogOut className="h-4 w-4 text-destructive" />
                     </Button>
                     
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" title="Delete User" disabled={user.email === 'michael.dodsworth@gonorthwest.co.uk' || user.uid === currentUser?.uid}>
+                            <Button variant="ghost" size="icon" title="Delete User" disabled={user.isSuperAdmin || user.id === currentUserId}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                         </AlertDialogTrigger>
@@ -275,13 +284,29 @@ function GTFSUpload() {
 }
 
 function PendingInvitations() {
-    const firestore = useFirestore();
     const { toast } = useToast();
-    const invitationsColRef = useMemoFirebase(() => collection(firestore, 'invitations'), [firestore]);
-    const { data: invitations, isLoading } = useCollection<Invitation>(invitationsColRef);
+    const [invitations, setInvitations] = useState<Invitation[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const handleCancelInvite = (id: string) => {
-        deleteDocumentNonBlocking(doc(firestore, 'invitations', id));
+    const fetchInvitations = async () => {
+        try {
+            const res = await fetch('/api/invitations');
+            if (res.ok) {
+                const data = await res.json();
+                setInvitations(data.invitations);
+            }
+        } catch (e) {
+            console.error('Failed to fetch invitations', e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchInvitations(); }, []);
+
+    const handleCancelInvite = async (id: string) => {
+        await fetch(`/api/invitations/${id}`, { method: 'DELETE' });
+        setInvitations(prev => prev.filter(i => i.id !== id));
         toast({ title: 'Invitation Revoked' });
     };
 
@@ -316,13 +341,36 @@ function PendingInvitations() {
 }
 
 function GeofenceManagement() {
-    const firestore = useFirestore();
     const { toast } = useToast();
-    const hazardsRef = useMemoFirebase(() => collection(firestore, 'monitoredHazards'), [firestore]);
-    const { data: monitored, isLoading } = useCollection<MonitoredHazard>(hazardsRef);
+    const [monitored, setMonitored] = useState<MonitoredHazard[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const { on, off } = useSocket();
 
-    const handleRemove = (id: string) => {
-        deleteDocumentNonBlocking(doc(firestore, 'monitoredHazards', id));
+    const fetchHazards = async () => {
+        try {
+            const res = await fetch('/api/monitored-hazards');
+            if (res.ok) {
+                const data = await res.json();
+                setMonitored(data.hazards);
+            }
+        } catch (e) {
+            console.error('Failed to fetch hazards', e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchHazards(); }, []);
+
+    useEffect(() => {
+        const handler = () => fetchHazards();
+        on(SOCKET_EVENTS.HAZARD_CHANGED, handler);
+        return () => off(SOCKET_EVENTS.HAZARD_CHANGED, handler);
+    }, [on, off]);
+
+    const handleRemove = async (id: string) => {
+        await fetch(`/api/monitored-hazards/${id}`, { method: 'DELETE' });
+        setMonitored(prev => prev.filter(m => m.id !== id));
         toast({ title: 'Monitor Removed' });
     };
 
@@ -474,8 +522,8 @@ function RichTextEditor({ value, onChange, placeholder, editorRef }: { value: st
 }
 
 function NetworkUpdateManagement() {
-    const firestore = useFirestore();
     const { toast } = useToast();
+    const { on, off } = useSocket();
     const [title, setTitle] = useState('');
     const [details, setDetails] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -483,41 +531,69 @@ function NetworkUpdateManagement() {
     const [isFormVisible, setIsFormVisible] = useState(false);
     const editorRef = useRef<HTMLDivElement>(null);
 
-    const updatesQuery = useMemoFirebase(() => collection(firestore, 'networkUpdates'), [firestore]);
-    const { data: allUpdates, isLoading } = useCollection<NetworkUpdate>(updatesQuery);
+    const [allUpdates, setAllUpdates] = useState<NetworkUpdate[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const fetchUpdates = async () => {
+        try {
+            const res = await fetch('/api/network-updates');
+            if (res.ok) {
+                const data = await res.json();
+                setAllUpdates(data.updates);
+            }
+        } catch (e) {
+            console.error('Failed to fetch updates', e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchUpdates(); }, []);
+
+    useEffect(() => {
+        const handler = () => fetchUpdates();
+        on(SOCKET_EVENTS.NETWORK_UPDATE_CHANGED, handler);
+        return () => off(SOCKET_EVENTS.NETWORK_UPDATE_CHANGED, handler);
+    }, [on, off]);
 
     const updates = useMemo(() => {
         if (!allUpdates) return null;
-        return [...allUpdates].sort((a, b) => (a.priority - b.priority) || (b.createdAt?.seconds - a.createdAt?.seconds));
+        return [...allUpdates].sort((a: any, b: any) => {
+            const pa = a.priority ?? 0;
+            const pb = b.priority ?? 0;
+            if (pa !== pb) return pa - pb;
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
     }, [allUpdates]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
         
-        if (editingId) {
-            const updateDocRef = doc(firestore, 'networkUpdates', editingId);
-            updateDocumentNonBlocking(updateDocRef, { title, details });
-            toast({ title: 'Update Updated', description: 'Your changes have been saved.' });
+        try {
+            if (editingId) {
+                await fetch(`/api/network-updates/${editingId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, details }),
+                });
+                toast({ title: 'Update Updated', description: 'Your changes have been saved.' });
+            } else {
+                await fetch('/api/network-updates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, details, priority: 0, isVisible: true }),
+                });
+                toast({ title: 'Update Added' });
+            }
             setTitle('');
             setDetails('');
             setEditingId(null);
             setIsFormVisible(false);
+        } catch (err) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to save update.' });
+        } finally {
             setIsSubmitting(false);
-        } else {
-            const colRef = collection(firestore, 'networkUpdates');
-            const updateData = {
-                title, details, priority: 0, isVisible: true, createdAt: serverTimestamp(),
-            };
-            addDocumentNonBlocking(colRef, updateData)
-                .then(() => {
-                    toast({ title: 'Update Added' });
-                    setTitle(''); setDetails('');
-                    setIsFormVisible(false);
-                })
-                .finally(() => {
-                    setIsSubmitting(false);
-                });
         }
     };
 
@@ -628,7 +704,9 @@ function NetworkUpdateManagement() {
                                 <Button variant="ghost" size="icon" onClick={() => handleEdit(update)} title="Edit Entry">
                                     <Pencil className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'networkUpdates', update.id))} title="Delete Entry">
+                                <Button variant="ghost" size="icon" onClick={() => {
+                                    fetch(`/api/network-updates/${update.id}`, { method: 'DELETE' });
+                                }} title="Delete Entry">
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                             </div>
@@ -643,43 +721,36 @@ function NetworkUpdateManagement() {
 export default function AdminPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
-  const auth = useAuth();
-  const firestore = useFirestore();
-  const { user: currentUser, isUserLoading: isAuthLoading } = useUser();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { toast } = useToast();
 
-  const userProfileRef = useMemoFirebase(() => currentUser ? doc(firestore, 'userProfiles', currentUser.uid) : null, [currentUser, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
-
-  const handleInvite = (e: React.FormEvent) => {
+  const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsInviting(true);
-    const colRef = collection(firestore, 'invitations');
-    const inviteData = { email: inviteEmail, invitedAt: new Date() };
-    
-    addDoc(colRef, inviteData)
-      .then(async (docRef) => {
-        await sendSignInLinkToEmail(auth, inviteEmail, { url: `${window.location.origin}/finish-sign-up?invitationId=${docRef.id}`, handleCodeInApp: true });
-        toast({ title: 'Invitation Sent' });
-        setInviteEmail('');
-      })
-      .catch(async (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: colRef.path,
-            operation: 'create',
-            requestResourceData: inviteData
-        }));
-      })
-      .finally(() => {
-        setIsInviting(false);
+    try {
+      const res = await fetch('/api/invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail }),
       });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to create invitation');
+      }
+      toast({ title: 'Invitation Created', description: `Share the invitation link with ${inviteEmail} to complete sign-up.` });
+      setInviteEmail('');
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Invitation Failed', description: error.message });
+    } finally {
+      setIsInviting(false);
+    }
   };
 
-  if (isAuthLoading || isProfileLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
+  if (isAuthLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
-  const isSuperAdmin = currentUser?.email === 'michael.dodsworth@gonorthwest.co.uk';
-  const isFullAdmin = !!userProfile?.isAdmin || isSuperAdmin;
-  const isContentCreator = userProfile?.isContentCreator === true;
+  const isSuperAdmin = user?.isSuperAdmin;
+  const isFullAdmin = !!user?.isAdmin || isSuperAdmin;
+  const isContentCreator = user?.isContentCreator === true;
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-background p-8 gap-8">
@@ -691,7 +762,7 @@ export default function AdminPage() {
 
         {isFullAdmin ? (
             <>
-                <UserManagement currentUser={currentUser} />
+                <UserManagement currentUserId={user?.id || ''} />
                 <Card>
                     <CardHeader><CardTitle className="text-xl">Invite New User</CardTitle></CardHeader>
                     <CardContent>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser, useAuth } from '@/firebase';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,18 +11,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { signOut } from 'firebase/auth';
 import { LogOut, User as UserIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function UserMenu() {
-  const { user, isUserLoading } = useUser();
-  const auth = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const { toast } = useToast();
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      await logout();
       toast({ title: 'Signed Out', description: 'You have been successfully signed out.' });
     } catch (error: any) {
       console.error('Sign out error:', error);
@@ -34,12 +32,12 @@ export default function UserMenu() {
     }
   };
 
-  if (isUserLoading) {
+  if (isLoading) {
     return <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />;
   }
 
   if (!user) {
-    return null; // Or a link to the login page
+    return null;
   }
 
   const getInitials = (email: string | null) => {

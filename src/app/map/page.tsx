@@ -19,25 +19,17 @@ import RouteRecorderDialog from '@/components/route-recorder';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
 import { useSearchParams } from 'next/navigation';
-import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 export default function Page() {
-  const { user } = useUser();
-  const firestore = useFirestore();
-
-  const userProfileRef = useMemoFirebase(() => {
-    if (!user) return null;
-    return doc(firestore, 'userProfiles', user.uid);
-  }, [user, firestore]);
-  const { data: userProfile } = useDoc<{ isAdmin: boolean }>(userProfileRef);
+  const { user } = useAuth();
   
   // Consolidated Admin Check
-  const isSuperAdmin = user?.email === 'michael.dodsworth@gonorthwest.co.uk';
-  const isAdmin = !!userProfile?.isAdmin || isSuperAdmin;
+  const isSuperAdmin = user?.isSuperAdmin;
+  const isAdmin = !!user?.isAdmin || isSuperAdmin;
 
   const { buses, error: busError } = useBusTracker();
   const { roadworks, error: roadworksError } = useRoadworksTracker();

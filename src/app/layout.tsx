@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { FirebaseClientProvider } from '@/firebase';
+import { AuthProvider } from '@/contexts/auth-context';
+import { SocketProvider } from '@/contexts/socket-context';
 import ClientLayout from '@/components/ClientLayout';
 import { AlertMonitor } from '@/components/AlertMonitor';
 import { GlobalAlertOverlay } from '@/components/GlobalAlertOverlay';
@@ -27,20 +28,22 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>
-          <AlertMonitor />
-          <GlobalAlertOverlay />
-          <ClientLayout>
-            <div className="min-h-screen flex flex-col">
-              <div className="flex-grow">
-                {children}
+        <AuthProvider>
+          <SocketProvider>
+            <AlertMonitor />
+            <GlobalAlertOverlay />
+            <ClientLayout>
+              <div className="min-h-screen flex flex-col">
+                <div className="flex-grow">
+                  {children}
+                </div>
+                <footer className="w-full py-2 bg-background border-t text-center text-[10px] font-medium text-muted-foreground flex-shrink-0">
+                  &copy; Michael Dodsworth 2026
+                </footer>
               </div>
-              <footer className="w-full py-2 bg-background border-t text-center text-[10px] font-medium text-muted-foreground flex-shrink-0">
-                &copy; Michael Dodsworth 2026
-              </footer>
-            </div>
-          </ClientLayout>
-        </FirebaseClientProvider>
+            </ClientLayout>
+          </SocketProvider>
+        </AuthProvider>
         <Toaster />
       </body>
     </html>

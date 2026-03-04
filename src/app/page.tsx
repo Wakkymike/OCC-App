@@ -9,30 +9,21 @@ import UserMenu from '@/components/auth/UserMenu';
 import TickerTape from '@/components/TickerTape';
 import BreakingNewsTicker from '@/components/BreakingNewsTicker';
 import NetworkUpdatesBox from '@/components/NetworkUpdatesBox';
-import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { format, isWithinInterval, isAfter } from 'date-fns';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export default function HomePage() {
-  const { user, isUserLoading } = useUser();
-  const firestore = useFirestore();
-
-  const userProfileRef = useMemoFirebase(() => {
-    if (!user) return null;
-    return doc(firestore, 'userProfiles', user.uid);
-  }, [user, firestore]);
-
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+  const { user, isLoading: isUserLoading } = useAuth();
 
   const [shifts, setShifts] = useState<any[]>([]);
   const [isLoadingShifts, setIsLoadingShifts] = useState(false);
 
   useEffect(() => {
-    if (userProfile?.icalUrl) {
+    if (user?.icalUrl) {
       setIsLoadingShifts(true);
-      fetch(`/api/shifts?url=${encodeURIComponent(userProfile.icalUrl)}`)
+      fetch(`/api/shifts?url=${encodeURIComponent(user.icalUrl)}`)
         .then(res => res.json())
         .then(data => {
           if (data.shifts) {
@@ -42,7 +33,7 @@ export default function HomePage() {
         .catch(err => console.error("Failed to fetch shifts for header:", err))
         .finally(() => setIsLoadingShifts(false));
     }
-  }, [userProfile?.icalUrl]);
+  }, [user?.icalUrl]);
 
   const now = new Date();
   const currentShift = shifts.find(s => 
@@ -50,9 +41,9 @@ export default function HomePage() {
   );
   const nextShift = shifts.find(s => isAfter(new Date(s.start), now));
 
-  const isSuperAdmin = user?.email === 'michael.dodsworth@gonorthwest.co.uk';
-  const isAdmin = userProfile?.isAdmin === true || isSuperAdmin;
-  const isContentCreator = userProfile?.isContentCreator === true;
+  const isSuperAdmin = user?.isSuperAdmin;
+  const isAdmin = user?.isAdmin === true || isSuperAdmin;
+  const isContentCreator = user?.isContentCreator === true;
   const canAccessAdmin = isAdmin || isContentCreator;
 
   const logoImage = PlaceHolderImages.find(img => img.id === 'app-logo');
@@ -69,7 +60,7 @@ export default function HomePage() {
                 <div className="flex flex-col md:flex-row items-center justify-between w-full max-w-6xl mb-4 gap-6 px-4">
                     {/* Left: Current Status */}
                     <div className="flex-1 flex justify-start w-full md:w-auto h-20">
-                        {userProfile?.icalUrl && !isLoadingShifts && (
+                        {user?.icalUrl && !isLoadingShifts && (
                             <div className="text-left w-full">
                                 {currentShift ? (
                                     <div className="animate-in fade-in slide-in-from-left-4 duration-500">
@@ -112,7 +103,7 @@ export default function HomePage() {
 
                     {/* Right: Next Shift */}
                     <div className="flex-1 flex justify-end w-full md:w-auto h-20">
-                        {userProfile?.icalUrl && !isLoadingShifts && (
+                        {user?.icalUrl && !isLoadingShifts && (
                             <div className="text-right w-full">
                                 {nextShift ? (
                                     <div className="animate-in fade-in slide-in-from-right-4 duration-500">
@@ -183,7 +174,7 @@ export default function HomePage() {
                           </Link>
                       </Button>
 
-                      {isUserLoading || isProfileLoading ? (
+                      {isUserLoading ? (
                            <Button size="lg" variant="secondary" disabled>
                               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                               Checking Access...

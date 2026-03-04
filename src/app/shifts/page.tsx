@@ -1,8 +1,7 @@
 
 'use client';
 
-import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 import ShiftDisplay from '@/components/ShiftDisplay';
 import { Button } from '@/components/ui/button';
 import { Home, Loader2, Calendar } from 'lucide-react';
@@ -10,17 +9,9 @@ import Link from 'next/link';
 import UserMenu from '@/components/auth/UserMenu';
 
 export default function ShiftsPage() {
-  const { user } = useUser();
-  const firestore = useFirestore();
+  const { user, isLoading: loading } = useAuth();
 
-  const userProfileRef = useMemoFirebase(() => {
-    if (!user) return null;
-    return doc(firestore, 'userProfiles', user.uid);
-  }, [user, firestore]);
-
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
-
-  if (isProfileLoading) {
+  if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -52,7 +43,7 @@ export default function ShiftsPage() {
         </div>
 
         <div className="w-full max-w-4xl">
-          <ShiftDisplay userProfile={userProfile} />
+          <ShiftDisplay userProfile={user} />
         </div>
       </main>
     </div>

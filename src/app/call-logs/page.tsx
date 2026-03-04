@@ -14,8 +14,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { useFirestore, useCollection, useMemoFirebase, useUser, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, serverTimestamp, doc, Timestamp, writeBatch } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Phone, Trash2, Home, Loader2, Info, Clock, Calendar, CheckCircle2, Plus, X, User as UserIcon, MapPin, Bus, Hash, Building2, Pencil, Search, LayoutList, FileDown } from 'lucide-react';
 import Link from 'next/link';
@@ -28,17 +27,17 @@ import autoTable from 'jspdf-autotable';
 type SearchCategory = 'employeeNumber' | 'fleetNumber' | 'runningBoard';
 
 export default function CallLogsPage() {
-  const { user } = useUser();
-  const firestore = useFirestore();
+  const { user } = useAuth();
   const { toast } = useToast();
   const formRef = useRef<HTMLDivElement>(null);
-  const hasCheckedRetention = useRef(false);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCategory, setSearchCategory] = useState<SearchCategory>('employeeNumber');
   const [isExporting, setIsExporting] = useState(false);
+  const [logs, setLogs] = useState<CallLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [formData, setFormData] = useState({
     date: '',
@@ -62,18 +61,23 @@ export default function CallLogsPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Memoize collection reference for current user
-  const callLogsRef = useMemoFirebase(() => {
-    if (!user) return null;
-    return collection(firestore, 'users', user.uid, 'callLogs');
-  }, [firestore, user]);
+  const fetchLogs = async () => {
+    try {
+      const res = await fetch('/api/call-logs');
+      if (res.ok) {
+        const data = await res.json();
+        setLogs(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch call logs', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const callLogsQuery = useMemoFirebase(() => {
-    if (!callLogsRef) return null;
-    return query(callLogsRef, orderBy('createdAt', 'desc'));
-  }, [callLogsRef]);
-
-  const { data: logs, isLoading } = useCollection<CallLog>(callLogsQuery);
+  useEffect(() => {
+    if (user) fetchLogs();
+  }, [user]);
 
   // Search filter logic - Strict filtering by category
   const filteredLogs = useMemo(() => {
@@ -87,26 +91,7 @@ export default function CallLogsPage() {
   }, [logs, searchQuery, searchCategory]);
 
   // Auto-retention logic: Purge records older than 5 days
-  useEffect(() => {
-    if (!callLogsRef || !logs || logs.length === 0 || hasCheckedRetention.current) return;
-
-    hasCheckedRetention.current = true;
-    const fiveDaysAgo = subDays(new Date(), 5);
-    
-    const oldLogs = logs.filter(log => {
-      if (!log.createdAt) return false;
-      const createdDate = log.createdAt instanceof Timestamp ? log.createdAt.toDate() : new Timestamp(log.createdAt.seconds, log.createdAt.nanoseconds).toDate();
-      return createdDate < fiveDaysAgo;
-    });
-
-    if (oldLogs.length > 0) {
-      const batch = writeBatch(firestore);
-      oldLogs.forEach(log => {
-        batch.delete(doc(callLogsRef, log.id));
-      });
-      batch.commit().catch(e => console.error("Auto-purge failed", e));
-    }
-  }, [logs, callLogsRef, firestore]);
+  // Auto-retention is handled server-side in the API route
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -188,38 +173,47 @@ export default function CallLogsPage() {
     }, 100);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !callLogsRef) return;
+    if (!user) return;
 
     setIsSubmitting(true);
 
-    if (editingId) {
-      const logDocRef = doc(firestore, 'users', user.uid, 'callLogs', editingId);
-      updateDocumentNonBlocking(logDocRef, formData);
-      toast({ title: 'Log Updated', description: 'Changes saved successfully.' });
-      setShowForm(false);
-      setEditingId(null);
-      setIsSubmitting(false);
-    } else {
-      const logData = {
-        ...formData,
-        userId: user.uid,
-        createdAt: serverTimestamp(),
-      };
-
-      addDocumentNonBlocking(callLogsRef, logData)
-        .then(() => {
+    try {
+      if (editingId) {
+        const res = await fetch(`/api/call-logs/${editingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        if (res.ok) {
+          toast({ title: 'Log Updated', description: 'Changes saved successfully.' });
+          setShowForm(false);
+          setEditingId(null);
+          fetchLogs();
+        }
+      } else {
+        const res = await fetch('/api/call-logs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+        if (res.ok) {
           toast({ title: 'Log Saved', description: 'Call record added successfully.' });
           setShowForm(false);
-        })
-        .finally(() => setIsSubmitting(false));
+          fetchLogs();
+        }
+      }
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to save log.' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleDeleteSingle = (logId: string) => {
-    if (!callLogsRef) return;
-    deleteDocumentNonBlocking(doc(callLogsRef, logId));
+  const handleDeleteSingle = async (logId: string) => {
+    await fetch(`/api/call-logs/${logId}`, { method: 'DELETE' });
+    setLogs(prev => prev.filter(l => l.id !== logId));
     toast({ title: 'Record Deleted' });
   };
 
