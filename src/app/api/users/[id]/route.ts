@@ -83,7 +83,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: 'No valid fields to update.' }, { status: 400 });
   }
 
-  setClauses.push("updatedAt = datetime('now')");
+  setClauses.push("updatedAt = strftime('%Y-%m-%dT%H:%M:%fZ','now')");
   values.push(id);
 
   db.prepare(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
@@ -102,7 +102,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // Prevent deleting the super-admin account
+  const superEmail = process.env.SUPER_ADMIN_EMAIL?.toLowerCase().trim();
   const db = getDb();
+  const targetUser = db.prepare('SELECT email FROM users WHERE id = ?').get(id) as any;
+  if (targetUser && superEmail && targetUser.email === superEmail) {
+    return NextResponse.json({ error: 'The super-admin account cannot be deleted.' }, { status: 403 });
+  }
 
   // Delete related data
   db.prepare('DELETE FROM call_logs WHERE userId = ?').run(id);

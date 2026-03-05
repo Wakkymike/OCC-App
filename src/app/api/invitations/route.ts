@@ -3,10 +3,13 @@ import { getDb } from '@/lib/db';
 import { getAuthUser, isSuperAdmin } from '@/lib/auth/middleware';
 import { v4 as uuidv4 } from 'uuid';
 
-/** GET /api/invitations — List all invitations */
+/** GET /api/invitations — List all invitations (admin only) */
 export async function GET() {
   const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user.isAdmin && !isSuperAdmin(user)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const db = getDb();
   const invitations = db.prepare('SELECT * FROM invitations ORDER BY invitedAt DESC').all();

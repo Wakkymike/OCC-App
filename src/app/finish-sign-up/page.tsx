@@ -48,8 +48,8 @@ function FinishSignUpComponent() {
           setStatus('error');
           return;
         }
-        const invitation = await res.json();
-        setEmail(invitation.email);
+        const data = await res.json();
+        setEmail(data.invitation.email);
         setStatus('form');
       } catch {
         setErrorMessage('Failed to verify invitation. Please try again.');

@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getAuthUser, isSuperAdmin } from '@/lib/auth/middleware';
-import { emitSocketEvent, SOCKET_EVENTS } from '@/lib/socket/events';
 
 /** GET /api/users — List all users (admin only) */
 export async function GET() {
@@ -12,7 +11,7 @@ export async function GET() {
   }
 
   const db = getDb();
-  const superEmail = process.env.SUPER_ADMIN_EMAIL;
+  const superEmail = process.env.SUPER_ADMIN_EMAIL?.toLowerCase().trim();
   const users = db.prepare(`
     SELECT id, email, displayName, isAdmin, isContentCreator, isActive,
            passwordChangeRequired, forceSignOut, icalUrl, createdAt

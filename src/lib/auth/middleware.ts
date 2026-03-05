@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { verifyToken, type JwtPayload } from './jwt';
 import { getDb } from '@/lib/db';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export const AUTH_COOKIE_NAME = 'occ_session';
 

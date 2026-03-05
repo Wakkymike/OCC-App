@@ -13,14 +13,14 @@ export function initSchema(db: Database.Database) {
       passwordChangeRequired INTEGER NOT NULL DEFAULT 0,
       forceSignOut INTEGER NOT NULL DEFAULT 0,
       icalUrl TEXT DEFAULT NULL,
-      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
-      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+      createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      updatedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     );
 
     CREATE TABLE IF NOT EXISTS invitations (
       id TEXT PRIMARY KEY,
       email TEXT NOT NULL,
-      invitedAt TEXT NOT NULL DEFAULT (datetime('now'))
+      invitedAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     );
 
     CREATE TABLE IF NOT EXISTS monitored_hazards (
@@ -34,7 +34,7 @@ export function initSchema(db: Database.Database) {
       geofenceCenterLng REAL,
       description TEXT NOT NULL DEFAULT '',
       radius REAL NOT NULL DEFAULT 50,
-      createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+      createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     );
 
     CREATE TABLE IF NOT EXISTS active_alerts (
@@ -47,7 +47,7 @@ export function initSchema(db: Database.Database) {
       hazardValue TEXT NOT NULL DEFAULT '',
       hazardDescription TEXT NOT NULL DEFAULT '',
       isAcknowledged INTEGER NOT NULL DEFAULT 0,
-      timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+      timestamp TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
       acknowledgedBy TEXT,
       acknowledgedAt TEXT,
       historyDocId TEXT
@@ -62,7 +62,7 @@ export function initSchema(db: Database.Database) {
       monitorId TEXT NOT NULL,
       hazardValue TEXT NOT NULL DEFAULT '',
       hazardDescription TEXT NOT NULL DEFAULT '',
-      timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+      timestamp TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
       acknowledgedAt TEXT,
       acknowledgedBy TEXT
     );
@@ -73,7 +73,7 @@ export function initSchema(db: Database.Database) {
       details TEXT NOT NULL DEFAULT '',
       priority INTEGER NOT NULL DEFAULT 0,
       isVisible INTEGER NOT NULL DEFAULT 1,
-      createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+      createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     );
 
     CREATE TABLE IF NOT EXISTS call_logs (
@@ -96,7 +96,7 @@ export function initSchema(db: Database.Database) {
       isIRRelated INTEGER NOT NULL DEFAULT 0,
       isTSIRelated INTEGER NOT NULL DEFAULT 0,
       isDriverReportRelated INTEGER NOT NULL DEFAULT 0,
-      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
       FOREIGN KEY (userId) REFERENCES users(id)
     );
 
@@ -104,7 +104,7 @@ export function initSchema(db: Database.Database) {
       id TEXT PRIMARY KEY,
       userId TEXT NOT NULL,
       data TEXT NOT NULL DEFAULT '{}',
-      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
       FOREIGN KEY (userId) REFERENCES users(id)
     );
 

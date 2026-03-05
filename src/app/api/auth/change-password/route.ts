@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const passwordHash = await hashPassword(newPassword);
 
     db.prepare(`
-      UPDATE users SET passwordHash = ?, passwordChangeRequired = 0, updatedAt = datetime('now')
+      UPDATE users SET passwordHash = ?, passwordChangeRequired = 0, updatedAt = strftime('%Y-%m-%dT%H:%M:%fZ','now')
       WHERE id = ?
     `).run(passwordHash, user.id);
 

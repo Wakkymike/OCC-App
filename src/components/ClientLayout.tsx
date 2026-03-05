@@ -11,7 +11,7 @@ const ADMIN_PAGES = ['/admin'];
 const FORCE_PASSWORD_CHANGE_PAGE = '/force-password-change';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, logout, refreshUser } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
@@ -81,7 +81,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         router.replace('/login');
       }
     }
-  }, [user, isLoading, pathname, router, toast, logout, refreshUser]);
+  }, [user, isLoading, pathname, router, toast, logout]);
 
   if (isLoading && !PUBLIC_PAGES.includes(pathname)) {
     return (
