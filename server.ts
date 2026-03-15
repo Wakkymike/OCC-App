@@ -1,3 +1,10 @@
+import dotenv from 'dotenv';
+import { resolve } from 'path';
+
+// Load .env files in the same order Next.js does, BEFORE reading any env vars
+dotenv.config({ path: resolve(process.cwd(), '.env.local'), override: true });
+dotenv.config({ path: resolve(process.cwd(), '.env') });
+
 import { createServer as createHttpServer } from 'http';
 import { createServer as createHttpsServer } from 'https';
 import { readFileSync, existsSync } from 'fs';
@@ -13,6 +20,12 @@ const port = parseInt(process.env.PORT || '9002', 10);
 const tlsCert = process.env.TLS_CERT_PATH;  // e.g. /etc/letsencrypt/live/occ.example.com/fullchain.pem
 const tlsKey = process.env.TLS_KEY_PATH;     // e.g. /etc/letsencrypt/live/occ.example.com/privkey.pem
 const useHttps = !!(tlsCert && tlsKey);
+
+console.log(`[config] PORT=${port}, HOSTNAME=${hostname}, TLS=${useHttps ? 'yes' : 'no'}`);
+if (tlsCert || tlsKey) {
+  console.log(`[config] TLS_CERT_PATH=${tlsCert || '(not set)'}`);
+  console.log(`[config] TLS_KEY_PATH=${tlsKey || '(not set)'}`);
+}
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
