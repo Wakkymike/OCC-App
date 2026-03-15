@@ -1,17 +1,53 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
-// Server-side cache to keep the map responsive
+// Persistent disk cache so we don't hammer Overpass on every dev-server restart
+const CACHE_DIR = path.join(process.cwd(), 'data');
+const CACHE_FILE = path.join(CACHE_DIR, 'bus-stops-cache.json');
+const CACHE_DURATION = 1000 * 60 * 60 * 24; // 24 hours
+
+// In-memory cache (fast path)
 let cachedStops: any[] | null = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 1000 * 60 * 60 * 24; // 24 hours
+
+function loadDiskCache(): boolean {
+  try {
+    if (!fs.existsSync(CACHE_FILE)) return false;
+    const stat = fs.statSync(CACHE_FILE);
+    if (Date.now() - stat.mtimeMs > CACHE_DURATION) return false;
+    const data = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf-8'));
+    if (Array.isArray(data) && data.length > 0) {
+      cachedStops = data;
+      lastFetchTime = stat.mtimeMs;
+      return true;
+    }
+  } catch { /* ignore corrupt cache */ }
+  return false;
+}
+
+function saveDiskCache(stops: any[]) {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(stops));
+  } catch (e) {
+    console.warn('Failed to write bus-stops cache:', e);
+  }
+}
 
 export async function GET() {
   const now = Date.now();
 
+  // 1) In-memory cache hit
   if (cachedStops && (now - lastFetchTime < CACHE_DURATION)) {
     return NextResponse.json({ stops: cachedStops, source: 'cache' });
+  }
+
+  // 2) Disk cache hit (survives server restarts)
+  if (loadDiskCache()) {
+    return NextResponse.json({ stops: cachedStops, source: 'disk-cache' });
   }
 
   // Bounding box for Greater Manchester area (approx Bolton to Manchester)
@@ -63,6 +99,7 @@ export async function GET() {
 
     cachedStops = uniqueStops;
     lastFetchTime = now;
+    saveDiskCache(uniqueStops as any[]);
 
     return NextResponse.json({ stops: uniqueStops, source: 'live' });
   } catch (error: any) {
