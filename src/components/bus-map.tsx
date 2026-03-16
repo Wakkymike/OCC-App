@@ -174,7 +174,7 @@ export default function BusMap({
                 type: 'line',
                 source: 'gtfs-route',
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 0.8 }
+                paint: { 'line-color': '#ef4444', 'line-width': 5, 'line-opacity': 0.8 }
             });
         }
 
