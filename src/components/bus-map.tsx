@@ -240,74 +240,90 @@ export default function BusMap({
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    const updateStopLayer = () => {
-      if (!map.isStyleLoaded()) return;
+    let cancelled = false;
 
-      if (!map.getSource('technical-bus-stops')) {
-        map.addSource('technical-bus-stops', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] }
-        });
+    const ensureLayerAndData = () => {
+      if (cancelled) return;
 
-        map.addLayer({
-          id: 'technical-bus-stops-layer',
-          type: 'circle',
-          source: 'technical-bus-stops',
-          paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2, 15, 6],
-            'circle-color': '#2563eb',
-            'circle-stroke-width': 2,
-            'circle-stroke-color': '#ffffff'
+      try {
+        // Create source if it doesn't exist
+        if (!map.getSource('technical-bus-stops')) {
+          map.addSource('technical-bus-stops', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] }
+          });
+        }
+
+        // Create layer if it doesn't exist
+        if (!map.getLayer('technical-bus-stops-layer')) {
+          map.addLayer({
+            id: 'technical-bus-stops-layer',
+            type: 'circle',
+            source: 'technical-bus-stops',
+            paint: {
+              'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2, 15, 6],
+              'circle-color': '#2563eb',
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#ffffff'
+            }
+          });
+
+          // Interactive "Flag" popup for stops showing operational details
+          map.on('click', 'technical-bus-stops-layer', (e) => {
+            if (!e.features?.length) return;
+            const feature = e.features[0];
+            const props = feature.properties;
+            
+            new mapboxgl.Popup({ 
+              className: 'bus-stop-popup',
+              closeButton: false,
+              offset: 10
+            })
+              .setLngLat(e.lngLat)
+              .setHTML(`
+                <div class="flex flex-col items-center text-center">
+                  <div class="font-bold text-[13px] leading-tight whitespace-nowrap">${props?.name}</div>
+                  <div class="text-[10px] opacity-80 font-mono mt-1">${Number(props?.lat).toFixed(5)}, ${Number(props?.lng).toFixed(5)}</div>
+                  <div class="text-[9px] opacity-60 uppercase font-black tracking-widest mt-0.5">${props?.atcoCode}</div>
+                </div>
+              `)
+              .addTo(map);
+          });
+
+          map.on('mouseenter', 'technical-bus-stops-layer', () => {
+            map.getCanvas().style.cursor = 'pointer';
+          });
+          map.on('mouseleave', 'technical-bus-stops-layer', () => {
+            map.getCanvas().style.cursor = '';
+          });
+        }
+
+        // Update the data
+        const source = map.getSource('technical-bus-stops') as mapboxgl.GeoJSONSource;
+        if (source) {
+          const features = showBusStops ? busStops.map(stop => ({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [stop.lng, stop.lat] },
+            properties: { ...stop }
+          })) : [];
+          source.setData({ type: 'FeatureCollection', features: features as any });
+        }
+      } catch (e) {
+        // Style may not be fully ready — retry on next idle or after a delay
+        if (!cancelled) {
+          const retry = () => { if (!cancelled) ensureLayerAndData(); };
+          if (typeof map.once === 'function') {
+            map.once('idle', retry);
+          } else {
+            setTimeout(retry, 300);
           }
-        });
-
-        // Interactive "Flag" popup for stops showing operational details
-        map.on('click', 'technical-bus-stops-layer', (e) => {
-          if (!e.features?.length) return;
-          const feature = e.features[0];
-          const props = feature.properties;
-          
-          new mapboxgl.Popup({ 
-            className: 'bus-stop-popup',
-            closeButton: false,
-            offset: 10
-          })
-            .setLngLat(e.lngLat)
-            .setHTML(`
-              <div class="flex flex-col items-center text-center">
-                <div class="font-bold text-[13px] leading-tight whitespace-nowrap">${props?.name}</div>
-                <div class="text-[10px] opacity-80 font-mono mt-1">${Number(props?.lat).toFixed(5)}, ${Number(props?.lng).toFixed(5)}</div>
-                <div class="text-[9px] opacity-60 uppercase font-black tracking-widest mt-0.5">${props?.atcoCode}</div>
-              </div>
-            `)
-            .addTo(map);
-        });
-
-        map.on('mouseenter', 'technical-bus-stops-layer', () => {
-          map.getCanvas().style.cursor = 'pointer';
-        });
-        map.on('mouseleave', 'technical-bus-stops-layer', () => {
-          map.getCanvas().style.cursor = '';
-        });
-      }
-
-      const source = map.getSource('technical-bus-stops') as mapboxgl.GeoJSONSource;
-      if (source) {
-        const features = showBusStops ? busStops.map(stop => ({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: [stop.lng, stop.lat] },
-          properties: { ...stop }
-        })) : [];
-        source.setData({ type: 'FeatureCollection', features: features as any });
+        }
       }
     };
 
-    // If style isn't loaded yet, wait for it then apply
-    if (map.isStyleLoaded()) {
-      updateStopLayer();
-    } else {
-      map.once('style.load', updateStopLayer);
-    }
+    ensureLayerAndData();
+
+    return () => { cancelled = true; };
   }, [busStops, showBusStops, mapLoaded, styleRevision]);
 
   const handleAddManualGeofence = useCallback((lngLat: mapboxgl.LngLat) => {
