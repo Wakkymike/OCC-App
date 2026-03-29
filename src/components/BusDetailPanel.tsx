@@ -20,6 +20,11 @@ import {
   GraduationCap,
   Timer,
   Info,
+  Mail,
+  CircleDot,
+  ArrowRight,
+  Loader2,
+  MapPinned,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -61,11 +66,47 @@ interface BusDetailPanelProps {
 
 export default function BusDetailPanel({ bus, allBuses, onClose, isOpen }: BusDetailPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [postcode, setPostcode] = useState<string | null>(null);
+  const [locality, setLocality] = useState<string | null>(null);
+  const [postcodeLoading, setPostcodeLoading] = useState(false);
 
   // Reset collapsed state when a new bus is selected
   useEffect(() => {
     if (bus) setCollapsed(false);
   }, [bus]);
+
+  // Reverse-geocode the bus position to get postcode
+  useEffect(() => {
+    if (!bus?.position) {
+      setPostcode(null);
+      setLocality(null);
+      return;
+    }
+
+    let cancelled = false;
+    const { lat, lng } = bus.position;
+
+    setPostcodeLoading(true);
+    fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) {
+          setPostcode(data.postcode ?? null);
+          setLocality(data.locality ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPostcode(null);
+          setLocality(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPostcodeLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [bus?.position?.lat, bus?.position?.lng]);
 
   const isFirstJourney = bus?.operator === 'GNW' && bus?.journeyRef && firstJourneyRefs.includes(bus.journeyRef);
   const isLastJourney = bus?.operator === 'GNW' && bus?.journeyRef && lastJourneyRefs.includes(bus.journeyRef);
@@ -153,6 +194,20 @@ export default function BusDetailPanel({ bus, allBuses, onClose, isOpen }: BusDe
             <ArrowUpDown className="h-3 w-3 shrink-0" />
             <span className="capitalize">{bus.direction?.toLowerCase()}</span>
           </div>
+          {(postcode || locality) && (
+            <div className="flex items-center gap-2 mt-1.5 text-xs">
+              <MapPinned className="h-3 w-3 shrink-0 text-primary" />
+              <span className="font-semibold">
+                {[locality, postcode].filter(Boolean).join(', ')}
+              </span>
+            </div>
+          )}
+          {postcodeLoading && (
+            <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Locating…</span>
+            </div>
+          )}
         </div>
 
         {/* Badges row */}
@@ -181,6 +236,66 @@ export default function BusDetailPanel({ bus, allBuses, onClose, isOpen }: BusDe
             </Badge>
           )}
         </div>
+
+        {/* Journey progress — last stop ➜ next stop */}
+        {(bus.lastStop || bus.nextStop || bus.origin) && (
+          <div className="px-4 py-3 space-y-2.5 border-b border-border">
+            <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Journey Progress</h3>
+
+            {bus.origin && (
+              <div className="flex items-start gap-2 text-xs">
+                <div className="w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <CircleDot className="h-3 w-3 text-emerald-500" />
+                </div>
+                <div>
+                  <span className="text-[9px] text-muted-foreground block">Origin</span>
+                  <span className="font-semibold">{bus.origin}</span>
+                </div>
+              </div>
+            )}
+
+            {bus.lastStop && (
+              <div className="flex items-start gap-2 text-xs">
+                <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <MapPin className="h-3 w-3 text-primary" />
+                </div>
+                <div>
+                  <span className="text-[9px] text-muted-foreground block">Last Stop Visited</span>
+                  <span className="font-semibold">{bus.lastStop}</span>
+                </div>
+              </div>
+            )}
+
+            {bus.nextStop && (
+              <div className="flex items-start gap-2 text-xs">
+                <div className="w-5 h-5 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <ArrowRight className="h-3 w-3 text-amber-500" />
+                </div>
+                <div>
+                  <span className="text-[9px] text-muted-foreground block">Next Stop</span>
+                  <span className="font-semibold">{bus.nextStop}</span>
+                  {bus.nextStopExpectedArrival && (
+                    <span className="text-[9px] text-muted-foreground ml-1">
+                      (ETA {new Date(bus.nextStopExpectedArrival).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {bus.destination && (
+              <div className="flex items-start gap-2 text-xs">
+                <div className="w-5 h-5 rounded-full bg-red-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <Navigation className="h-3 w-3 text-red-500" />
+                </div>
+                <div>
+                  <span className="text-[9px] text-muted-foreground block">Destination</span>
+                  <span className="font-semibold">{bus.destination}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Detail grid */}
         <div className="px-4 py-3 space-y-2 border-b border-border">

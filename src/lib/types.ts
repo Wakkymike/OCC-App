@@ -18,6 +18,14 @@ export interface Bus {
   delay?: number; 
   status: string; 
   operator: 'GNW' | 'MET' | 'VB' | 'SC' | 'FB' | 'DB';
+  /** Name of the previous / current stop from MonitoredCall (SIRI-VM) */
+  lastStop?: string;
+  /** Name of the next upcoming stop from the first OnwardCall */
+  nextStop?: string;
+  /** Expected arrival time at the next stop (ISO string) */
+  nextStopExpectedArrival?: string;
+  /** The origin / departure stop name */
+  origin?: string;
 }
 
 export interface BusStop {

@@ -148,8 +148,20 @@ export async function GET() {
               let delayInMinutes: number | undefined;
               let status: string = 'Active';
 
+              // MonitoredCall = the stop the bus is currently at or has just left
+              const monitoredCall = journey.MonitoredCall;
+              const lastStop = monitoredCall ? (getText(monitoredCall.StopPointName) ?? getText(monitoredCall.DestinationDisplay)) : undefined;
+
+              // OnwardCalls = upcoming stops
               const onwardCallsRaw = journey.OnwardCalls?.OnwardCall;
               const onwardCalls = onwardCallsRaw ? ensureArray(onwardCallsRaw) : [];
+
+              const firstOnward = onwardCalls[0];
+              const nextStop = firstOnward ? (getText(firstOnward.StopPointName) ?? getText(firstOnward.DestinationDisplay)) : undefined;
+              const nextStopExpectedArrival = firstOnward ? getText(firstOnward.ExpectedArrivalTime) : undefined;
+
+              // Origin stop name
+              const origin = getText(journey.OriginName)?.replace(/_/g, ' ');
               
               let callToUse = onwardCalls.find(c => getText(c.AimedArrivalTime) && getText(c.ExpectedArrivalTime));
               if (callToUse) {
@@ -173,6 +185,10 @@ export async function GET() {
                 delay: delayInMinutes,
                 status: status,
                 operator: operator,
+                lastStop: lastStop?.replace(/_/g, ' '),
+                nextStop: nextStop?.replace(/_/g, ' '),
+                nextStopExpectedArrival,
+                origin: origin,
               };
 
               const busKey = `${operator}-${fleetNumber}`;
