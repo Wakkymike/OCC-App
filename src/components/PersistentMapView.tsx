@@ -436,7 +436,8 @@ export default function PersistentMapView() {
 
   return (
     <div
-      className={isVisible ? 'fixed inset-0 z-[100]' : 'hidden'}
+      className="fixed inset-0 z-[100]"
+      style={isVisible ? undefined : { visibility: 'hidden', pointerEvents: 'none' }}
       aria-hidden={!isVisible}
     >
         <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
@@ -559,6 +560,7 @@ export default function PersistentMapView() {
           showGeofences={showGeofences}
           manualGeofenceMode={manualGeofenceMode}
           setManualGeofenceMode={setManualGeofenceMode}
+          isVisible={isVisible}
         />
         <RouteRecorderDialog
           isOpen={isRecorderOpen}

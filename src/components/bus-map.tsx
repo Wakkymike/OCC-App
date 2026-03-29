@@ -35,6 +35,7 @@ interface BusMapProps {
   showGeofences: boolean;
   manualGeofenceMode?: boolean;
   setManualGeofenceMode?: (val: boolean) => void;
+  isVisible?: boolean;
 }
 
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
@@ -81,6 +82,7 @@ export default function BusMap({
   showGeofences,
   manualGeofenceMode = false,
   setManualGeofenceMode,
+  isVisible = true,
 }: BusMapProps) {
   const { user } = useAuth();
   const { on, off } = useSocket();
@@ -155,6 +157,15 @@ export default function BusMap({
       }
     };
   }, []);
+
+  // Resize map when container becomes visible (e.g. navigating to /map)
+  useEffect(() => {
+    if (isVisible && mapRef.current) {
+      // Small delay lets the browser finish the layout pass after display changes
+      const id = requestAnimationFrame(() => mapRef.current?.resize());
+      return () => cancelAnimationFrame(id);
+    }
+  }, [isVisible]);
 
   // GTFS Route Layer
   useEffect(() => {
