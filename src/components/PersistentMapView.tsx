@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import BusMap from '@/components/bus-map';
 import { useBusTracker } from '@/hooks/use-bus-tracker';
@@ -302,17 +302,31 @@ export default function PersistentMapView() {
       }
     }
 
+
+    // Only recenter if the selected bus's position has changed
     const busToTrack = selectedBusId
       ? finalDisplayBuses.find((b) => {
           const busId = `${b.operator}-${b.fleetNumber}`;
           return busId === selectedBusId;
         })
       : undefined;
-
-    if (busToTrack && busToTrack.position) {
-      setMapView({ center: busToTrack.position, zoom: 16 });
-      return;
-    }
+    // Only recenter if the selected bus's position has changed
+    // (moved to top-level)
+    const lastCenteredRef = useRef<{ id: string; lat: number; lng: number } | null>(null);
+    useEffect(() => {
+      if (busToTrack && busToTrack.position) {
+        const { lat, lng } = busToTrack.position;
+        if (
+          !lastCenteredRef.current ||
+          lastCenteredRef.current.id !== selectedBusId ||
+          lastCenteredRef.current.lat !== lat ||
+          lastCenteredRef.current.lng !== lng
+        ) {
+          setMapView({ center: busToTrack.position, zoom: 16 });
+          lastCenteredRef.current = { id: selectedBusId!, lat, lng };
+        }
+      }
+    }, [busToTrack?.position?.lat, busToTrack?.position?.lng, selectedBusId]);
 
     if (isSearching) {
       if (finalDisplayBuses.length === 1) {

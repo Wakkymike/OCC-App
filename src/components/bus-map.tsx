@@ -706,9 +706,9 @@ export default function BusMap({
         </div>
       )}
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
-      {/* Zoom level indicator */}
+      {/* Zoom level indicator, positioned above the map controls button */}
       {mapLoaded && (
-        <div className="absolute bottom-[120px] right-[10px] z-[45] bg-background/80 backdrop-blur-sm text-xs font-mono font-bold px-2 py-1 rounded shadow border border-border text-foreground">
+        <div className="absolute bottom-[170px] right-[18px] z-[45] bg-background/90 backdrop-blur-sm text-xs font-mono font-bold px-2 py-1 rounded shadow border border-border text-foreground pointer-events-auto select-none">
           {Math.round((zoomLevel / 22) * 100)}%
         </div>
       )}
