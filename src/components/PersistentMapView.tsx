@@ -503,7 +503,7 @@ export default function PersistentMapView() {
                 <Layers3 className="h-5 w-5" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent side="top" align="end" className="w-auto p-0">
+            <PopoverContent side="top" align="end" className="w-auto p-0 z-[200]">
               <MapControls
                 mapStyle={mapStyle}
                 setMapStyle={setMapStyle}
