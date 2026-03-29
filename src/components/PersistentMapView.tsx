@@ -21,6 +21,7 @@ import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
 import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import BusDetailPanel from '@/components/BusDetailPanel';
 
 /**
  * This component is rendered at the layout level and stays mounted across
@@ -561,6 +562,12 @@ export default function PersistentMapView() {
           manualGeofenceMode={manualGeofenceMode}
           setManualGeofenceMode={setManualGeofenceMode}
           isVisible={isVisible}
+        />
+        <BusDetailPanel
+          bus={selectedBusId ? displayBuses.find(b => `${b.operator}-${b.fleetNumber}` === selectedBusId) ?? null : null}
+          allBuses={displayBuses}
+          onClose={() => setSelectedBusId(null)}
+          isOpen={!!selectedBusId}
         />
         <RouteRecorderDialog
           isOpen={isRecorderOpen}

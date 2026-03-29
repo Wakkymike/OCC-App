@@ -579,17 +579,9 @@ export default function BusMap({
       const busBody = el.querySelector('.bus-body-rect');
       
       if (flag) {
-        const dirLabel = bus.direction?.toLowerCase() === 'inbound' ? '[I]' : '[O]';
         const isFirstLast = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
         
-        const isSchool = bus.operator === 'GNW' && bus.journeyRef && schoolJourneyRefs.includes(bus.journeyRef);
-        const isNight = bus.operator === 'GNW' && bus.runningBoard && nightBusRunningBoards.includes(bus.runningBoard);
-        
-        let labelHtml = `${bus.fleetNumber} | ${bus.service} | ${dirLabel} ${bus.destination} | Board: ${bus.runningBoard}`;
-        if (isSchool) labelHtml += ' <span style="color: #ef4444; font-weight: bold;">[SCHOOL]</span>';
-        if (isNight) labelHtml += ' <span style="color: #9333ea; font-weight: bold;">[NIGHT]</span>';
-        
-        flag.innerHTML = labelHtml;
+        flag.textContent = bus.fleetNumber;
         flag.className = `bus-flag ${isFirstLast ? 'blinking-rb' : ''}`;
       }
 

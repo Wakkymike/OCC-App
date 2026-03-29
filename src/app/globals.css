@@ -309,6 +309,28 @@
     position: absolute;
 }
 
+/* ---- Mapbox Popup Dark-Mode Support ---- */
+.mapboxgl-popup-content {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2), 0 4px 6px -2px rgba(0,0,0,0.1) !important;
+}
+.mapboxgl-popup-close-button {
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 18px;
+}
+.mapboxgl-popup-close-button:hover {
+  color: hsl(var(--foreground)) !important;
+  background: hsl(var(--accent)) !important;
+  border-radius: 0 0.5rem 0 0.25rem;
+}
+.mapboxgl-popup-anchor-top .mapboxgl-popup-tip { border-bottom-color: hsl(var(--card)) !important; }
+.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip { border-top-color: hsl(var(--card)) !important; }
+.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: hsl(var(--card)) !important; }
+.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: hsl(var(--card)) !important; }
+
 /* Bus Stop Flag Popup Styles */
 .bus-stop-popup .mapboxgl-popup-content {
   background-color: #1a1a1a;
