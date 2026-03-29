@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import type { Bus } from '@/lib/types';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import type { Bus, BusStop } from '@/lib/types';
 import {
   X,
   ChevronRight,
@@ -57,6 +57,19 @@ const nightBusRunningBoards = [
   '11091', '11092', '11093', '13691', '13692', '13693',
 ];
 
+// Haversine distance in metres
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371e3;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
 interface BusDetailPanelProps {
   bus: Bus | null;
   allBuses: Bus[];
@@ -69,6 +82,39 @@ export default function BusDetailPanel({ bus, allBuses, onClose, isOpen }: BusDe
   const [postcode, setPostcode] = useState<string | null>(null);
   const [locality, setLocality] = useState<string | null>(null);
   const [postcodeLoading, setPostcodeLoading] = useState(false);
+  const [busStops, setBusStops] = useState<BusStop[]>([]);
+  const busStopsFetched = useRef(false);
+
+  // Fetch bus stops once for nearest-stop lookup
+  useEffect(() => {
+    if (busStopsFetched.current) return;
+    busStopsFetched.current = true;
+    fetch('/api/bus-stops')
+      .then((r) => r.json())
+      .then((data) => { if (data.stops) setBusStops(data.stops); })
+      .catch(() => {});
+  }, []);
+
+  // Compute nearest stop to the bus position (same logic as Live Service Board)
+  const nearestStop = useMemo(() => {
+    if (!bus?.position || busStops.length === 0) return null;
+    const { lat, lng } = bus.position;
+    let minDist = Infinity;
+    let nearest: BusStop | null = null;
+    // Narrow to ~1km bounding box first for performance
+    const nearby = busStops.filter(
+      (s) => Math.abs(s.lat - lat) < 0.01 && Math.abs(s.lng - lng) < 0.01
+    );
+    const searchSet = nearby.length > 0 ? nearby : busStops;
+    for (const stop of searchSet) {
+      const d = getDistance(lat, lng, stop.lat, stop.lng);
+      if (d < minDist) {
+        minDist = d;
+        nearest = stop;
+      }
+    }
+    return minDist < 400 ? nearest?.name ?? null : null;
+  }, [bus?.position?.lat, bus?.position?.lng, busStops]);
 
   // Reset collapsed state when a new bus is selected
   useEffect(() => {
@@ -238,7 +284,7 @@ export default function BusDetailPanel({ bus, allBuses, onClose, isOpen }: BusDe
         </div>
 
         {/* Journey progress — last stop ➜ next stop */}
-        {(bus.lastStop || bus.nextStop || bus.origin) && (
+        {(nearestStop || bus.lastStop || bus.nextStop || bus.origin) && (
           <div className="px-4 py-3 space-y-2.5 border-b border-border">
             <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Journey Progress</h3>
 
@@ -254,14 +300,14 @@ export default function BusDetailPanel({ bus, allBuses, onClose, isOpen }: BusDe
               </div>
             )}
 
-            {bus.lastStop && (
+            {(nearestStop || bus.lastStop) && (
               <div className="flex items-start gap-2 text-xs">
                 <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
                   <MapPin className="h-3 w-3 text-primary" />
                 </div>
                 <div>
-                  <span className="text-[9px] text-muted-foreground block">Last Stop Visited</span>
-                  <span className="font-semibold">{bus.lastStop}</span>
+                  <span className="text-[9px] text-muted-foreground block">Last Stop</span>
+                  <span className="font-semibold">{nearestStop ?? bus.lastStop}</span>
                 </div>
               </div>
             )}
