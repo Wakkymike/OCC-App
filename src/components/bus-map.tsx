@@ -550,17 +550,12 @@ export default function BusMap({
         flag.className = 'bus-flag';
         el.appendChild(flag);
         
-        const iconContainer = document.createElement('div');
-        iconContainer.innerHTML = `
-          <svg width="32" height="32" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5))">
-            <rect class="bus-body-rect" x="4" y="2" width="16" height="20" rx="3" fill="#FFC107" stroke="black" stroke-width="1.5"/>
-            <rect x="6" y="4" width="12" height="6" rx="1" fill="#333"/>
-            <rect x="6" y="14" width="12" height="1" fill="rgba(255,255,255,0.3)"/>
-            <line x1="8" y1="2" x2="8" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
-            <line x1="12" y1="2" x2="12" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
-            <line x1="16" y1="2" x2="16" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
-          </svg>`;
-        el.appendChild(iconContainer);
+        const img = document.createElement('img');
+        img.src = '/images/bus.png';
+        img.alt = 'bus';
+        img.className = 'bus-icon';
+        img.draggable = false;
+        el.appendChild(img);
         
         try {
           marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
@@ -576,7 +571,7 @@ export default function BusMap({
       
       const el = marker.getElement();
       const flag = el.querySelector('.bus-flag') as HTMLDivElement;
-      const busBody = el.querySelector('.bus-body-rect');
+      const img = el.querySelector('.bus-icon') as HTMLImageElement;
       
       if (flag) {
         const isFirstLast = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
@@ -585,11 +580,15 @@ export default function BusMap({
         flag.className = `bus-flag ${isFirstLast ? 'blinking-rb' : ''}`;
       }
 
-      if (busBody) {
-        let color = '#ef4444'; // Other operators
-        if (bus.operator === 'GNW') color = '#FFC107'; // GNW Yellow
-        if (markerId === selectedBusId) color = '#00FFFF'; // Highlight Cyan
-        busBody.setAttribute('fill', color);
+      if (img) {
+        const isSelected = markerId === selectedBusId;
+        const isGNW = bus.operator === 'GNW';
+        // GNW keeps natural colour; other operators get hue-rotated to red
+        img.style.filter = isSelected
+          ? 'drop-shadow(0 0 6px cyan) drop-shadow(0 0 10px cyan)'
+          : isGNW
+            ? 'none'
+            : 'hue-rotate(330deg) saturate(1.4)';
       }
     });
 
