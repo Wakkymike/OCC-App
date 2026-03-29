@@ -167,6 +167,26 @@ export default function BusMap({
     }
   }, [isVisible]);
 
+  // Dynamic bus-marker scaling based on map zoom level
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const updateBusScale = () => {
+      const zoom = map.getZoom();
+      // Scale markers proportionally to zoom: ~32px at z13, ~106px at z17, ~194px at z19
+      const size = Math.min(250, Math.max(32, 32 * Math.pow(1.35, zoom - 13)));
+      document.documentElement.style.setProperty('--bus-size', `${size}px`);
+      // Show LED text only when bus is large enough to see it (~zoom 16+)
+      document.documentElement.style.setProperty('--bus-led-opacity', size >= 80 ? '1' : '0');
+      document.documentElement.style.setProperty('--bus-led-play', size >= 80 ? 'running' : 'paused');
+    };
+
+    updateBusScale();
+    map.on('zoom', updateBusScale);
+    return () => { map.off('zoom', updateBusScale); };
+  }, [mapLoaded]);
+
   // GTFS Route Layer
   useEffect(() => {
     const map = mapRef.current;
@@ -549,13 +569,27 @@ export default function BusMap({
         const flag = document.createElement('div');
         flag.className = 'bus-flag';
         el.appendChild(flag);
-        
+
+        // Bus image container (scales via --bus-size CSS var)
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bus-img-container';
+
         const img = document.createElement('img');
         img.src = '/images/bus.png';
         img.alt = 'bus';
         img.className = 'bus-icon';
         img.draggable = false;
-        el.appendChild(img);
+        wrapper.appendChild(img);
+
+        // LED destination display overlay
+        const led = document.createElement('div');
+        led.className = 'bus-led';
+        const ledText = document.createElement('span');
+        ledText.className = 'bus-led-text';
+        led.appendChild(ledText);
+        wrapper.appendChild(led);
+
+        el.appendChild(wrapper);
         
         try {
           marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
@@ -572,6 +606,7 @@ export default function BusMap({
       const el = marker.getElement();
       const flag = el.querySelector('.bus-flag') as HTMLDivElement;
       const img = el.querySelector('.bus-icon') as HTMLImageElement;
+      const ledText = el.querySelector('.bus-led-text') as HTMLSpanElement;
       
       if (flag) {
         const isFirstLast = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
@@ -583,12 +618,23 @@ export default function BusMap({
       if (img) {
         const isSelected = markerId === selectedBusId;
         const isGNW = bus.operator === 'GNW';
-        // GNW keeps natural colour; other operators get hue-rotated to red
         img.style.filter = isSelected
           ? 'drop-shadow(0 0 6px cyan) drop-shadow(0 0 10px cyan)'
           : isGNW
             ? 'none'
             : 'hue-rotate(330deg) saturate(1.4)';
+      }
+
+      // Update LED destination display text
+      if (ledText) {
+        const displayText = `${bus.service}   ${bus.destination}`;
+        if (ledText.getAttribute('data-text') !== displayText) {
+          ledText.setAttribute('data-text', displayText);
+          ledText.textContent = displayText;
+          // Set scroll speed proportional to text length (~0.35s per character)
+          const duration = Math.max(5, displayText.length * 0.35);
+          ledText.style.animationDuration = `${duration}s`;
+        }
       }
     });
 

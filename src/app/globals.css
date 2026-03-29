@@ -273,7 +273,6 @@
   display:flex;
   flex-direction:column;
   align-items:center;
-  font-size:12px;
   text-align:center;
   pointer-events:none;
 }
@@ -288,28 +287,67 @@
   white-space: nowrap;
   font-weight: 600;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  font-size: clamp(10px, calc(var(--bus-size, 32px) * 0.38), 20px);
 }
 
-.bus-marker svg {
-  transform-origin:center center;
-  transition: transform 0.2s linear;
-}
-
-.bus-marker svg .stripe {
-  animation: stripeMove 0.5s linear infinite;
+/* Bus image container — scales dynamically via --bus-size CSS var set on :root by zoom handler */
+.bus-img-container {
+  position: relative;
+  width: var(--bus-size, 32px);
+  height: var(--bus-size, 32px);
+  transition: width 0.15s linear, height 0.15s linear;
+  flex-shrink: 0;
 }
 
 .bus-icon {
-  width: 32px;
-  height: 32px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   transition: filter 0.2s ease;
   filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
 }
 
-@keyframes stripeMove {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-4px); }
+/* --- LED Destination Display Overlay --- */
+/* Positioned exactly over the dark display band in bus.png */
+.bus-led {
+  position: absolute;
+  top: 24%;
+  left: 26%;
+  width: 48%;
+  height: 8%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  opacity: var(--bus-led-opacity, 0);
+  transition: opacity 0.3s ease;
+  border-radius: 1px;
+}
+
+.bus-led-text {
+  display: inline-block;
+  white-space: nowrap;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 900;
+  color: #33ff33;
+  text-shadow:
+    0 0 1px #33ff33,
+    0 0 3px rgba(51, 255, 51, 0.6),
+    0 0 6px rgba(51, 255, 51, 0.25);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: calc(var(--bus-size, 32px) * 0.056);
+  line-height: 1;
+  /* Classic marquee: padding-left pushes text to start off right edge,
+     translateX(-100%) scrolls it fully off the left */
+  padding-left: 100%;
+  animation: led-scroll 8s linear infinite;
+  animation-play-state: var(--bus-led-play, paused);
+}
+
+@keyframes led-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
 }
 
 .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right {
