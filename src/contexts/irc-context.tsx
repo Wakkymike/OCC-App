@@ -299,7 +299,8 @@ export function IrcProvider({ children }: { children: ReactNode }) {
       registeredRef.current = false;
       pendingNamesRef.current = [];
 
-      const ws = new WebSocket('wss://bus.valware.uk:6698');
+      const ircUrl = process.env.NEXT_PUBLIC_IRC_WS_URL || 'wss://bus.valware.uk:6698';
+      const ws = new WebSocket(ircUrl);
       wsRef.current = ws;
 
       /* local helper that closes over `ws` */
