@@ -97,6 +97,10 @@ export default function BusMap({
   const [configError, setConfigError] = useState<string | null>(null);
   const [busStops, setBusStops] = useState<BusStop[]>([]);
   const [monitoredHazards, setMonitoredHazards] = useState<MonitoredHazard[]>([]);
+  const [zoomLevel, setZoomLevel] = useState(13);
+  // Track whether user manually panned away while a bus is selected
+  const userPannedRef = useRef(false);
+  const flyingRef = useRef(false);
 
   const isAdmin = user?.isAdmin || user?.isSuperAdmin;
 
@@ -174,6 +178,7 @@ export default function BusMap({
 
     const updateBusScale = () => {
       const zoom = map.getZoom();
+      setZoomLevel(zoom);
       // Scale markers proportionally to zoom: ~32px at z13, ~106px at z17, ~194px at z19
       const size = Math.min(250, Math.max(32, 32 * Math.pow(1.35, zoom - 13)));
       document.documentElement.style.setProperty('--bus-size', `${size}px`);
@@ -184,8 +189,38 @@ export default function BusMap({
 
     updateBusScale();
     map.on('zoom', updateBusScale);
-    return () => { map.off('zoom', updateBusScale); };
+
+    // Detect user-initiated drag/pan so we stop force-following
+    const onDragStart = () => {
+      if (!flyingRef.current) userPannedRef.current = true;
+    };
+    map.on('dragstart', onDragStart);
+
+    return () => {
+      map.off('zoom', updateBusScale);
+      map.off('dragstart', onDragStart);
+    };
   }, [mapLoaded]);
+
+  // Fly to selected bus when selection changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !selectedBusId) return;
+
+    const bus = buses.find(b => `${b.operator}-${b.fleetNumber}` === selectedBusId);
+    if (!bus?.position) return;
+
+    userPannedRef.current = false;
+    // LED text becomes visible at ~zoom 16 (size >= 80px)
+    const targetZoom = Math.max(16, map.getZoom());
+    flyingRef.current = true;
+    map.flyTo({
+      center: [bus.position.lng, bus.position.lat],
+      zoom: targetZoom,
+      duration: 1200,
+    });
+    map.once('moveend', () => { flyingRef.current = false; });
+  }, [selectedBusId, mapLoaded]);
 
   // GTFS Route Layer
   useEffect(() => {
@@ -601,6 +636,13 @@ export default function BusMap({
         }
       } else {
         marker.setLngLat([bus.position.lng, bus.position.lat]);
+        // Smoothly follow the selected bus as it moves
+        if (markerId === selectedBusId && !userPannedRef.current) {
+          map.easeTo({
+            center: [bus.position.lng, bus.position.lat],
+            duration: 600,
+          });
+        }
       }
       
       const el = marker.getElement();
@@ -664,6 +706,12 @@ export default function BusMap({
         </div>
       )}
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+      {/* Zoom level indicator */}
+      {mapLoaded && (
+        <div className="absolute bottom-[120px] right-[10px] z-[45] bg-background/80 backdrop-blur-sm text-xs font-mono font-bold px-2 py-1 rounded shadow border border-border text-foreground">
+          {Math.round((zoomLevel / 22) * 100)}%
+        </div>
+      )}
     </div>
   );
 }
