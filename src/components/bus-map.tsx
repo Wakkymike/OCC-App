@@ -302,7 +302,12 @@ export default function BusMap({
       }
     };
 
-    updateStopLayer();
+    // If style isn't loaded yet, wait for it then apply
+    if (map.isStyleLoaded()) {
+      updateStopLayer();
+    } else {
+      map.once('style.load', updateStopLayer);
+    }
   }, [busStops, showBusStops, mapLoaded, styleRevision]);
 
   const handleAddManualGeofence = useCallback((lngLat: mapboxgl.LngLat) => {
