@@ -1,0 +1,575 @@
+'use client';
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import BusMap from '@/components/bus-map';
+import { useBusTracker } from '@/hooks/use-bus-tracker';
+import { useRoadworksTracker } from '@/hooks/useRoadworksTracker';
+import { useHazardsTracker } from '@/hooks/useHazardsTracker';
+import type { Bus, LatLng, MetrolinkData, JourneyPlan } from '@/lib/types';
+import SearchBar from '@/components/search-bar';
+import LocationSearchBar from '@/components/location-search-bar';
+import mapboxgl from 'mapbox-gl';
+import { Home, Layers3, Radio, ShieldPlus, AlertOctagon } from 'lucide-react';
+import { buttonVariants, Button } from '@/components/ui/button';
+import Link from 'next/link';
+import MapControls from '@/components/map-controls';
+import { useToast } from '@/hooks/use-toast';
+import RouteRecorderDialog from '@/components/route-recorder';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import preRecordedRoutes from '@/lib/pre-recorded-routes.json';
+import { useAuth } from '@/contexts/auth-context';
+import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+/**
+ * This component is rendered at the layout level and stays mounted across
+ * route navigations. It is visible (display:contents) only when the user
+ * is on the /map route and hidden (display:none) otherwise, so the Mapbox
+ * GL instance, bus-tracker polling and all UI state survive tab switches.
+ */
+export default function PersistentMapView() {
+  const pathname = usePathname();
+  const isVisible = pathname === '/map';
+
+  const { user } = useAuth();
+
+  // Consolidated Admin Check
+  const isSuperAdmin = user?.isSuperAdmin;
+  const isAdmin = !!user?.isAdmin || isSuperAdmin;
+
+  const { buses, error: busError } = useBusTracker();
+  const { roadworks, error: roadworksError } = useRoadworksTracker();
+  const { hazards, error: hazardsError } = useHazardsTracker();
+
+  const [displayBuses, setDisplayBuses] = useState<Bus[]>([]);
+  const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
+  const [searchedPlace, setSearchedPlace] = useState<LatLng | null>(null);
+  const [mapView, setMapView] = useState<{
+    center?: LatLng;
+    bounds?: mapboxgl.LngLatBounds;
+    zoom?: number;
+  }>({});
+  const [currentSearch, setCurrentSearch] = useState<{
+    searchType: string;
+    query: string;
+    direction: 'all' | 'inbound' | 'outbound';
+  } | null>(null);
+
+  // Map layer states
+  const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/streets-v12');
+  const [show3DBuildings, setShow3DBuildings] = useState(true);
+  const [showBusStops, setShowBusStops] = useState(true);
+  const [showGnw, setShowGnw] = useState(true);
+  const [showMetroline, setShowMetroline] = useState(false);
+  const [showVisionBus, setShowVisionBus] = useState(false);
+  const [showStagecoach, setShowStagecoach] = useState(false);
+  const [showFirstBus, setShowFirstBus] = useState(false);
+  const [showDiamondBus, setShowDiamondBus] = useState(false);
+  const [showRoadworks, setShowRoadworks] = useState(true);
+  const [showHazards, setShowHazards] = useState(false);
+  const [showGeofences, setShowGeofences] = useState(true);
+
+  const [manualGeofenceMode, setManualGeofenceMode] = useState(false);
+
+  const { toast } = useToast();
+
+  const [metrolinkData, setMetrolinkData] = useState<MetrolinkData | null>(null);
+  const [txcRoutes, setTxcRoutes] = useState<Record<string, { name: string; route: LatLng[]; busId: string | null }>>({});
+  const [gtfsRoutes, setGtfsRoutes] = useState<Record<string, any>>({});
+  const [selectedGtfsRouteId, setSelectedGtfsRouteId] = useState<string | null>(null);
+  const [showGtfsRoute, setShowGtfsRoute] = useState(false);
+
+  // State for route recording
+  const [isRecording, setIsRecording] = useState(false);
+  const [activeRecordingRoute, setActiveRecordingRoute] = useState<LatLng[]>([]);
+  const [recordingBusId, setRecordingBusId] = useState<string | null>(null);
+  const [recordingService, setRecordingService] = useState<string | null>(null);
+
+  const [userSavedRoutes, setUserSavedRoutes] = useState<Record<string, { name: string; route: LatLng[]; busId: string | null }>>({});
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+
+  const [initialRoutes] = useState<Record<string, { name: string; route: LatLng[]; busId: string | null }>>(preRecordedRoutes);
+
+  const allAvailableRoutes = useMemo(() => {
+    return {
+      ...initialRoutes,
+      ...txcRoutes,
+      ...userSavedRoutes,
+    };
+  }, [initialRoutes, userSavedRoutes, txcRoutes]);
+
+  const [isRecorderOpen, setIsRecorderOpen] = useState(false);
+
+  // Check for Mapbox Token availability
+  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+
+  // Memoize last known position to avoid adding duplicate points
+  const lastRecordedPosition = useMemo(() => {
+    if (activeRecordingRoute.length === 0) return null;
+    return activeRecordingRoute[activeRecordingRoute.length - 1];
+  }, [activeRecordingRoute]);
+
+  const routeToDisplay = useMemo(() => {
+    if (selectedRouteId && allAvailableRoutes[selectedRouteId]) {
+      return allAvailableRoutes[selectedRouteId].route;
+    }
+    return null;
+  }, [selectedRouteId, allAvailableRoutes]);
+
+  const gtfsRouteToDisplay = useMemo(() => {
+    if (showGtfsRoute && selectedGtfsRouteId && gtfsRoutes[selectedGtfsRouteId]) {
+      return gtfsRoutes[selectedGtfsRouteId].path;
+    }
+    return null;
+  }, [showGtfsRoute, selectedGtfsRouteId, gtfsRoutes]);
+
+  const handleStopRecording = useCallback(() => {
+    if (isRecording && recordingService && activeRecordingRoute.length > 1) {
+      const routeId = `${recordingService}-${Date.now()}`;
+      const routeName = `Service ${recordingService} (${new Date().toLocaleTimeString()})`;
+      setUserSavedRoutes((prev) => ({
+        ...prev,
+        [routeId]: {
+          name: routeName,
+          route: activeRecordingRoute,
+          busId: recordingBusId,
+        },
+      }));
+      setSelectedRouteId(routeId);
+      toast({ title: 'Route Saved', description: `${routeName} has been saved.` });
+    }
+    setIsRecording(false);
+    setRecordingService(null);
+    setRecordingBusId(null);
+    setActiveRecordingRoute([]);
+  }, [isRecording, recordingService, activeRecordingRoute, recordingBusId, toast]);
+
+  const searchParams = useSearchParams();
+  const [journeyPlan, setJourneyPlan] = useState<JourneyPlan | null>(null);
+  const [dataFetched, setDataFetched] = useState(false);
+
+  // Handle search-param driven state (busId, journey) — only when visible
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const busIdFromQuery = searchParams.get('busId');
+    if (busIdFromQuery) {
+      setSelectedBusId(decodeURIComponent(busIdFromQuery));
+      const newUrl = window.location.pathname;
+      window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
+    }
+
+    const journeyParam = searchParams.get('journey');
+    if (journeyParam) {
+      try {
+        const plan = JSON.parse(journeyParam) as JourneyPlan;
+        setJourneyPlan(plan);
+
+        const newBounds = new mapboxgl.LngLatBounds();
+        plan.path.forEach((p) => newBounds.extend([p.lng, p.lat]));
+        if (!newBounds.isEmpty()) {
+          setMapView({ bounds: newBounds });
+        }
+
+        const newUrl = window.location.pathname;
+        window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
+      } catch (e) {
+        console.error('Failed to parse journey plan from URL', e);
+        toast({
+          variant: 'destructive',
+          title: 'Could not display journey',
+          description: 'There was an error reading the planned journey from the URL.',
+        });
+      }
+    }
+  }, [isVisible, searchParams, toast]);
+
+  // Fetch supplementary data once
+  useEffect(() => {
+    if (dataFetched) return;
+
+    const fetchData = async () => {
+      try {
+        const [metroRes, routesRes, gtfsRes] = await Promise.all([
+          fetch('/api/metrolink'),
+          fetch('/api/routes'),
+          fetch('/api/gtfs-data'),
+        ]);
+
+        if (metroRes.ok) setMetrolinkData(await metroRes.json());
+        if (routesRes.ok) {
+          const data = await routesRes.json();
+          setTxcRoutes(data.txcRoutes || {});
+        }
+        if (gtfsRes.ok) {
+          const data = await gtfsRes.json();
+          setGtfsRoutes(data.gtfsRoutes || {});
+        }
+      } catch (err) {
+        console.error('Error fetching supplementary map data:', err);
+      }
+      setDataFetched(true);
+    };
+
+    fetchData();
+  }, [dataFetched]);
+
+  useEffect(() => {
+    if (showGtfsRoute && selectedGtfsRouteId && gtfsRoutes[selectedGtfsRouteId]) {
+      const path = gtfsRoutes[selectedGtfsRouteId].path;
+      if (path && path.length > 0) {
+        const bounds = new mapboxgl.LngLatBounds();
+        path.forEach((p: LatLng) => bounds.extend([p.lng, p.lat]));
+        setMapView({ bounds });
+      }
+    }
+  }, [showGtfsRoute, selectedGtfsRouteId, gtfsRoutes]);
+
+  useEffect(() => {
+    // 1. Filter buses based on the operator toggles
+    const operatorFilteredBuses = buses.filter(
+      (bus) =>
+        (bus.operator === 'GNW' && showGnw) ||
+        (bus.operator === 'MET' && showMetroline) ||
+        (bus.operator === 'VB' && showVisionBus) ||
+        (bus.operator === 'SC' && showStagecoach) ||
+        (bus.operator === 'FB' && showFirstBus) ||
+        (bus.operator === 'DB' && showDiamondBus),
+    );
+
+    // 2. Filter by search query if there is one
+    let searchFilteredBuses = operatorFilteredBuses;
+    let isSearching = false;
+    if (currentSearch) {
+      const { searchType, query, direction } = currentSearch;
+      isSearching = query !== '' || (searchType === 'service' && direction !== 'all');
+
+      if (isSearching) {
+        const lowerCaseQuery = query.toLowerCase();
+
+        searchFilteredBuses = operatorFilteredBuses.filter((bus) => {
+          if (searchType === 'fleetNumber') {
+            return String(bus.fleetNumber).toLowerCase().includes(lowerCaseQuery);
+          } else if (searchType === 'runningBoard') {
+            return String(bus.runningBoard).toLowerCase().includes(lowerCaseQuery);
+          } else if (searchType === 'journey') {
+            return String(bus.journeyRef ?? '').toLowerCase().includes(lowerCaseQuery);
+          } else if (searchType === 'service') {
+            const serviceMatch = !query || String(bus.service).toLowerCase() === lowerCaseQuery;
+            const directionMatch = direction === 'all' || String(bus.direction).toLowerCase() === direction;
+            return serviceMatch && directionMatch;
+          }
+          return false;
+        });
+      }
+    }
+
+    const finalDisplayBuses = searchFilteredBuses;
+    setDisplayBuses(finalDisplayBuses);
+
+    // 3. Handle route recording and map view updates
+    if (isRecording) {
+      if (!recordingBusId) {
+        const busToStartTracking = finalDisplayBuses.find((b) => b.service === recordingService);
+        if (busToStartTracking) {
+          const busId = `${busToStartTracking.operator}-${busToStartTracking.fleetNumber}`;
+          setRecordingBusId(busId);
+          setActiveRecordingRoute([]);
+          toast({
+            title: 'Recording Started',
+            description: `Now recording route for bus ${busToStartTracking.fleetNumber} on service ${recordingService}.`,
+          });
+        }
+      } else {
+        const trackedBus = finalDisplayBuses.find((b) => {
+          const busId = `${b.operator}-${b.fleetNumber}`;
+          return busId === recordingBusId;
+        });
+        if (trackedBus && trackedBus.position) {
+          if (
+            !lastRecordedPosition ||
+            trackedBus.position.lat !== lastRecordedPosition.lat ||
+            trackedBus.position.lng !== lastRecordedPosition.lng
+          ) {
+            setActiveRecordingRoute((prev) => [...prev, trackedBus.position!]);
+          }
+        } else {
+          handleStopRecording();
+          toast({ title: 'Recording Stopped', description: `Bus tracking ended. Route saved.` });
+        }
+      }
+    }
+
+    const busToTrack = selectedBusId
+      ? finalDisplayBuses.find((b) => {
+          const busId = `${b.operator}-${b.fleetNumber}`;
+          return busId === selectedBusId;
+        })
+      : undefined;
+
+    if (busToTrack && busToTrack.position) {
+      setMapView({ center: busToTrack.position, zoom: 16 });
+      return;
+    }
+
+    if (isSearching) {
+      if (finalDisplayBuses.length === 1) {
+        const bus = finalDisplayBuses[0];
+        if (bus.position) {
+          const busId = `${bus.operator}-${bus.fleetNumber}`;
+          setSelectedBusId(busId);
+          setMapView({ center: bus.position, zoom: 16 });
+        }
+      } else if (finalDisplayBuses.length > 1) {
+        const newBounds = new mapboxgl.LngLatBounds();
+        finalDisplayBuses.forEach((bus) => {
+          if (bus.position) {
+            newBounds.extend([bus.position.lng, bus.position.lat]);
+          }
+        });
+        if (!newBounds.isEmpty()) {
+          setSelectedBusId(null);
+          setMapView({ bounds: newBounds });
+        }
+      } else {
+        setSelectedBusId(null);
+      }
+    }
+  }, [
+    buses, currentSearch, selectedBusId, isRecording, recordingBusId,
+    recordingService, toast, lastRecordedPosition, handleStopRecording,
+    showGnw, showMetroline, showVisionBus, showStagecoach, showFirstBus, showDiamondBus,
+  ]);
+
+  const handleLocationSearch = async (query: string) => {
+    setSelectedBusId(null);
+    setCurrentSearch(null);
+    setSearchedPlace(null);
+    try {
+      const response = await fetch(`/api/geocode?query=${encodeURIComponent(query)}`);
+      const data = await response.json();
+
+      if (response.ok && data.coordinates) {
+        setSearchedPlace(data.coordinates);
+      } else {
+        setSearchedPlace(null);
+        toast({
+          variant: 'destructive',
+          title: 'Location not found',
+          description: `Could not find a location for "${query}".`,
+        });
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+    }
+  };
+
+  const handleBusSearch = (searchType: string, query: string, direction: 'all' | 'inbound' | 'outbound') => {
+    setSelectedBusId(null);
+    setSearchedPlace(null);
+    setCurrentSearch({ searchType, query, direction });
+  };
+
+  const handleLocationClear = () => {
+    setSearchedPlace(null);
+    setMapView({});
+  };
+
+  const handleBusClear = () => {
+    setCurrentSearch(null);
+    setSelectedBusId(null);
+    setMapView({});
+  };
+
+  const handleStartRecording = (service: string) => {
+    setIsRecording(true);
+    setRecordingService(service);
+    setRecordingBusId(null);
+    setActiveRecordingRoute([]);
+  };
+
+  const handleExport = () => {
+    if (!selectedRouteId || !allAvailableRoutes[selectedRouteId]) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: 'Please select a route to export.' });
+      return;
+    }
+
+    const routeToExport = allAvailableRoutes[selectedRouteId];
+
+    const geoJson = {
+      type: 'Feature',
+      properties: {
+        name: routeToExport.name,
+        service: routeToExport.name.split(' ')[1],
+        busId: routeToExport.busId,
+        recordedAt: new Date().toISOString(),
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: routeToExport.route.map((p) => [p.lng, p.lat]),
+      },
+    };
+
+    const blob = new Blob([JSON.stringify(geoJson, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `route-${routeToExport.name.replace(/[\s():]/g, '_')}.geojson`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: 'Export Successful', description: `Route downloaded.` });
+  };
+
+  const toggleManualGeofence = () => {
+    const newState = !manualGeofenceMode;
+    setManualGeofenceMode(newState);
+    if (newState) {
+      toast({ title: 'Manual Geofence Mode', description: 'Click anywhere on the map to add a monitoring zone.' });
+    }
+  };
+
+  // Don't render anything until the user is logged in
+  if (!user) return null;
+
+  return (
+    <div
+      className={isVisible ? 'fixed inset-0 z-[100]' : 'hidden'}
+      aria-hidden={!isVisible}
+    >
+        <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
+          <Link
+            href="/"
+            className={buttonVariants({ variant: 'outline', size: 'icon' })}
+            aria-label="Home"
+          >
+            <Home className="h-5 w-5" />
+          </Link>
+          {isAdmin && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsRecorderOpen(true)}
+                aria-label="Open Route Recorder"
+              >
+                <Radio className="h-5 w-5" />
+              </Button>
+              <Button
+                variant={manualGeofenceMode ? 'destructive' : 'outline'}
+                size="icon"
+                onClick={toggleManualGeofence}
+                aria-label="Add Manual Geofence"
+                className={cn(manualGeofenceMode && 'animate-pulse')}
+              >
+                <ShieldPlus className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
+        </div>
+        <div className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-center items-start gap-4">
+          <LocationSearchBar onSearch={handleLocationSearch} onClear={handleLocationClear} />
+          <SearchBar onSearch={handleBusSearch} onClear={handleBusClear} />
+        </div>
+
+        {!mapboxToken && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4">
+            <Alert variant="destructive" className="bg-destructive text-destructive-foreground border-4 shadow-2xl">
+              <AlertOctagon className="h-6 w-6" />
+              <AlertTitle className="font-black text-lg">CONFIGURATION ERROR</AlertTitle>
+              <AlertDescription className="font-bold">
+                The Mapbox Access Token is missing from the environment variables. Please check your{' '}
+                <code className="bg-black/20 px-1 rounded">.env</code> file or VPS dashboard.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
+        {(busError || roadworksError || hazardsError) && (
+          <div className="absolute top-24 left-4 z-10 flex flex-col gap-2">
+            {busError && <p className="text-destructive bg-card p-2 rounded-lg shadow-md">{busError}</p>}
+            {roadworksError && <p className="text-destructive bg-card p-2 rounded-lg shadow-md">{roadworksError}</p>}
+            {hazardsError && <p className="text-destructive bg-card p-2 rounded-lg shadow-md">Hazards: {hazardsError}</p>}
+          </div>
+        )}
+        <div className="absolute bottom-4 right-4 z-10">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Map Layers">
+                <Layers3 className="h-5 w-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="end" className="w-auto p-0">
+              <MapControls
+                mapStyle={mapStyle}
+                setMapStyle={setMapStyle}
+                show3DBuildings={show3DBuildings}
+                setShow3DBuildings={setShow3DBuildings}
+                showBusStops={showBusStops}
+                setShowBusStops={setShowBusStops}
+                savedRoutes={allAvailableRoutes}
+                selectedRouteId={selectedRouteId}
+                setSelectedRouteId={setSelectedRouteId}
+                showGnw={showGnw}
+                setShowGnw={setShowGnw}
+                showMetroline={showMetroline}
+                setShowMetroline={setShowMetroline}
+                showVisionBus={showVisionBus}
+                setShowVisionBus={setShowVisionBus}
+                showStagecoach={showStagecoach}
+                setShowStagecoach={setShowStagecoach}
+                showFirstBus={showFirstBus}
+                setShowFirstBus={setShowFirstBus}
+                showDiamondBus={showDiamondBus}
+                setShowDiamondBus={setShowDiamondBus}
+                showRoadworks={showRoadworks}
+                setShowRoadworks={setShowRoadworks}
+                showHazards={showHazards}
+                setShowHazards={setShowHazards}
+                showGeofences={showGeofences}
+                setShowGeofences={setShowGeofences}
+                gtfsRoutes={gtfsRoutes}
+                selectedGtfsRouteId={selectedGtfsRouteId}
+                setSelectedGtfsRouteId={setSelectedGtfsRouteId}
+                showGtfsRoute={showGtfsRoute}
+                setShowGtfsRoute={setShowGtfsRoute}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+        <BusMap
+          buses={displayBuses}
+          selectedBusId={selectedBusId}
+          setSelectedBusId={setSelectedBusId}
+          searchedPlace={searchedPlace}
+          mapView={mapView}
+          mapStyle={mapStyle}
+          show3DBuildings={show3DBuildings}
+          showBusStops={showBusStops}
+          metrolinkData={metrolinkData}
+          routeToDisplay={routeToDisplay}
+          gtfsRouteToDisplay={gtfsRouteToDisplay}
+          journeyPlan={journeyPlan}
+          roadworks={roadworks}
+          showRoadworks={showRoadworks}
+          hazards={hazards}
+          showHazards={showHazards}
+          showGeofences={showGeofences}
+          manualGeofenceMode={manualGeofenceMode}
+          setManualGeofenceMode={setManualGeofenceMode}
+        />
+        <RouteRecorderDialog
+          isOpen={isRecorderOpen}
+          onClose={() => setIsRecorderOpen(false)}
+          onStartRecording={handleStartRecording}
+          onStopRecording={handleStopRecording}
+          onExport={handleExport}
+          isRecording={isRecording}
+          recordedPointsCount={activeRecordingRoute.length}
+          recordingService={recordingService}
+        />
+      </div>
+  );
+}

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/contexts/auth-context';
@@ -10,6 +11,7 @@ import { IrcProvider } from '@/contexts/irc-context';
 import ChatBubble from '@/components/ChatBubble';
 import SideNav from '@/components/SideNav';
 import { ThemeProvider } from '@/contexts/theme-context';
+import PersistentMapView from '@/components/PersistentMapView';
 
 export const metadata: Metadata = {
   title: 'OCC App',
@@ -38,6 +40,9 @@ export default function RootLayout({
             <IrcProvider>
               <AlertMonitor />
               <GlobalAlertOverlay />
+              <Suspense fallback={null}>
+              <PersistentMapView />
+              </Suspense>
               <div className="flex min-h-screen">
                 <SideNav />
                 <div className="flex-1 min-w-0 flex flex-col">
