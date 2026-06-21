@@ -185,8 +185,19 @@ export function IrcProvider({ children }: { children: ReactNode }) {
   const n2rRef = useRef(new Map<string, string>()); // nick → realname
   const pendingNamesRef = useRef<string[]>([]);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const registeredRef = useRef(false);
   const chatOpenRef = useRef(false);
+
+  const registerTimeout = useCallback((timeoutId: ReturnType<typeof setTimeout>) => {
+    activeTimeoutsRef.current.push(timeoutId);
+    return timeoutId;
+  }, []);
+
+  const clearAllActiveTimeouts = useCallback(() => {
+    activeTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+    activeTimeoutsRef.current = [];
+  }, []);
 
   /* ---- state (drives UI) ---- */
   const [messages, setMessages] = useState<IrcMessage[]>([]);
@@ -271,11 +282,19 @@ export function IrcProvider({ children }: { children: ReactNode }) {
     if (!realname) {
       // tear down any existing connection
       if (wsRef.current) {
+        wsRef.current.onopen = null;
+        wsRef.current.onmessage = null;
         wsRef.current.onclose = null;
+        wsRef.current.onerror = null;
         wsRef.current.close();
         wsRef.current = null;
       }
-      if (reconnectRef.current) clearTimeout(reconnectRef.current);
+      if (reconnectRef.current) {
+        clearTimeout(reconnectRef.current);
+        reconnectRef.current = null;
+      }
+      clearAllActiveTimeouts();
+      clearAllActiveTimeouts();
       setIsConnected(false);
       setMessages([]);
       setMembers([]);
@@ -334,7 +353,10 @@ export function IrcProvider({ children }: { children: ReactNode }) {
         setIsConnected(false);
         setMembers([]);
         registeredRef.current = false;
-        if (!dead) reconnectRef.current = setTimeout(connect, 5000);
+        if (!dead) {
+          if (reconnectRef.current) clearTimeout(reconnectRef.current);
+          reconnectRef.current = registerTimeout(setTimeout(connect, 5000));
+        }
       };
 
       ws.onerror = () => {
@@ -400,7 +422,7 @@ export function IrcProvider({ children }: { children: ReactNode }) {
             } else {
               // Request realname for newcomer; delay join msg so WHO can arrive
               raw(`WHO ${jNick}`);
-              setTimeout(() => {
+              registerTimeout(setTimeout(() => {
                 const rn = n2rRef.current.get(jNick) || jNick;
                 addMsg({
                   type: 'join',
@@ -416,7 +438,7 @@ export function IrcProvider({ children }: { children: ReactNode }) {
                     ? prev
                     : [...prev, { nick: jNick, realname: rn, prefix: '' }],
                 );
-              }, 600);
+              }, 600));
             }
             break;
           }
@@ -476,7 +498,7 @@ export function IrcProvider({ children }: { children: ReactNode }) {
             setMembers((prev) => prev.filter((m) => m.nick !== target));
             n2rRef.current.delete(target);
             if (target === nickRef.current) {
-              setTimeout(() => raw(`JOIN ${CHANNEL}`), 3000);
+              registerTimeout(setTimeout(() => raw(`JOIN ${CHANNEL}`), 3000));
             }
             break;
           }
