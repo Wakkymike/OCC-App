@@ -5,8 +5,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { Bus, LatLng, MetrolinkData, JourneyPlan, Roadwork, Hazard, MonitoredHazard, BusStop } from '@/lib/types';
-import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { doc, serverTimestamp, collection } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
+import { useSocket } from '@/contexts/socket-context';
+import { SOCKET_EVENTS } from '@/lib/socket/events';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -34,6 +35,7 @@ interface BusMapProps {
   showGeofences: boolean;
   manualGeofenceMode?: boolean;
   setManualGeofenceMode?: (val: boolean) => void;
+  isVisible?: boolean;
 }
 
 const firstJourneyRefs = ['1001', '1002', '1301', '1302', '1601', '1602'];
@@ -80,9 +82,10 @@ export default function BusMap({
   showGeofences,
   manualGeofenceMode = false,
   setManualGeofenceMode,
+  isVisible = true,
 }: BusMapProps) {
-  const { user } = useUser();
-  const firestore = useFirestore();
+  const { user } = useAuth();
+  const { on, off } = useSocket();
   const { toast } = useToast();
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -93,13 +96,23 @@ export default function BusMap({
   const [styleRevision, setStyleRevision] = useState(0);
   const [configError, setConfigError] = useState<string | null>(null);
   const [busStops, setBusStops] = useState<BusStop[]>([]);
+  const [monitoredHazards, setMonitoredHazards] = useState<MonitoredHazard[]>([]);
 
-  const monitoredRef = useMemoFirebase(() => user ? collection(firestore, 'monitoredHazards') : null, [firestore, user]);
-  const { data: monitoredHazards } = useCollection<MonitoredHazard>(monitoredRef);
+  const isAdmin = user?.isAdmin || user?.isSuperAdmin;
 
-  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [user, firestore]);
-  const { data: userProfile } = useDoc<any>(userProfileRef);
-  const isAdmin = userProfile?.isAdmin || user?.email === 'michael.dodsworth@gonorthwest.co.uk';
+  // Fetch monitored hazards via REST + listen for real-time updates
+  useEffect(() => {
+    if (!user) return;
+    fetch('/api/monitored-hazards').then(r => r.json()).then(data => setMonitoredHazards(data.hazards || [])).catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    const handler = () => {
+      fetch('/api/monitored-hazards').then(r => r.json()).then(data => setMonitoredHazards(data.hazards || [])).catch(() => {});
+    };
+    on(SOCKET_EVENTS.HAZARD_CHANGED, handler);
+    return () => { off(SOCKET_EVENTS.HAZARD_CHANGED, handler); };
+  }, [on, off]);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -145,6 +158,35 @@ export default function BusMap({
     };
   }, []);
 
+  // Resize map when container becomes visible (e.g. navigating to /map)
+  useEffect(() => {
+    if (isVisible && mapRef.current) {
+      // Small delay lets the browser finish the layout pass after display changes
+      const id = requestAnimationFrame(() => mapRef.current?.resize());
+      return () => cancelAnimationFrame(id);
+    }
+  }, [isVisible]);
+
+  // Dynamic bus-marker scaling based on map zoom level
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const updateBusScale = () => {
+      const zoom = map.getZoom();
+      // Scale markers proportionally to zoom: ~32px at z13, ~106px at z17, ~194px at z19
+      const size = Math.min(250, Math.max(32, 32 * Math.pow(1.35, zoom - 13)));
+      document.documentElement.style.setProperty('--bus-size', `${size}px`);
+      // Show LED text only when bus is large enough to see it (~zoom 16+)
+      document.documentElement.style.setProperty('--bus-led-opacity', size >= 80 ? '1' : '0');
+      document.documentElement.style.setProperty('--bus-led-play', size >= 80 ? 'running' : 'paused');
+    };
+
+    updateBusScale();
+    map.on('zoom', updateBusScale);
+    return () => { map.off('zoom', updateBusScale); };
+  }, [mapLoaded]);
+
   // GTFS Route Layer
   useEffect(() => {
     const map = mapRef.current;
@@ -163,7 +205,7 @@ export default function BusMap({
                 type: 'line',
                 source: 'gtfs-route',
                 layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#3b82f6', 'line-width': 5, 'line-opacity': 0.8 }
+                paint: { 'line-color': '#ef4444', 'line-width': 5, 'line-opacity': 0.8 }
             });
         }
 
@@ -198,69 +240,103 @@ export default function BusMap({
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    const updateStopLayer = () => {
-      if (!map.isStyleLoaded()) return;
+    let cancelled = false;
+    let retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-      if (!map.getSource('technical-bus-stops')) {
-        map.addSource('technical-bus-stops', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] }
-        });
+    const handleTechnicalStopClick = (e: mapboxgl.MapLayerMouseEvent) => {
+      if (!e.features?.length) return;
+      const feature = e.features[0];
+      const props = feature.properties;
 
-        map.addLayer({
-          id: 'technical-bus-stops-layer',
-          type: 'circle',
-          source: 'technical-bus-stops',
-          paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2, 15, 6],
-            'circle-color': '#2563eb',
-            'circle-stroke-width': 2,
-            'circle-stroke-color': '#ffffff'
+      new mapboxgl.Popup({
+        className: 'bus-stop-popup',
+        closeButton: false,
+        offset: 10,
+      })
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div class="flex flex-col items-center text-center">
+            <div class="font-bold text-[13px] leading-tight whitespace-nowrap">${props?.name}</div>
+            <div class="text-[10px] opacity-80 font-mono mt-1">${Number(props?.lat).toFixed(5)}, ${Number(props?.lng).toFixed(5)}</div>
+            <div class="text-[9px] opacity-60 uppercase font-black tracking-widest mt-0.5">${props?.atcoCode}</div>
+          </div>
+        `)
+        .addTo(map);
+    };
+
+    const handleTechnicalStopMouseEnter = () => {
+      map.getCanvas().style.cursor = 'pointer';
+    };
+
+    const handleTechnicalStopMouseLeave = () => {
+      map.getCanvas().style.cursor = '';
+    };
+
+    const ensureLayerAndData = () => {
+      if (cancelled) return;
+
+      try {
+        if (!map.getSource('technical-bus-stops')) {
+          map.addSource('technical-bus-stops', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] },
+          });
+        }
+
+        if (!map.getLayer('technical-bus-stops-layer')) {
+          map.addLayer({
+            id: 'technical-bus-stops-layer',
+            type: 'circle',
+            source: 'technical-bus-stops',
+            paint: {
+              'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 2, 15, 6],
+              'circle-color': '#2563eb',
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#ffffff',
+            },
+          });
+
+          map.on('click', 'technical-bus-stops-layer', handleTechnicalStopClick);
+          map.on('mouseenter', 'technical-bus-stops-layer', handleTechnicalStopMouseEnter);
+          map.on('mouseleave', 'technical-bus-stops-layer', handleTechnicalStopMouseLeave);
+        }
+
+        const source = map.getSource('technical-bus-stops') as mapboxgl.GeoJSONSource;
+        if (source) {
+          const features = showBusStops
+            ? busStops.map((stop) => ({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [stop.lng, stop.lat] },
+                properties: { ...stop },
+              }))
+            : [];
+          source.setData({ type: 'FeatureCollection', features: features as any });
+        }
+      } catch (e) {
+        if (!cancelled) {
+          const retry = () => { if (!cancelled) ensureLayerAndData(); };
+          if (typeof map.once === 'function') {
+            map.once('idle', retry);
+          } else {
+            retryTimeoutId = setTimeout(retry, 300);
           }
-        });
-
-        // Interactive "Flag" popup for stops showing operational details
-        map.on('click', 'technical-bus-stops-layer', (e) => {
-          if (!e.features?.length) return;
-          const feature = e.features[0];
-          const props = feature.properties;
-          
-          new mapboxgl.Popup({ 
-            className: 'bus-stop-popup',
-            closeButton: false,
-            offset: 10
-          })
-            .setLngLat(e.lngLat)
-            .setHTML(`
-              <div class="flex flex-col items-center text-center">
-                <div class="font-bold text-[13px] leading-tight whitespace-nowrap">${props?.name}</div>
-                <div class="text-[10px] opacity-80 font-mono mt-1">${Number(props?.lat).toFixed(5)}, ${Number(props?.lng).toFixed(5)}</div>
-                <div class="text-[9px] opacity-60 uppercase font-black tracking-widest mt-0.5">${props?.atcoCode}</div>
-              </div>
-            `)
-            .addTo(map);
-        });
-
-        map.on('mouseenter', 'technical-bus-stops-layer', () => {
-          map.getCanvas().style.cursor = 'pointer';
-        });
-        map.on('mouseleave', 'technical-bus-stops-layer', () => {
-          map.getCanvas().style.cursor = '';
-        });
-      }
-
-      const source = map.getSource('technical-bus-stops') as mapboxgl.GeoJSONSource;
-      if (source) {
-        const features = showBusStops ? busStops.map(stop => ({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: [stop.lng, stop.lat] },
-          properties: { ...stop }
-        })) : [];
-        source.setData({ type: 'FeatureCollection', features: features as any });
+        }
       }
     };
 
-    updateStopLayer();
+    ensureLayerAndData();
+
+    return () => {
+      cancelled = true;
+      if (map.getLayer('technical-bus-stops-layer')) {
+        map.off('click', 'technical-bus-stops-layer', handleTechnicalStopClick);
+        map.off('mouseenter', 'technical-bus-stops-layer', handleTechnicalStopMouseEnter);
+        map.off('mouseleave', 'technical-bus-stops-layer', handleTechnicalStopMouseLeave);
+      }
+      if (retryTimeoutId) {
+        clearTimeout(retryTimeoutId);
+      }
+    };
   }, [busStops, showBusStops, mapLoaded, styleRevision]);
 
   const handleAddManualGeofence = useCallback((lngLat: mapboxgl.LngLat) => {
@@ -315,7 +391,6 @@ export default function BusMap({
             return;
         }
 
-        const colRef = collection(firestore, 'monitoredHazards');
         const manualData = {
             hazardId: 'manual', 
             type: 'manual', 
@@ -323,16 +398,19 @@ export default function BusMap({
             location: { lat: lngLat.lat, lng: lngLat.lng },
             description, 
             radius, 
-            createdAt: serverTimestamp()
         };
 
-        addDocumentNonBlocking(colRef, manualData).then(() => {
+        fetch('/api/monitored-hazards', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(manualData),
+        }).then(() => {
             toast({ title: 'Manual Geofence Added' });
             popup.remove();
             if (setManualGeofenceMode) setManualGeofenceMode(false);
         });
     };
-  }, [isAdmin, firestore, toast, setManualGeofenceMode]);
+  }, [isAdmin, toast, setManualGeofenceMode]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -354,20 +432,24 @@ export default function BusMap({
 
   const handleAddGeofence = (hazard: Hazard, radius: number) => {
     if (!isAdmin) return;
-    const colRef = collection(firestore, 'monitoredHazards');
     const geoData = {
       hazardId: hazard.id, type: hazard.type, value: hazard.value, location: hazard.location,
-      description: hazard.description, radius, createdAt: serverTimestamp()
+      description: hazard.description, radius,
     };
-    addDocumentNonBlocking(colRef, geoData).then(() => {
+    fetch('/api/monitored-hazards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(geoData),
+    }).then(() => {
         toast({ title: 'Geofence Added' });
     });
   };
 
   const handleRemoveGeofence = (monitorId: string) => {
     if (!isAdmin) return;
-    deleteDocumentNonBlocking(doc(firestore, 'monitoredHazards', monitorId));
-    toast({ title: 'Geofence Removed' });
+    fetch(`/api/monitored-hazards/${monitorId}`, { method: 'DELETE' }).then(() => {
+      toast({ title: 'Geofence Removed' });
+    });
   };
 
   useEffect(() => {
@@ -521,18 +603,27 @@ export default function BusMap({
         const flag = document.createElement('div');
         flag.className = 'bus-flag';
         el.appendChild(flag);
-        
-        const iconContainer = document.createElement('div');
-        iconContainer.innerHTML = `
-          <svg width="32" height="32" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5))">
-            <rect class="bus-body-rect" x="4" y="2" width="16" height="20" rx="3" fill="#FFC107" stroke="black" stroke-width="1.5"/>
-            <rect x="6" y="4" width="12" height="6" rx="1" fill="#333"/>
-            <rect x="6" y="14" width="12" height="1" fill="rgba(255,255,255,0.3)"/>
-            <line x1="8" y1="2" x2="8" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
-            <line x1="12" y1="2" x2="12" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
-            <line x1="16" y1="2" x2="16" y2="22" stroke="rgba(0,0,0,0.1)" stroke-width="0.5" />
-          </svg>`;
-        el.appendChild(iconContainer);
+
+        // Bus image container (scales via --bus-size CSS var)
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bus-img-container';
+
+        const img = document.createElement('img');
+        img.src = '/images/bus.png';
+        img.alt = 'bus';
+        img.className = 'bus-icon';
+        img.draggable = false;
+        wrapper.appendChild(img);
+
+        // LED destination display overlay
+        const led = document.createElement('div');
+        led.className = 'bus-led';
+        const ledText = document.createElement('span');
+        ledText.className = 'bus-led-text';
+        led.appendChild(ledText);
+        wrapper.appendChild(led);
+
+        el.appendChild(wrapper);
         
         try {
           marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
@@ -548,28 +639,36 @@ export default function BusMap({
       
       const el = marker.getElement();
       const flag = el.querySelector('.bus-flag') as HTMLDivElement;
-      const busBody = el.querySelector('.bus-body-rect');
+      const img = el.querySelector('.bus-icon') as HTMLImageElement;
+      const ledText = el.querySelector('.bus-led-text') as HTMLSpanElement;
       
       if (flag) {
-        const dirLabel = bus.direction?.toLowerCase() === 'inbound' ? '[I]' : '[O]';
         const isFirstLast = bus.operator === 'GNW' && bus.journeyRef && (firstJourneyRefs.includes(bus.journeyRef) || lastJourneyRefs.includes(bus.journeyRef));
         
-        const isSchool = bus.operator === 'GNW' && bus.journeyRef && schoolJourneyRefs.includes(bus.journeyRef);
-        const isNight = bus.operator === 'GNW' && bus.runningBoard && nightBusRunningBoards.includes(bus.runningBoard);
-        
-        let labelHtml = `${bus.fleetNumber} | ${bus.service} | ${dirLabel} ${bus.destination} | Board: ${bus.runningBoard}`;
-        if (isSchool) labelHtml += ' <span style="color: #ef4444; font-weight: bold;">[SCHOOL]</span>';
-        if (isNight) labelHtml += ' <span style="color: #9333ea; font-weight: bold;">[NIGHT]</span>';
-        
-        flag.innerHTML = labelHtml;
+        flag.textContent = bus.fleetNumber;
         flag.className = `bus-flag ${isFirstLast ? 'blinking-rb' : ''}`;
       }
 
-      if (busBody) {
-        let color = '#ef4444'; // Other operators
-        if (bus.operator === 'GNW') color = '#FFC107'; // GNW Yellow
-        if (markerId === selectedBusId) color = '#00FFFF'; // Highlight Cyan
-        busBody.setAttribute('fill', color);
+      if (img) {
+        const isSelected = markerId === selectedBusId;
+        const isGNW = bus.operator === 'GNW';
+        img.style.filter = isSelected
+          ? 'drop-shadow(0 0 6px cyan) drop-shadow(0 0 10px cyan)'
+          : isGNW
+            ? 'none'
+            : 'hue-rotate(330deg) saturate(1.4)';
+      }
+
+      // Update LED destination display text
+      if (ledText) {
+        const displayText = `${bus.service}   ${bus.destination}`;
+        if (ledText.getAttribute('data-text') !== displayText) {
+          ledText.setAttribute('data-text', displayText);
+          ledText.textContent = displayText;
+          // Set scroll speed proportional to text length (~0.35s per character)
+          const duration = Math.max(5, displayText.length * 0.35);
+          ledText.style.animationDuration = `${duration}s`;
+        }
       }
     });
 

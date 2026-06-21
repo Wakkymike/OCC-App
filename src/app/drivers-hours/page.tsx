@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useFirestore, useCollection, useMemoFirebase, deleteDocumentNonBlocking, addDocumentNonBlocking, useUser } from '@/firebase';
-import { collection, serverTimestamp, query, orderBy, limit, doc } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Clock, Plus, Trash2, Save, AlertTriangle, User, Hash, History, Home, Coffee, FileText, Info, ChevronDown, ChevronUp, FileDown, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -62,22 +61,30 @@ const LIMIT_DAILY_DRIVING_MINS = 10 * 60; // 600 mins
 const LIMIT_SHIFT_MINS = 16 * 60; // 960 mins
 
 export default function DriversHoursPage() {
-  const { user } = useUser();
+  const { user } = useAuth();
   const [driverName, setDriverName] = useState('');
   const [employeeNumber, setEmployeeNumber] = useState('');
   const [segments, setSegments] = useState<DrivingSegment[]>([{ start: '', end: '', type: 'driving' }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [history, setHistory] = useState<Record[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   
-  const firestore = useFirestore();
   const { toast } = useToast();
 
-  const historyQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'driverHours'), orderBy('createdAt', 'desc'), limit(50)),
-    [firestore]
-  );
-  const { data: history, isLoading: isHistoryLoading } = useCollection<Record>(historyQuery);
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch('/api/driver-hours');
+      if (res.ok) setHistory(await res.json());
+    } catch (e) {
+      console.error('Failed to fetch driver hours', e);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchHistory(); }, []);
 
   const addDrivingSegment = () => setSegments([...segments, { start: '', end: '', type: 'driving' }]);
   const addBreakSegment = () => setSegments([...segments, { start: '', end: '', type: 'break' }]);
@@ -158,7 +165,7 @@ export default function DriversHoursPage() {
     return { totalDrivingMinutes, totalShiftMinutes, maxContinuousMins, currentContinuousMins, breaches, breaksDetected };
   }, [segments]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!driverName || !employeeNumber) {
       toast({ variant: 'destructive', title: 'Error', description: 'Please enter driver details.' });
       return;
@@ -170,30 +177,34 @@ export default function DriversHoursPage() {
     }
 
     setIsSubmitting(true);
-    const colRef = collection(firestore, 'driverHours');
-    const recordData = {
-        driverName,
-        employeeNumber,
-        date: new Date().toLocaleDateString('en-GB'),
-        segments,
-        totalDrivingMinutes: calculations.totalDrivingMinutes,
-        totalShiftMinutes: calculations.totalShiftMinutes,
-        maxContinuousMins: calculations.maxContinuousMins,
-        hasBreach: calculations.breaches.length > 0,
-        breachTypes: calculations.breaches,
-        createdAt: serverTimestamp(),
-    };
-
-    addDocumentNonBlocking(colRef, recordData)
-        .then(() => {
-            toast({ title: 'Success', description: 'Record saved successfully.' });
-            setSegments([{ start: '', end: '', type: 'driving' }]);
-            setDriverName('');
-            setEmployeeNumber('');
-        })
-        .finally(() => {
-            setIsSubmitting(false);
-        });
+    try {
+      const res = await fetch('/api/driver-hours', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverName,
+          employeeNumber,
+          date: new Date().toLocaleDateString('en-GB'),
+          segments,
+          totalDrivingMinutes: calculations.totalDrivingMinutes,
+          totalShiftMinutes: calculations.totalShiftMinutes,
+          maxContinuousMins: calculations.maxContinuousMins,
+          hasBreach: calculations.breaches.length > 0,
+          breachTypes: calculations.breaches,
+        }),
+      });
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Record saved successfully.' });
+        setSegments([{ start: '', end: '', type: 'driving' }]);
+        setDriverName('');
+        setEmployeeNumber('');
+        fetchHistory();
+      }
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to save record.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -256,8 +267,9 @@ export default function DriversHoursPage() {
     toast({ title: 'PDF Exported' });
   };
 
-  const handleDeleteRecord = (id: string) => {
-    deleteDocumentNonBlocking(doc(firestore, 'driverHours', id));
+  const handleDeleteRecord = async (id: string) => {
+    await fetch(`/api/driver-hours/${id}`, { method: 'DELETE' });
+    setHistory(prev => prev.filter(r => r.id !== id));
     toast({ title: 'Record Deleted' });
   };
 

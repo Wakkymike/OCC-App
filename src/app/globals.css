@@ -3,7 +3,11 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  /* ============================
+     Theme: Light (default)
+     ============================ */
+  :root,
+  [data-theme='light'] {
     --background: 0 0% 94%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -38,7 +42,50 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
-  .dark {
+
+  /* ============================
+     Theme: Medium
+     ============================ */
+  [data-theme='medium'] {
+    --background: 220 15% 80%;
+    --foreground: 220 20% 12%;
+    --card: 220 14% 88%;
+    --card-foreground: 220 20% 12%;
+    --popover: 220 14% 88%;
+    --popover-foreground: 220 20% 12%;
+    --primary: 207 65% 45%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 220 12% 75%;
+    --secondary-foreground: 220 20% 12%;
+    --muted: 220 12% 75%;
+    --muted-foreground: 220 10% 38%;
+    --accent: 28 75% 48%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 14% 70%;
+    --input: 220 14% 70%;
+    --ring: 207 65% 45%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+    --sidebar-background: 220 14% 84%;
+    --sidebar-foreground: 220 20% 15%;
+    --sidebar-primary: 207 65% 45%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 220 12% 78%;
+    --sidebar-accent-foreground: 220 20% 12%;
+    --sidebar-border: 220 14% 70%;
+    --sidebar-ring: 207 65% 45%;
+  }
+
+  /* ============================
+     Theme: Dark
+     ============================ */
+  [data-theme='dark'] {
     --background: 222 47% 11%;
     --foreground: 210 40% 98%;
     --card: 222 47% 13%;
@@ -63,6 +110,7 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+    --radius: 0.5rem;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -71,6 +119,121 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  /* ============================
+     Theme: High Contrast
+     (WCAG AAA — strong borders,
+      pure B&W, vivid focus indicators)
+     ============================ */
+  [data-theme='high-contrast'] {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 220 90% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 0%;
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 25%;
+    --accent: 30 100% 40%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 100% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 0%;
+    --input: 0 0% 0%;
+    --ring: 220 90% 40%;
+    --chart-1: 0 100% 40%;
+    --chart-2: 120 100% 25%;
+    --chart-3: 220 100% 40%;
+    --chart-4: 45 100% 40%;
+    --chart-5: 280 100% 40%;
+    --radius: 0.25rem;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 0%;
+    --sidebar-primary: 220 90% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 92%;
+    --sidebar-accent-foreground: 0 0% 0%;
+    --sidebar-border: 0 0% 0%;
+    --sidebar-ring: 220 90% 40%;
+  }
+
+  [data-theme='high-contrast'] * {
+    border-width: 2px !important;
+    font-weight: 600;
+  }
+
+  [data-theme='high-contrast'] a,
+  [data-theme='high-contrast'] button {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  [data-theme='high-contrast'] *:focus-visible {
+    outline: 3px solid hsl(220 90% 40%) !important;
+    outline-offset: 2px !important;
+  }
+
+  /* ============================
+     Theme: Calm (reduced motion,
+      muted palette, larger text,
+      for cognitive & vestibular needs)
+     ============================ */
+  [data-theme='calm'] {
+    --background: 40 20% 95%;
+    --foreground: 220 15% 20%;
+    --card: 40 18% 98%;
+    --card-foreground: 220 15% 20%;
+    --popover: 40 18% 98%;
+    --popover-foreground: 220 15% 20%;
+    --primary: 210 40% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 15% 90%;
+    --secondary-foreground: 220 15% 20%;
+    --muted: 40 15% 90%;
+    --muted-foreground: 220 10% 40%;
+    --accent: 35 50% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 55% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 15% 82%;
+    --input: 40 15% 82%;
+    --ring: 210 40% 45%;
+    --chart-1: 0 55% 48%;
+    --chart-2: 150 40% 40%;
+    --chart-3: 210 40% 45%;
+    --chart-4: 45 50% 50%;
+    --chart-5: 280 35% 50%;
+    --radius: 0.75rem;
+    --sidebar-background: 40 18% 96%;
+    --sidebar-foreground: 220 15% 20%;
+    --sidebar-primary: 210 40% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 40 15% 90%;
+    --sidebar-accent-foreground: 220 15% 20%;
+    --sidebar-border: 40 15% 82%;
+    --sidebar-ring: 210 40% 45%;
+  }
+
+  /* Disable ALL animations & transitions in Calm theme */
+  [data-theme='calm'] *,
+  [data-theme='calm'] *::before,
+  [data-theme='calm'] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Slightly larger base text in Calm theme */
+  [data-theme='calm'] body {
+    font-size: 1.05rem;
+    line-height: 1.7;
+    letter-spacing: 0.01em;
   }
 }
 
@@ -110,7 +273,6 @@
   display:flex;
   flex-direction:column;
   align-items:center;
-  font-size:12px;
   text-align:center;
   pointer-events:none;
 }
@@ -125,26 +287,95 @@
   white-space: nowrap;
   font-weight: 600;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  font-size: clamp(10px, calc(var(--bus-size, 32px) * 0.38), 20px);
 }
 
-.bus-marker svg {
-  transform-origin:center center;
-  transition: transform 0.2s linear;
+/* Bus image container — scales dynamically via --bus-size CSS var set on :root by zoom handler */
+.bus-img-container {
+  position: relative;
+  width: var(--bus-size, 32px);
+  height: var(--bus-size, 32px);
+  transition: width 0.15s linear, height 0.15s linear;
+  flex-shrink: 0;
 }
 
-.bus-marker svg .stripe {
-  animation: stripeMove 0.5s linear infinite;
+.bus-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: filter 0.2s ease;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
 }
 
-@keyframes stripeMove {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-4px); }
+/* --- LED Destination Display Overlay --- */
+/* Positioned exactly over the dark display band in bus.png */
+.bus-led {
+  position: absolute;
+  top: 24%;
+  left: 26%;
+  width: 48%;
+  height: 8%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  opacity: var(--bus-led-opacity, 0);
+  transition: opacity 0.3s ease;
+  border-radius: 1px;
+}
+
+.bus-led-text {
+  display: inline-block;
+  white-space: nowrap;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 900;
+  color: #33ff33;
+  text-shadow:
+    0 0 1px #33ff33,
+    0 0 3px rgba(51, 255, 51, 0.6),
+    0 0 6px rgba(51, 255, 51, 0.25);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: calc(var(--bus-size, 32px) * 0.056);
+  line-height: 1;
+  /* Classic marquee: padding-left pushes text to start off right edge,
+     translateX(-100%) scrolls it fully off the left */
+  padding-left: 100%;
+  animation: led-scroll 8s linear infinite;
+  animation-play-state: var(--bus-led-play, paused);
+}
+
+@keyframes led-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
 }
 
 .mapboxgl-ctrl-bottom-left, .mapboxgl-ctrl-bottom-right {
     bottom: 0;
     position: absolute;
 }
+
+/* ---- Mapbox Popup Dark-Mode Support ---- */
+.mapboxgl-popup-content {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.5rem !important;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2), 0 4px 6px -2px rgba(0,0,0,0.1) !important;
+}
+.mapboxgl-popup-close-button {
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 18px;
+}
+.mapboxgl-popup-close-button:hover {
+  color: hsl(var(--foreground)) !important;
+  background: hsl(var(--accent)) !important;
+  border-radius: 0 0.5rem 0 0.25rem;
+}
+.mapboxgl-popup-anchor-top .mapboxgl-popup-tip { border-bottom-color: hsl(var(--card)) !important; }
+.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip { border-top-color: hsl(var(--card)) !important; }
+.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: hsl(var(--card)) !important; }
+.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: hsl(var(--card)) !important; }
 
 /* Bus Stop Flag Popup Styles */
 .bus-stop-popup .mapboxgl-popup-content {
@@ -191,4 +422,13 @@
 
 .animate-bounce-zoom {
   animation: bounce-zoom 2s infinite;
+}
+
+@keyframes chat-flash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); transform: scale(1.1); }
+}
+
+.chat-flash-ring {
+  animation: chat-flash 0.6s ease-in-out 3;
 }

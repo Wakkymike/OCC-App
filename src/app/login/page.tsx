@@ -2,8 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -23,41 +22,30 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const auth = useAuth();
+  const { login } = useAuth();
   const { toast } = useToast();
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    signInWithEmailAndPassword(auth, email, password)
-      .then(() => {
-        toast({
-          title: 'Login Successful',
-          description: 'Welcome back!',
-        });
-        // Redirect is handled by ClientLayout
-      })
-      .catch((error: any) => {
-        console.error('Login error:', error);
-        let message = 'An unknown error occurred.';
-        
-        // Handle common Firebase Auth errors gracefully
-        if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-          message = 'Invalid email or password. Please check your credentials and try again.';
-        } else if (error.code === 'auth/too-many-requests') {
-          message = 'Too many failed login attempts. Please try again later.';
-        } else if (error.message) {
-          message = error.message;
-        }
-
-        toast({
-          variant: 'destructive',
-          title: 'Login Failed',
-          description: message,
-        });
-        setIsLoading(false);
+    try {
+      await login(email, password);
+      toast({
+        title: 'Login Successful',
+        description: 'Welcome back!',
       });
+      // Redirect is handled by ClientLayout
+    } catch (error: any) {
+      console.error('Login error:', error);
+      const message = error?.message || 'Invalid email or password. Please check your credentials and try again.';
+      toast({
+        variant: 'destructive',
+        title: 'Login Failed',
+        description: message,
+      });
+      setIsLoading(false);
+    }
   };
 
   return (

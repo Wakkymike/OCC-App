@@ -1,5 +1,5 @@
 
-import { Timestamp } from 'firebase/firestore';
+// Timestamps are ISO 8601 date strings from the SQLite/REST API layer
 
 export interface LatLng {
   lat: number;
@@ -18,6 +18,14 @@ export interface Bus {
   delay?: number; 
   status: string; 
   operator: 'GNW' | 'MET' | 'VB' | 'SC' | 'FB' | 'DB';
+  /** Name of the previous / current stop from MonitoredCall (SIRI-VM) */
+  lastStop?: string;
+  /** Name of the next upcoming stop from the first OnwardCall */
+  nextStop?: string;
+  /** Expected arrival time at the next stop (ISO string) */
+  nextStopExpectedArrival?: string;
+  /** The origin / departure stop name */
+  origin?: string;
 }
 
 export interface BusStop {
@@ -68,7 +76,7 @@ export interface NetworkUpdate {
   details: string;
   priority: number;
   isVisible: boolean;
-  createdAt: Timestamp;
+  createdAt: string;
 }
 
 export interface Hazard {
@@ -80,15 +88,15 @@ export interface Hazard {
 }
 
 export interface MonitoredHazard {
-  id: string; // Firestore Document ID
-  hazardId: string; // The original hazard ID from OSM or 'manual'
+  id: string;
+  hazardId: string;
   type: 'height' | 'width' | 'both' | 'manual';
   value: string;
   location: LatLng;
   geofenceCenter?: LatLng;
   description: string;
   radius: number;
-  createdAt: Timestamp;
+  createdAt: string;
 }
 
 export interface ActiveAlert {
@@ -101,9 +109,9 @@ export interface ActiveAlert {
   hazardValue: string;
   hazardDescription: string;
   isAcknowledged: boolean;
-  timestamp: Timestamp;
+  timestamp: string;
   acknowledgedBy?: string;
-  acknowledgedAt?: Timestamp;
+  acknowledgedAt?: string;
   historyDocId?: string;
 }
 
@@ -116,8 +124,8 @@ export interface AlertHistory {
   monitorId: string;
   hazardValue: string;
   hazardDescription: string;
-  timestamp: Timestamp;
-  acknowledgedAt?: Timestamp;
+  timestamp: string;
+  acknowledgedAt?: string;
   acknowledgedBy?: string;
 }
 
@@ -141,5 +149,5 @@ export interface CallLog {
   isIRRelated: boolean;
   isTSIRelated: boolean;
   isDriverReportRelated: boolean;
-  createdAt: Timestamp;
+  createdAt: string;
 }

@@ -2,9 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth, setDocumentNonBlocking } from '@/firebase';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, getFirestore } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -26,12 +24,11 @@ export default function SignUpPage() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const auth = useAuth();
-  const db = getFirestore();
+  const { register } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6) {
       toast({
@@ -44,54 +41,23 @@ export default function SignUpPage() {
     
     setIsLoading(true);
     
-    createUserWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        const user = userCredential.user;
-
-        // Perform side-effects after creation
-        updateProfile(user, { displayName });
-
-        const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
-
-        const userProfile = {
-          uid: user.uid,
-          email: user.email,
-          displayName: displayName,
-          isAdmin: isSuperAdmin,
-          isContentCreator: false,
-          isActive: isSuperAdmin,
-          passwordChangeRequired: false,
-          forceSignOut: false,
-        };
-        
-        const userProfileRef = doc(db, 'userProfiles', user.uid);
-        setDocumentNonBlocking(userProfileRef, userProfile, { merge: false });
-
-        toast({
-          title: 'Account Created',
-          description: 'Your account is now pending activation by an administrator.',
-        });
-      })
-      .catch((error: any) => {
-        console.error('Sign up error:', error);
-        let message = 'An unknown error occurred.';
-        if (error.code === 'auth/email-already-in-use') {
-          message = 'This email is already registered. Please login instead.';
-        } else if (error.code === 'auth/invalid-email') {
-          message = 'The email address is not valid.';
-        } else if (error.code === 'auth/weak-password') {
-          message = 'The password is too weak.';
-        } else if (error.message) {
-          message = error.message;
-        }
-
-        toast({
-          variant: 'destructive',
-          title: 'Sign Up Failed',
-          description: message,
-        });
-        setIsLoading(false);
+    try {
+      await register(email, password, displayName);
+      toast({
+        title: 'Account Created',
+        description: 'Your account is now pending activation by an administrator.',
       });
+      // After registration the user is logged in but inactive — ClientLayout will redirect to /pending-activation
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      const message = error?.message || 'An unknown error occurred.';
+      toast({
+        variant: 'destructive',
+        title: 'Sign Up Failed',
+        description: message,
+      });
+      setIsLoading(false);
+    }
   };
 
   return (

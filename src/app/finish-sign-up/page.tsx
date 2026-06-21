@@ -1,14 +1,6 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useAuth, setDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import {
-  isSignInWithEmailLink,
-  signInWithEmailLink,
-  updatePassword,
-  updateProfile,
-} from 'firebase/auth';
-import { doc, getFirestore, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -35,8 +27,6 @@ function FinishSignUpComponent() {
   const [isLoading, setIsLoading] = useState(false);
   const [invitationId, setInvitationId] = useState<string | null>(null);
   
-  const auth = useAuth();
-  const db = getFirestore();
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -51,28 +41,24 @@ function FinishSignUpComponent() {
       }
       setInvitationId(invId);
 
-      const inviteRef = doc(db, 'invitations', invId);
-      const inviteSnap = await getDoc(inviteRef);
-
-      if (!inviteSnap.exists()) {
-        setErrorMessage('This invitation is invalid, has expired, or has been cancelled.');
+      try {
+        const res = await fetch(`/api/invitations/${invId}`);
+        if (!res.ok) {
+          setErrorMessage('This invitation is invalid, has expired, or has been cancelled.');
+          setStatus('error');
+          return;
+        }
+        const data = await res.json();
+        setEmail(data.invitation.email);
+        setStatus('form');
+      } catch {
+        setErrorMessage('Failed to verify invitation. Please try again.');
         setStatus('error');
-        return;
       }
-      const inviteEmail = inviteSnap.data().email;
-
-      if (!isSignInWithEmailLink(auth, window.location.href)) {
-        setErrorMessage('This is not a valid sign-up link. Please request a new invitation.');
-        setStatus('error');
-        return;
-      }
-      
-      setEmail(inviteEmail);
-      setStatus('form');
     };
 
     verifyInvitation();
-  }, [auth, searchParams, db]);
+  }, [searchParams]);
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,36 +71,27 @@ function FinishSignUpComponent() {
       return;
     }
     if (!invitationId) {
-        toast({ variant: 'destructive', title: 'Sign Up Failed', description: 'Missing invitation information.' });
-        return;
+      toast({ variant: 'destructive', title: 'Sign Up Failed', description: 'Missing invitation information.' });
+      return;
     }
     
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailLink(auth, email, window.location.href);
-      const user = userCredential.user;
+      const res = await fetch('/api/auth/finish-sign-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invitationId,
+          email,
+          password,
+          displayName,
+        }),
+      });
 
-      await updatePassword(user, password);
-      await updateProfile(user, { displayName });
-
-      const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
-
-      const userProfile = {
-        uid: user.uid,
-        email: user.email,
-        displayName: displayName,
-        isAdmin: isSuperAdmin,
-        isContentCreator: false,
-        isActive: isSuperAdmin,
-        passwordChangeRequired: false,
-        forceSignOut: false,
-      };
-      
-      const userProfileRef = doc(db, 'userProfiles', user.uid);
-      setDocumentNonBlocking(userProfileRef, userProfile, { merge: false });
-      
-      const inviteRef = doc(db, 'invitations', invitationId);
-      deleteDocumentNonBlocking(inviteRef);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Sign up failed');
+      }
 
       toast({
         title: 'Account Created',
@@ -122,17 +99,12 @@ function FinishSignUpComponent() {
       });
 
       router.replace('/pending-activation');
-
     } catch (error: any) {
       console.error('Finish sign up error:', error);
-      let description = error.message;
-      if (error.code === 'auth/invalid-action-code') {
-        description = "The invitation link is invalid or has expired. Please request a new one."
-      }
       toast({
         variant: 'destructive',
         title: 'Sign Up Failed',
-        description: description,
+        description: error.message || 'An unexpected error occurred.',
       });
       setIsLoading(false);
     }

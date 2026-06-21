@@ -39,6 +39,10 @@ next-env.d.ts
 
 .genkit/*
 .env*
+!.env.example
+
+# SQLite database
+/data/
 
 # firebase
 firebase-debug.log

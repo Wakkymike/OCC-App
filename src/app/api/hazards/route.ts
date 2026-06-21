@@ -1,13 +1,42 @@
 
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 import type { Hazard } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-// Persistent in-memory cache for the server process
+// Persistent disk + memory cache
+const CACHE_DIR = path.join(process.cwd(), 'data');
+const CACHE_FILE = path.join(CACHE_DIR, 'hazards-cache.json');
+const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
+
 let cachedHazards: Hazard[] | null = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 1000 * 60 * 60; // 1 hour caching
+
+function loadDiskCache(): boolean {
+  try {
+    if (!fs.existsSync(CACHE_FILE)) return false;
+    const stat = fs.statSync(CACHE_FILE);
+    if (Date.now() - stat.mtimeMs > CACHE_DURATION) return false;
+    const data = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf-8'));
+    if (Array.isArray(data) && data.length > 0) {
+      cachedHazards = data;
+      lastFetchTime = stat.mtimeMs;
+      return true;
+    }
+  } catch { /* ignore */ }
+  return false;
+}
+
+function saveDiskCache(hazards: Hazard[]) {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(hazards));
+  } catch (e) {
+    console.warn('Failed to write hazards cache:', e);
+  }
+}
 
 /**
  * Converts metric meters to UK standard feet and inches.
@@ -45,6 +74,11 @@ export async function GET() {
   // Return cached data if available and fresh (less than 1 hour old)
   if (cachedHazards && (now - lastFetchTime < CACHE_DURATION)) {
     return NextResponse.json({ hazards: cachedHazards, source: 'cache' });
+  }
+
+  // Disk cache (survives restarts)
+  if (loadDiskCache()) {
+    return NextResponse.json({ hazards: cachedHazards, source: 'disk-cache' });
   }
 
   // Bounding box for Greater Manchester area
@@ -132,6 +166,7 @@ export async function GET() {
     // Update the cache on successful fetch
     cachedHazards = hazards;
     lastFetchTime = now;
+    saveDiskCache(hazards);
 
     return NextResponse.json({ hazards, source: 'live' });
   } catch (error: any) {

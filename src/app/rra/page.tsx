@@ -1,7 +1,9 @@
 'use client';
 
-import { useCollection, useFirestore, useMemoFirebase, useUser, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, orderBy, limit } from 'firebase/firestore';
+import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '@/contexts/auth-context';
+import { useSocket } from '@/contexts/socket-context';
+import { SOCKET_EVENTS } from '@/lib/socket/events';
 import type { ActiveAlert, AlertHistory } from '@/lib/types';
 import { AlertTriangle, ShieldAlert, CheckCircle2, Home, History, Bus as BusIcon, Clock, MapPin, ListFilter, CheckCircle } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -10,21 +12,63 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useMemo } from 'react';
 
 export default function RRAListPage() {
-  const firestore = useFirestore();
-  const { user } = useUser();
+  const { user } = useAuth();
+  const { on, off } = useSocket();
   
-  const alertsRef = useMemoFirebase(() => user ? collection(firestore, 'activeAlerts') : null, [firestore, user]);
-  const { data: allAlerts, isLoading: isAlertsLoading } = useCollection<ActiveAlert>(alertsRef);
+  const [allAlerts, setAllAlerts] = useState<ActiveAlert[]>([]);
+  const [isAlertsLoading, setIsAlertsLoading] = useState(true);
+  const [history, setHistory] = useState<AlertHistory[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+
+  const fetchAlerts = async () => {
+    try {
+      const res = await fetch('/api/active-alerts');
+      if (res.ok) {
+        const data = await res.json();
+        setAllAlerts(data.alerts);
+      }
+    } catch (e) { console.error('Failed to fetch alerts', e); }
+    finally { setIsAlertsLoading(false); }
+  };
+
+  const fetchHistory = async () => {
+    try {
+      const res = await fetch('/api/alert-history');
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data.history);
+      }
+    } catch (e) { console.error('Failed to fetch history', e); }
+    finally { setIsHistoryLoading(false); }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchAlerts();
+      fetchHistory();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const handleAlertChange = () => { fetchAlerts(); fetchHistory(); };
+    on(SOCKET_EVENTS.ALERT_CREATED, handleAlertChange);
+    on(SOCKET_EVENTS.ALERT_ACKNOWLEDGED, handleAlertChange);
+    on(SOCKET_EVENTS.ALERT_DELETED, handleAlertChange);
+    return () => {
+      off(SOCKET_EVENTS.ALERT_CREATED, handleAlertChange);
+      off(SOCKET_EVENTS.ALERT_ACKNOWLEDGED, handleAlertChange);
+      off(SOCKET_EVENTS.ALERT_DELETED, handleAlertChange);
+    };
+  }, [on, off]);
 
   // Sort alerts: unacknowledged first, then by timestamp
   const alerts = useMemo(() => {
     if (!allAlerts) return null;
-    return [...allAlerts].sort((a, b) => {
-        const timeA = a.timestamp?.seconds || 0;
-        const timeB = b.timestamp?.seconds || 0;
+    return [...allAlerts].sort((a: any, b: any) => {
+        const timeA = new Date(a.timestamp).getTime() || 0;
+        const timeB = new Date(b.timestamp).getTime() || 0;
         if (a.isAcknowledged === b.isAcknowledged) {
             return timeB - timeA;
         }
@@ -32,24 +76,18 @@ export default function RRAListPage() {
     });
   }, [allAlerts]);
 
-  const historyRef = useMemoFirebase(() => {
-    if (!user) return null;
-    return query(collection(firestore, 'alertHistory'), orderBy('timestamp', 'desc'), limit(50));
-  }, [firestore, user]);
-  const { data: history, isLoading: isHistoryLoading } = useCollection<AlertHistory>(historyRef);
-
-  const handleClearAlert = (alertId: string) => {
-    deleteDocumentNonBlocking(doc(firestore, 'activeAlerts', alertId));
+  const handleClearAlert = async (alertId: string) => {
+    await fetch(`/api/active-alerts/${alertId}`, { method: 'DELETE' });
   };
 
   const formatTimestamp = (ts: any) => {
-    if (!ts || !ts.toDate) return '--:--';
-    return ts.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (!ts) return '--:--';
+    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
   const formatDate = (ts: any) => {
-    if (!ts || !ts.toDate) return '--/--/--';
-    return ts.toDate().toLocaleDateString();
+    if (!ts) return '--/--/--';
+    return new Date(ts).toLocaleDateString();
   };
 
   return (

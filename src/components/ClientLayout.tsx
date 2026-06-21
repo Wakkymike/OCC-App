@@ -1,11 +1,9 @@
 'use client';
 
-import { useUser, updateDocumentNonBlocking } from '@/firebase';
+import { useAuth } from '@/contexts/auth-context';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import { doc, getDoc, getFirestore } from 'firebase/firestore';
-import { getAuth, signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 
 const PUBLIC_PAGES = ['/login', '/sign-up', '/pending-activation', '/finish-sign-up'];
@@ -13,15 +11,13 @@ const ADMIN_PAGES = ['/admin'];
 const FORCE_PASSWORD_CHANGE_PAGE = '/force-password-change';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  const { user, isUserLoading } = useUser();
+  const { user, isLoading, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isUserLoading) {
-      return;
-    }
+    if (isLoading) return;
 
     const isPublicPage = PUBLIC_PAGES.includes(pathname);
     const isAdminPage = ADMIN_PAGES.includes(pathname);
@@ -29,80 +25,65 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const isPasswordChangePage = pathname === FORCE_PASSWORD_CHANGE_PAGE;
 
     if (user) {
-      const db = getFirestore();
-      const userProfileRef = doc(db, 'userProfiles', user.uid);
-      
-      getDoc(userProfileRef).then(userProfileSnap => {
-        const isSuperAdmin = user.email === 'michael.dodsworth@gonorthwest.co.uk';
+      const isSuperAdmin = user.isSuperAdmin;
 
-        if (!userProfileSnap.exists()) {
-          if (!isPublicPage) {
-            signOut(getAuth());
-          }
-          return;
-        }
-        
-        const userProfile = userProfileSnap.data() || {};
+      if (user.forceSignOut) {
+        // Update the flag via API then log out
+        fetch(`/api/users/${user.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ forceSignOut: false }),
+        }).finally(() => {
+          logout();
+          toast({
+            title: 'Signed Out',
+            description: 'You have been signed out by an administrator.',
+          });
+        });
+        return;
+      }
 
-        if (userProfile.forceSignOut) {
-            updateDocumentNonBlocking(userProfileRef, { forceSignOut: false });
-            signOut(getAuth());
-            toast({
-                title: "Signed Out",
-                description: "You have been signed out by an administrator."
-            });
-            return;
+      if (!user.isActive && !isSuperAdmin) {
+        if (!isPendingPage) {
+          router.replace('/pending-activation');
         }
+        return;
+      }
 
-        if (!userProfile.isActive && !isSuperAdmin) {
-          if (!isPendingPage) {
-            router.replace('/pending-activation');
-          }
-          return;
-        }
+      if (user.passwordChangeRequired && !isPasswordChangePage) {
+        router.replace(FORCE_PASSWORD_CHANGE_PAGE);
+        return;
+      }
 
-        if (userProfile.passwordChangeRequired && !isPasswordChangePage) {
-            router.replace(FORCE_PASSWORD_CHANGE_PAGE);
-            return;
-        }
+      if (!user.passwordChangeRequired && isPasswordChangePage) {
+        router.replace('/');
+        return;
+      }
 
-        if (!userProfile.passwordChangeRequired && isPasswordChangePage) {
-            router.replace('/');
-            return;
-        }
-        
-        if (isPendingPage && (userProfile.isActive || isSuperAdmin)) {
+      if (isPendingPage && (user.isActive || isSuperAdmin)) {
+        router.replace('/');
+        return;
+      }
+
+      if (isAdminPage) {
+        if (!isSuperAdmin && !user.isAdmin && !user.isContentCreator) {
           router.replace('/');
-          return;
         }
+        return;
+      }
 
-        if (isAdminPage) {
-          const isDbAdmin = userProfile.isAdmin === true;
-          const isContentCreator = userProfile.isContentCreator === true;
-
-          if (!isSuperAdmin && !isDbAdmin && !isContentCreator) {
-            router.replace('/');
-          }
-          return;
-        }
-
-        if (isPublicPage && !isPendingPage) {
-            router.replace('/');
-            return;
-        }
-
-      }).catch((err) => {
-          console.error("Layout auth check failed", err);
-          signOut(getAuth());
-      });
+      if (isPublicPage && !isPendingPage) {
+        router.replace('/');
+        return;
+      }
     } else {
       if (!isPublicPage) {
         router.replace('/login');
       }
     }
-  }, [user, isUserLoading, pathname, router, toast]);
+  }, [user, isLoading, pathname, router, toast, logout]);
 
-  if (isUserLoading && !PUBLIC_PAGES.includes(pathname)) {
+  if (isLoading && !PUBLIC_PAGES.includes(pathname)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -113,7 +94,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   if (!user && !PUBLIC_PAGES.includes(pathname)) {
     return null;
   }
-  
+
   if (user && (pathname === '/login' || pathname === '/sign-up')) {
     return null;
   }

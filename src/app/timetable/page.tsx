@@ -180,7 +180,7 @@ export default function LiveServicePage() {
                           <TableRow>
                             <TableHead>Fleet No.</TableHead>
                             <TableHead>Running Board</TableHead>
-                            <TableHead>Journey No.</TableHead>
+                            <TableHead className="w-20">Journey No.</TableHead>
                             <TableHead>Last Stop</TableHead>
                             <TableHead>Destination</TableHead>
                             <TableHead>Direction</TableHead>
@@ -217,10 +217,10 @@ export default function LiveServicePage() {
                                       <TableCell className={isFirst || isLast ? 'blinking-rb text-white font-bold text-center' : ''}>
                                         {bus.journeyRef || '--'}
                                       </TableCell>
-                                      <TableCell className="text-[10px] max-w-[150px]">
+                                      <TableCell className="text-[10px] max-w-[200px]">
                                         <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
                                             <MapPin className="h-3 w-3 shrink-0" />
-                                            <span className="truncate" title={lastStop}>{lastStop}</span>
+                                            <span title={lastStop}>{lastStop}</span>
                                         </div>
                                       </TableCell>
                                       <TableCell className="font-medium">

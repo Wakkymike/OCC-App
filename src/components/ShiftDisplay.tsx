@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useUser, useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useAuth } from '@/contexts/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -73,8 +72,7 @@ interface Shift {
 }
 
 export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
-  const { user } = useUser();
-  const firestore = useFirestore();
+  const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   
   const [icalUrl, setIcalUrl] = useState(userProfile?.icalUrl || '');
@@ -126,13 +124,21 @@ export default function ShiftDisplay({ userProfile }: { userProfile: any }) {
     }
   }, [isLoading, shifts, hasScrolledToToday]);
 
-  const handleSaveUrl = () => {
+  const handleSaveUrl = async () => {
     if (!user) return;
     setIsUpdating(true);
-    const userDocRef = doc(firestore, 'userProfiles', user.uid);
-    updateDocumentNonBlocking(userDocRef, { icalUrl });
-    toast({ title: 'Rota Link Updated' });
-    fetchShifts(icalUrl);
+    try {
+      await fetch(`/api/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ icalUrl }),
+      });
+      toast({ title: 'Rota Link Updated' });
+      fetchShifts(icalUrl);
+      await refreshUser();
+    } catch {
+      toast({ title: 'Failed to update rota link', variant: 'destructive' });
+    }
     setIsUpdating(false);
     setShowSettings(false);
   };

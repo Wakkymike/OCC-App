@@ -9,19 +9,19 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getAuth, signOut } from 'firebase/auth';
+import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 
 export default function PendingActivationPage() {
   const router = useRouter();
+  const { logout } = useAuth();
 
   const handleSignOut = async () => {
     try {
-      await signOut(getAuth());
+      await logout();
       router.replace('/login');
     } catch (error) {
       console.error('Error signing out:', error);
-      // Even if sign-out fails, redirect to login
       router.replace('/login');
     }
   };
