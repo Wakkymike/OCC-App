@@ -113,6 +113,40 @@ data/
   occ.db               # SQLite database (created automatically on first run)
 ```
 
+## UI Layout Standard (TfGM Style)
+
+All new pages should use the full-width OCC shell style rather than centered max-width wrappers.
+
+Use the shared page scaffold:
+
+`src/components/layout/PageShell.tsx`
+
+Example:
+
+```tsx
+import PageShell from '@/components/layout/PageShell';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+
+export default function ExamplePage() {
+  return (
+    <PageShell
+      title="Example Dashboard"
+      description="TfGM-style full-width operational page"
+      actions={<Button asChild variant="outline"><Link href="/">Home</Link></Button>}
+    >
+      <section className="occ-panel p-4">Page content</section>
+    </PageShell>
+  );
+}
+```
+
+Styling guidance:
+
+- Prefer `occ-panel` for card/group containers.
+- Keep page-level wrappers full width using `min-h-full w-full`.
+- Use `font-headline` for major page titles.
+
 ## Environment Variables Reference
 
 | Variable | Required | Description |

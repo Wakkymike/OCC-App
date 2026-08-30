@@ -10,8 +10,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
+        body: ['Public Sans', 'Segoe UI', 'sans-serif'],
+        headline: ['Barlow Condensed', 'Public Sans', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {

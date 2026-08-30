@@ -61,8 +61,8 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <Card className="w-full max-w-sm">
+    <div className="flex min-h-full w-full items-center justify-center bg-transparent px-4 py-8">
+      <Card className="occ-panel w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-2xl">Sign Up</CardTitle>
           <CardDescription>

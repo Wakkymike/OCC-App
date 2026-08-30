@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import PageShell from '@/components/layout/PageShell';
 
 // Custom Steering Wheel Icon
 const SteeringWheelIcon = ({ className }: { className?: string }) => (
@@ -280,17 +281,15 @@ export default function DriversHoursPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-background p-4 sm:p-8">
-      <div className="w-full max-w-6xl space-y-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Clock className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Drivers Hours Tracker</h1>
-          </div>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/"><Home className="mr-2 h-4 w-4" /> Home</Link>
-          </Button>
-        </div>
+    <PageShell
+      title="Drivers Hours Tracker"
+      description="Log driving and break compliance with operator duty limits."
+      actions={
+        <Button asChild variant="outline" size="sm">
+          <Link href="/"><Home className="mr-2 h-4 w-4" /> Home</Link>
+        </Button>
+      }
+    >
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           <Card className="shadow-md border-primary/10">
@@ -649,7 +648,6 @@ export default function DriversHoursPage() {
             )}
           </CardContent>
         </Card>
-      </div>
-    </div>
+    </PageShell>
   );
 }

@@ -112,7 +112,7 @@ function FinishSignUpComponent() {
   
   if (status === 'verifying') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-full w-full items-center justify-center bg-transparent px-4 py-8">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="ml-4 text-muted-foreground">Verifying invitation...</p>
       </div>
@@ -121,8 +121,8 @@ function FinishSignUpComponent() {
 
   if (status === 'error') {
      return (
-        <div className="flex min-h-screen items-center justify-center bg-background">
-            <Card className="w-full max-w-md">
+      <div className="flex min-h-full w-full items-center justify-center bg-transparent px-4 py-8">
+        <Card className="occ-panel w-full max-w-md">
                 <CardHeader>
                     <CardTitle className="text-2xl text-destructive">Invitation Error</CardTitle>
                     <CardDescription>{errorMessage}</CardDescription>
@@ -138,8 +138,8 @@ function FinishSignUpComponent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <Card className="w-full max-w-sm">
+    <div className="flex min-h-full w-full items-center justify-center bg-transparent px-4 py-8">
+      <Card className="occ-panel w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-2xl">Complete Your Account</CardTitle>
           <CardDescription>

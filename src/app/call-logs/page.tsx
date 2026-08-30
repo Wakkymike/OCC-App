@@ -23,6 +23,7 @@ import { subDays, format } from 'date-fns';
 import type { CallLog } from '@/lib/types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import PageShell from '@/components/layout/PageShell';
 
 type SearchCategory = 'employeeNumber' | 'fleetNumber' | 'runningBoard';
 
@@ -291,34 +292,26 @@ export default function CallLogsPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-background p-4 sm:p-8">
-      <div className="w-full max-w-6xl space-y-8">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="p-2 border-primary/20 bg-primary/5">
-              <Clock className="h-6 w-6 text-primary" />
-            </Badge>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">OCC Call Logs</h1>
-              <p className="text-muted-foreground text-sm font-medium italic">Personal operational log tracker.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {!showForm && (
-              <Button onClick={handleStartNewEntry} className="font-bold">
-                <Plus className="mr-2 h-4 w-4" /> Start New Entry
-              </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isExporting || !filteredLogs.length}>
-              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-              {isExporting ? 'Downloading...' : 'Download Shift Report (PDF)'}
+    <PageShell
+      title="OCC Call Logs"
+      description="Personal operational log tracker."
+      actions={
+        <>
+          {!showForm && (
+            <Button onClick={handleStartNewEntry} className="font-bold">
+              <Plus className="mr-2 h-4 w-4" /> Start New Entry
             </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/"><Home className="mr-2 h-4 w-4" /> Home</Link>
-            </Button>
-          </div>
-        </div>
+          )}
+          <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isExporting || !filteredLogs.length}>
+            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+            {isExporting ? 'Downloading...' : 'Download Shift Report (PDF)'}
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/"><Home className="mr-2 h-4 w-4" /> Home</Link>
+          </Button>
+        </>
+      }
+    >
 
         {/* Disclaimer Section */}
         <Card className="border-destructive/30 bg-destructive/5 shadow-none ring-1 ring-destructive/20">
@@ -612,7 +605,6 @@ export default function CallLogsPage() {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </PageShell>
   );
 }

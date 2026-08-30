@@ -27,8 +27,8 @@ export default function PendingActivationPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-full w-full items-center justify-center bg-transparent p-4 py-8">
+      <Card className="occ-panel w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-2xl">Account Pending Activation</CardTitle>
           <CardDescription>

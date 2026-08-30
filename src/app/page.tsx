@@ -79,27 +79,40 @@ export default function HomePage() {
   }, [allUpdates]);
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex min-h-full flex-col bg-transparent">
       <BreakingNewsTicker />
 
       <div className="flex-grow overflow-y-auto">
-        <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-          {/* ---- Logo ---- */}
-          <div className="flex justify-center">
+        <main className="w-full px-4 py-6 sm:px-6 lg:px-8 xl:px-10 space-y-6">
+          <div className="occ-panel flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between">
             <Image
               src={logoImage?.imageUrl || 'https://picsum.photos/seed/occ-logo/400/120'}
               alt="OCC App Logo"
               width={400}
               height={120}
               priority
-              className="h-auto w-auto max-h-20 sm:max-h-28 drop-shadow-sm"
+              className="h-auto w-auto max-h-20 sm:max-h-24 drop-shadow-sm"
               data-ai-hint={logoImage?.imageHint || 'transport logo'}
             />
+            <div className="grid w-full max-w-3xl gap-3 sm:grid-cols-3">
+              <div className="occ-kpi">
+                <p className="occ-kpi-label">Status</p>
+                <p className="occ-kpi-value text-primary">Monitoring</p>
+              </div>
+              <div className="occ-kpi">
+                <p className="occ-kpi-label">Control Area</p>
+                <p className="occ-kpi-value">Greater Manchester</p>
+              </div>
+              <div className="occ-kpi">
+                <p className="occ-kpi-label">Service Feed</p>
+                <p className="occ-kpi-value">Live</p>
+              </div>
+            </div>
           </div>
 
           {/* ---- Shift status strip ---- */}
           {user?.icalUrl && !isLoadingShifts && (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border bg-card p-4 shadow-sm">
+            <div className="occ-panel flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4">
               {/* Current */}
               <div className="flex-1 min-w-0">
                 {currentShift ? (
@@ -157,7 +170,7 @@ export default function HomePage() {
           {/* ---- Live Network Alerts header ---- */}
           <div className="flex items-center gap-2">
             <Rss className="h-5 w-5 text-primary" />
-            <h1 className="text-xl font-bold uppercase tracking-tight text-primary">
+            <h1 className="font-headline text-3xl font-semibold uppercase tracking-wide text-primary">
               Live Network Alerts
             </h1>
           </div>
@@ -178,13 +191,13 @@ export default function HomePage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {updates.map((update) => (
                 <article
                   key={update.id}
-                  className="rounded-xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md"
+                  className="occ-panel border-l-4 border-l-primary p-5 transition-shadow hover:shadow-md"
                 >
-                  <h2 className="font-black text-lg leading-tight mb-2">
+                  <h2 className="font-headline text-2xl font-semibold leading-tight mb-2 text-primary">
                     {update.title}
                   </h2>
                   {update.details && (

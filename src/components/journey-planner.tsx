@@ -56,12 +56,12 @@ export default function JourneyPlanner() {
     };
 
     return (
-        <Card>
+        <Card className="occ-panel w-full">
             <CardHeader>
                 <div className="flex items-center gap-3">
-                    <Route className="h-6 w-6" />
+                    <Route className="h-6 w-6 text-primary" />
                     <div>
-                        <CardTitle className="text-xl">Journey Planner</CardTitle>
+                        <CardTitle className="font-headline text-2xl font-semibold uppercase tracking-wide text-primary">Route Search</CardTitle>
                         <CardDescription>
                           Find the best bus route for your journey across the network.
                         </CardDescription>
@@ -96,7 +96,7 @@ export default function JourneyPlanner() {
                             />
                         </div>
                     </div>
-                    <Button type="submit" disabled={isLoading || !start || !end}>
+                    <Button type="submit" disabled={isLoading || !start || !end} className="font-semibold uppercase tracking-wide">
                         {isLoading ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

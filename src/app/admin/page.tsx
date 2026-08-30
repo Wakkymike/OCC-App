@@ -29,6 +29,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import PageShell from '@/components/layout/PageShell';
 
 interface UserProfile {
   id: string;
@@ -752,13 +753,14 @@ export default function AdminPage() {
   const isFullAdmin = !!user?.isAdmin || isSuperAdmin;
   const isContentCreator = user?.isContentCreator === true;
 
-  return (
-    <main className="flex min-h-screen flex-col items-center bg-background p-8 gap-8">
-       <div className="w-full max-w-4xl space-y-8">
-        <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-foreground">OCC App Admin</h1>
-            <Button asChild variant="outline"><Link href="/"><Home className="mr-2 h-5 w-5" />Home</Link></Button>
-        </div>
+    return (
+        <PageShell
+            title="OCC App Admin"
+            description="Manage users, invitations, network updates, and operations data."
+            actions={
+                <Button asChild variant="outline"><Link href="/"><Home className="mr-2 h-5 w-5" />Home</Link></Button>
+            }
+        >
 
         {isFullAdmin ? (
             <>
@@ -787,7 +789,6 @@ export default function AdminPage() {
               </CardHeader>
             </Card>
         )}
-      </div>
-    </main>
+        </PageShell>
   );
 }

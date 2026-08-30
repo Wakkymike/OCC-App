@@ -25,6 +25,7 @@ import { ArrowLeft, Loader2, Home, MapPin } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import PageShell from '@/components/layout/PageShell';
 
 const schoolJourneyRefs = ['9001', '9002', '9003', '9004', '9005'];
 const nightBusRunningBoards = ['3691', '3692', '3693', '1091', '1092', '1093', '21091', '21092', '21093', '23691', '23692', '23693', '11091', '11092', '11093', '13691', '13692', '13693'];
@@ -119,27 +120,31 @@ export default function LiveServicePage() {
   }
   
   return (
-    <main className="flex min-h-screen flex-col items-center bg-background p-4 sm:p-8">
-      <div className="w-full max-w-5xl">
-        <Card>
+    <PageShell
+      title="Live Service Board"
+      description="Real-time status and approximate locations of Go North West services."
+      actions={
+        <Button asChild variant="outline" size="icon" aria-label="Home">
+          <Link href="/">
+            <Home className="h-5 w-5" />
+          </Link>
+        </Button>
+      }
+    >
+      <Card className="occ-panel">
           <CardHeader>
-             <div className="flex items-start justify-between gap-4">
-              <div>
-                <CardTitle className="text-3xl flex flex-wrap items-center gap-4">
-                  <span>Live Service Board</span>
-                  {gnwBuses.length > 0 && (
-                    <Badge className="bg-chart-2 text-primary-foreground">
-                      {gnwBuses.length} active buses over {sortedServiceNumbers.length} services
-                    </Badge>
-                  )}
-                </CardTitle>
-                <CardDescription>
-                  Real-time status and approximate locations of all Go North West services.
-                </CardDescription>
-              </div>
-              <Link href="/" className={buttonVariants({ variant: 'outline', size: 'icon' })} aria-label="Home">
-                <Home className="h-5 w-5" />
-              </Link>
+             <div>
+              <CardTitle className="text-xl flex flex-wrap items-center gap-4">
+                <span>By Service Number</span>
+                {gnwBuses.length > 0 && (
+                  <Badge className="bg-chart-2 text-primary-foreground">
+                    {gnwBuses.length} active buses over {sortedServiceNumbers.length} services
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Filter by direction and inspect live fleet assignments.
+              </CardDescription>
             </div>
           </CardHeader>
           <CardContent>
@@ -248,8 +253,7 @@ export default function LiveServicePage() {
                 </Link>
              </Button>
           </CardFooter>
-        </Card>
-      </div>
-    </main>
+      </Card>
+    </PageShell>
   );
 }

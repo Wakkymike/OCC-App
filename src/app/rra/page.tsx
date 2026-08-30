@@ -5,13 +5,14 @@ import { useAuth } from '@/contexts/auth-context';
 import { useSocket } from '@/contexts/socket-context';
 import { SOCKET_EVENTS } from '@/lib/socket/events';
 import type { ActiveAlert, AlertHistory } from '@/lib/types';
-import { AlertTriangle, ShieldAlert, CheckCircle2, Home, History, Bus as BusIcon, Clock, MapPin, ListFilter, CheckCircle } from 'lucide-react';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { AlertTriangle, CheckCircle2, Home, History, Bus as BusIcon, Clock, MapPin, ListFilter, CheckCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import PageShell from '@/components/layout/PageShell';
 
 export default function RRAListPage() {
   const { user } = useAuth();
@@ -91,25 +92,20 @@ export default function RRAListPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-background p-4 sm:p-8">
-      <div className="w-full max-w-6xl space-y-8">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <ShieldAlert className="h-8 w-8 text-destructive" />
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">RRA Dashboard</h1>
-              <p className="text-muted-foreground text-sm">Real-time Road Restriction Alerts & History</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              <Home className="mr-2 h-4 w-4" /> Home
-            </Link>
-          </div>
-        </div>
+    <PageShell
+      title="RRA Dashboard"
+      description="Real-time Road Restriction Alerts and history."
+      actions={(
+        <Button asChild variant="outline" size="sm">
+          <Link href="/">
+            <Home className="mr-2 h-4 w-4" /> Home
+          </Link>
+        </Button>
+      )}
+    >
 
         <Tabs defaultValue="active" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+          <TabsList className="grid w-full grid-cols-2 max-w-[420px]">
             <TabsTrigger value="active" className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
               Active Breaches
@@ -126,7 +122,7 @@ export default function RRAListPage() {
           </TabsList>
 
           <TabsContent value="active" className="mt-6">
-            <Card className="border-destructive/20 bg-destructive/5">
+            <Card className="occ-panel border-destructive/20 bg-destructive/5">
               <CardHeader>
                 <CardTitle>Active Breaches</CardTitle>
                 <CardDescription>Live geofence triggers. Acknowledged items remain here until cleared.</CardDescription>
@@ -219,7 +215,7 @@ export default function RRAListPage() {
           </TabsContent>
 
           <TabsContent value="history" className="mt-6">
-            <Card>
+            <Card className="occ-panel">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -289,7 +285,6 @@ export default function RRAListPage() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
-    </main>
+    </PageShell>
   );
 }
